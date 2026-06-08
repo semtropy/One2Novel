@@ -1,0 +1,584 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../app/api";
+
+export interface Novel {
+  id: string;
+  title: string;
+  description?: string;
+  genre?: string;
+  status: string;
+  projectStatus?: string;
+  targetAudience?: string;
+  bookSellingPoint?: string;
+  competingFeel?: string;
+  first30ChapterPromise?: string;
+  commercialTags?: string;
+  narrativePov?: string;
+  pacePreference?: string;
+  styleTone?: string;
+  emotionIntensity?: string;
+  defaultChapterLength?: number;
+  estimatedChapterCount?: number;
+  structuredOutline?: string;
+  draftSeed?: string;
+  outline?: string;
+  worldRules?: string;
+  titleSuggestions?: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface BookFramingResult {
+  targetAudience: string;
+  commercialTags: string[];
+  competingFeel: string;
+  bookSellingPoint: string;
+  first30ChapterPromise: string;
+}
+
+export function useNovels() {
+  return useQuery({
+    queryKey: ["novels"],
+    queryFn: async () => {
+      const { data } = await api.get("/novels");
+      return data.data as Novel[];
+    },
+  });
+}
+
+export function useNovel(id: string | undefined) {
+  return useQuery({
+    queryKey: ["novel", id],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${id}`);
+      return data.data as Novel & { chapters: unknown[]; characters: unknown[] };
+    },
+    enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useCreateNovel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { title: string; genre?: string; description?: string }) => {
+      const { data } = await api.post("/novels", input);
+      return data.data as Novel;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["novels"] }); },
+  });
+}
+
+export function useUpdateNovel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; [key: string]: unknown }) => {
+      const { data } = await api.patch(`/novels/${id}`, body);
+      return data.data as Novel;
+    },
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ["novel", id] });
+      qc.invalidateQueries({ queryKey: ["confirmation-status", id] });
+    },
+  });
+}
+
+export interface StoryOutline {
+  premise: string;
+  mainArc: string;
+  mysteryBox?: string;
+  endingDirection: string;
+  volumes: VolumeOutline[];
+}
+export interface VolumeOutline {
+  sortOrder: number;
+  title: string;
+  summary: string;
+  chapters: ChapterOutline[];
+}
+export interface ChapterOutline {
+  order: number;
+  title: string;
+  summary: string;
+  coreEvent: string;
+  hook: string;
+  characters: string[];
+  conflictLevel: number;
+  revealLevel: number;
+}
+export interface NovelCharacter {
+  id: string;
+  name: string;
+  role: string;
+  personality?: string;
+  background?: string;
+  development?: string;
+  appearance?: string;
+  currentGoal?: string;
+  voiceTexture?: string;
+  identityLabel?: string;
+  factionLabel?: string;
+  prohibitions?: string;
+}
+
+export function useGenerateOutline() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/outline`);
+      return data.data as StoryOutline;
+    },
+    onSuccess: (_, novelId) => {
+      qc.invalidateQueries({ queryKey: ["novel", novelId] });
+    },
+  });
+}
+
+export function useGenerateCharacters() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/characters/generate`);
+      return data.data as { characters: NovelCharacter[]; relationships: Array<{ source: string; target: string; type: string; summary: string }> };
+    },
+    onSuccess: (_, novelId) => {
+      qc.invalidateQueries({ queryKey: ["novel", novelId] });
+      qc.invalidateQueries({ queryKey: ["confirmation-status", novelId] });
+    },
+  });
+}
+
+export function useGenerateFraming() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/framing`);
+      return data.data as BookFramingResult;
+    },
+    onSuccess: (_, novelId) => {
+      qc.invalidateQueries({ queryKey: ["novel", novelId] });
+    },
+  });
+}
+
+// ─── Story Core ─────────────────────────────────────────
+
+export interface StoryCoreResult {
+  premise: string; mainArc: string; mysteryBox: string; endingDirection: string;
+  genre: string | null; narrativePov: string | null; pacePreference: string | null;
+  styleTone: string | null; emotionIntensity: string | null;
+}
+
+export function useGenerateStoryCore() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/story-core`);
+      return data.data as StoryCoreResult;
+    },
+    onSuccess: (_, novelId) => {
+      qc.invalidateQueries({ queryKey: ["novel", novelId] });
+      qc.invalidateQueries({ queryKey: ["confirmation-status", novelId] });
+    },
+  });
+}
+
+// ─── Editorial Info ──────────────────────────────────────
+
+export interface EditorialInfoResult {
+  targetAudience: string; bookSellingPoint: string;
+  competingFeel: string; first30ChapterPromise: string;
+  commercialTags: string[];
+}
+
+export function useGenerateEditorialInfo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/editorial-info`);
+      return data.data as EditorialInfoResult;
+    },
+    onSuccess: (_, novelId) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
+  });
+}
+
+// ─── Quick Start (batch: story core → characters + blueprint + editorial) ──
+
+export interface QuickStartResult {
+  storyCore: StoryCoreResult;
+  characters: { characters: unknown[]; relationships: unknown[] };
+  blueprint: { volumes: unknown[] };
+  editorialInfo: EditorialInfoResult;
+}
+
+export function useQuickStart() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/quick-start`);
+      return data.data as QuickStartResult;
+    },
+    onSuccess: (_, novelId) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
+  });
+}
+
+// ─── Legacy Story Seed (kept for reference, replaced by story-core) ──
+
+export interface StorySeedResult {
+  premise: string; mainArc: string; mysteryBox: string; endingDirection: string;
+  genre: string | null; narrativePov: string | null; pacePreference: string | null;
+  styleTone: string | null; emotionIntensity: string | null;
+  targetAudience: string | null; bookSellingPoint: string | null;
+  competingFeel: string | null; first30ChapterPromise: string | null; commercialTags: string[];
+}
+
+/** @deprecated Use useGenerateStoryCore instead */
+export function useGenerateStorySeed() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/story-core`);
+      return data.data as StorySeedResult;
+    },
+    onSuccess: (_, novelId) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
+  });
+}
+
+// ─── Blueprint ──────────────────────────────────────────
+
+export interface BlueprintResult {
+  volumes: VolumeOutline[];
+}
+
+export function useGenerateBlueprint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/blueprint`);
+      return data.data as BlueprintResult;
+    },
+    onSuccess: (_, novelId) => {
+      qc.invalidateQueries({ queryKey: ["novel", novelId] });
+      qc.invalidateQueries({ queryKey: ["confirmation-status", novelId] });
+    },
+  });
+}
+
+// ─── Confirmation (Phase 17: replaces lock/unlock) ─────
+
+export interface ScopeStatus {
+  confirmed: boolean;
+  dirty: boolean;
+  dirtyCount: number;
+  lastConfirmedAt: string | null;
+}
+export interface ConfirmationStatus {
+  story_seed: ScopeStatus;
+  characters: ScopeStatus;
+  blueprint: ScopeStatus;
+}
+
+export function useConfirmationStatus(novelId: string | undefined) {
+  return useQuery({
+    queryKey: ["confirmation-status", novelId],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/confirmation-status`);
+      return data.data as ConfirmationStatus;
+    },
+    enabled: !!novelId,
+    staleTime: 0,
+  });
+}
+
+const confirmInvalidate = (qc: ReturnType<typeof useQueryClient>, novelId: string) => {
+  qc.invalidateQueries({ queryKey: ["confirmation-status", novelId] });
+  qc.invalidateQueries({ queryKey: ["novel", novelId] });
+};
+
+export function useConfirmAllScopes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ novelId, mode }: { novelId: string; mode: "replace" | "merge" }) => {
+      const { data } = await api.post(`/novels/${novelId}/confirm-all`, { mode });
+      return data.data as { confirmed: string[] };
+    },
+    onSuccess: (_, { novelId }) => confirmInvalidate(qc, novelId),
+  });
+}
+
+export function useConfirmScope() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ novelId, scope }: { novelId: string; scope: string }) => {
+      await api.post(`/novels/${novelId}/${scope}/confirm`);
+    },
+    onSuccess: (_, { novelId }) => confirmInvalidate(qc, novelId),
+  });
+}
+
+export function useUnconfirmScope() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ novelId, scope }: { novelId: string; scope: string }) => {
+      await api.delete(`/novels/${novelId}/${scope}/confirm`);
+    },
+    onSuccess: (_, { novelId }) => confirmInvalidate(qc, novelId),
+  });
+}
+
+// ─── Phase 13: Export / Statistics / Cleanup ───────────
+
+export interface ExportPreview {
+  title: string; genre: string | null;
+  chapterCount: number; totalChars: number; completedChapters: number;
+}
+
+export interface WritingStats {
+  totalChars: number; totalChapters: number; completedChapters: number;
+  draftedChapters: number; avgCharsPerChapter: number; avgQualityScore: number;
+  payoffSetupCount: number; payoffPaidCount: number; payoffCompletionRate: number;
+  totalCharacters: number; estimatedReadingMinutes: number;
+}
+
+export interface DailyOutput { date: string; chars: number; chapters: number; }
+export interface QualityTrend { chapterOrder: number; title: string; totalScore: number; breakdown: Record<string, number>; }
+export interface PayoffStats { total: number; setup: number; hinted: number; pendingPayoff: number; paidOff: number; failed: number; overdue: number; completionRate: number; }
+export interface FormattingIssue { type: string; severity: string; description: string; count: number; }
+export interface CleanupResult { chapterId: string; issuesFixed: string[]; charsBefore: number; charsAfter: number; }
+
+export function useExportPreview(novelId?: string) {
+  return useQuery({
+    queryKey: ["export-preview", novelId],
+    queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/export/preview`); return data.data as ExportPreview; },
+    enabled: !!novelId,
+  });
+}
+
+export function useExportNovel() {
+  return useMutation({
+    mutationFn: async ({ novelId, format }: { novelId: string; format: string }) => {
+      const response = await api.get(`/novels/${novelId}/export`, { params: { format }, responseType: "blob" });
+      return response.data;
+    },
+  });
+}
+
+export function useNovelStatistics(novelId?: string) {
+  return useQuery({
+    queryKey: ["statistics", novelId],
+    queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/statistics`); return data.data as WritingStats; },
+    enabled: !!novelId,
+  });
+}
+
+export function useDailyOutput(novelId?: string, days = 30) {
+  return useQuery({
+    queryKey: ["daily-output", novelId, days],
+    queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/statistics/daily`, { params: { days } }); return data.data as DailyOutput[]; },
+    enabled: !!novelId,
+  });
+}
+
+export function useQualityTrend(novelId?: string) {
+  return useQuery({
+    queryKey: ["quality-trend", novelId],
+    queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/statistics/quality`); return data.data as QualityTrend[]; },
+    enabled: !!novelId,
+  });
+}
+
+export function usePayoffStats(novelId?: string) {
+  return useQuery({
+    queryKey: ["payoff-stats", novelId],
+    queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/statistics/payoffs`); return data.data as PayoffStats; },
+    enabled: !!novelId,
+  });
+}
+
+export function useFormattingIssues(novelId?: string, chapterId?: string) {
+  return useQuery({
+    queryKey: ["format-issues", novelId, chapterId],
+    queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/chapters/${chapterId}/format-issues`); return data.data as FormattingIssue[]; },
+    enabled: !!novelId && !!chapterId,
+  });
+}
+
+export function useCleanupChapter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ novelId, chapterId }: { novelId: string; chapterId: string }) => {
+      const { data } = await api.post(`/novels/${novelId}/chapters/${chapterId}/cleanup`);
+      return data.data as CleanupResult;
+    },
+    onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
+  });
+}
+
+export function useCleanupAllChapters() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/cleanup`);
+      return data.data as CleanupResult[];
+    },
+    onSuccess: (_, novelId) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
+  });
+}
+
+// ─── Phase 11: World Rules ─────────────────────────────
+
+export interface WorldRule {
+  id: string; novelId: string; category: string; title: string;
+  content: string; priority: number; status: string;
+}
+export interface ConflictResult {
+  ruleId: string; title: string;
+  conflicts: Array<{ ruleId: string; title: string; explanation: string }>;
+}
+
+export function useWorldRules(novelId?: string, category?: string) {
+  return useQuery({
+    queryKey: ["world-rules", novelId, category],
+    queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (category) params.category = category;
+      const { data } = await api.get(`/novels/${novelId}/world/rules`, { params });
+      return data.data as WorldRule[];
+    },
+    enabled: !!novelId,
+  });
+}
+
+export function useCreateWorldRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { novelId: string; category: string; title: string; content: string; priority?: number }) => {
+      const { data } = await api.post(`/novels/${input.novelId}/world/rules`, { category: input.category, title: input.title, content: input.content, priority: input.priority });
+      return data.data as WorldRule;
+    },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["world-rules", v.novelId] }); },
+  });
+}
+
+export function useUpdateWorldRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { novelId: string; ruleId: string; title?: string; content?: string; category?: string; priority?: number; status?: string }) => {
+      const { data } = await api.patch(`/novels/${input.novelId}/world/rules/${input.ruleId}`, { title: input.title, content: input.content, category: input.category, priority: input.priority, status: input.status });
+      return data.data as WorldRule;
+    },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["world-rules", v.novelId] }); },
+  });
+}
+
+export function useDeleteWorldRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { novelId: string; ruleId: string }) => {
+      await api.delete(`/novels/${input.novelId}/world/rules/${input.ruleId}`);
+    },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["world-rules", v.novelId] }); },
+  });
+}
+
+export function useGenerateWorldRules() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/world/rules/generate`);
+      return data.data as WorldRule[];
+    },
+    onSuccess: (_, novelId) => { qc.invalidateQueries({ queryKey: ["world-rules", novelId] }); },
+  });
+}
+
+export function useCheckWorldConflicts() {
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/world/rules/check-conflicts`);
+      return data.data as ConflictResult[];
+    },
+  });
+}
+
+export function useResolveWorldConflict() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { novelId: string; ruleId: string; resolution: "keep" | "deprecate" }) => {
+      const { data } = await api.post(`/novels/${input.novelId}/world/rules/${input.ruleId}/resolve-conflict`, { resolution: input.resolution });
+      return data.data as WorldRule;
+    },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["world-rules", v.novelId] }); },
+  });
+}
+
+// ─── Phase 12: Character Depth ─────────────────────────
+
+export interface CharacterResourceItem { id: string; name: string; category: string; description?: string; ownerId: string; status: string; acquiredIn?: number; depletedIn?: number; }
+export interface InfoProfileItem { id: string; knowerId: string; subject: string; content: string; certainty: string; }
+export interface RelationshipGraph { nodes: Array<{ id: string; name: string; role: string }>; edges: Array<{ id: string; sourceId: string; targetId: string; type: string; attitudeSource: string | null; attitudeTarget: string | null; stage: string | null; sourceName: string; targetName: string }>; }
+export function useResources(novelId?: string, ownerId?: string) {
+  return useQuery({ queryKey: ["resources", novelId, ownerId], queryFn: async () => { const params: Record<string,string> = {}; if (ownerId) params.ownerId = ownerId; const { data } = await api.get(`/novels/${novelId}/resources`, { params }); return data.data as CharacterResourceItem[]; }, enabled: !!novelId });
+}
+
+export function useCreateResource() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: async (input: { novelId: string; ownerId: string; name: string; category: string; description?: string; acquiredIn?: number }) => { const { data } = await api.post(`/novels/${input.novelId}/resources`, input); return data.data; }, onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["resources", v.novelId] }); } });
+}
+
+export function useInfoProfiles(novelId?: string) {
+  return useQuery({ queryKey: ["info-profiles", novelId], queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/info-profiles`); return data.data as InfoProfileItem[]; }, enabled: !!novelId });
+}
+
+export function useRelationshipGraph(novelId?: string) {
+  return useQuery({ queryKey: ["rel-graph", novelId], queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/relations/graph`); return data.data as RelationshipGraph; }, enabled: !!novelId });
+}
+
+// Draft character relations (planning tab)
+export function useDraftRelationshipGraph(novelId?: string) {
+  return useQuery({
+    queryKey: ["draft-rel-graph", novelId],
+    queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/draft-relations/graph`); return data.data as RelationshipGraph; },
+    enabled: !!novelId,
+  });
+}
+
+export function useUpsertDraftRelation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { novelId: string; sourceCharacterId: string; targetCharacterId: string; type: string }) => {
+      const { data } = await api.post(`/novels/${input.novelId}/draft-relations`, input);
+      return data.data;
+    },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["draft-rel-graph", v.novelId] }); },
+  });
+}
+
+export function useUpsertRelation() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: async (input: { novelId: string; sourceCharacterId: string; targetCharacterId: string; type: string; attitudeSource?: string; attitudeTarget?: string; stage?: string }) => { const { data } = await api.post(`/novels/${input.novelId}/relations`, input); return data.data; }, onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["rel-graph", v.novelId] }); } });
+}
+
+// ─── Timeline ─────────────────────────────────────────
+
+export interface ChapterReminder {
+  title: string; category: string; sortOrder: number;
+  status: string; isOverdue: boolean; isUpcoming: boolean;
+}
+
+export interface ChapterRemindersResult {
+  reminders: ChapterReminder[]; summary: string;
+}
+
+export function useTimelineReminders(novelId?: string, chapterOrder?: number) {
+  return useQuery({
+    queryKey: ["timeline-reminders", novelId, chapterOrder],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/timeline/reminders/${chapterOrder}`);
+      return data.data as ChapterRemindersResult;
+    },
+    enabled: !!novelId && chapterOrder !== undefined && chapterOrder > 0,
+    staleTime: 30_000,
+  });
+}

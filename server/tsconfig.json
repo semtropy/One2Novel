@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "src/modules/promptRegistry/prompts/**",
+    "src/modules/promptRegistry/core/**"
+  ]
+}

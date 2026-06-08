@@ -1,0 +1,40 @@
+{
+  "name": "@one2novel/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@one2novel/shared": "workspace:*",
+    "@tanstack/react-query": "^5.90.21",
+    "@tiptap/core": "^2.27.2",
+    "@tiptap/extension-placeholder": "^2.16.0",
+    "@tiptap/pm": "^2.16.0",
+    "@tiptap/react": "^2.16.0",
+    "@tiptap/starter-kit": "^2.16.0",
+    "axios": "^1.13.6",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.576.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.1",
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.11"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

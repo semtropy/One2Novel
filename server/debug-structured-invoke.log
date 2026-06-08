@@ -1,0 +1,47 @@
+[Attempt 0] Zod: rules: invalid_type/Invalid input: expected array, received undefined
+[Attempt 1] Zod: rules: invalid_type/Invalid input: expected array, received object
+[Attempt 2] Zod: rules: invalid_type/Invalid input: expected array, received object
+[Attempt 3] Zod: rules.0.title: invalid_type/Invalid input: expected string, received undefined | rules.0.content: invalid_type/Invalid input: expected string, received undefined | rules.1.title: invalid_type/Invalid input: expected string, received undefined | rules.1.content: invalid_type/Invalid input: expected string, received undefined | rules.2.title: invalid_type/Invalid input: expected string, received undefined
+[FINAL] All attempts exhausted: [
+  {
+    "expected": "string",
+    "code": "invalid_type",
+    "path": [
+      "rules",
+      0,
+      "title"
+    ],
+    "message": "Invalid input: expected string, received undefined"
+  },
+  {
+    "expected": "string",
+    "code": "invalid_type",
+    "path": [
+      "rules",
+      0,
+      "content"
+    ],
+    "message": "Invalid input: expected string, received undefined"
+  },
+  {
+    "expected": "string",
+    "code": "invalid_type",
+    "path": [
+      "rules",
+      1,
+      "title"
+    ],
+[Attempt 0] Zod: rules: invalid_type/Invalid input: expected array, received undefined
+[Attempt 1] Zod: rules: invalid_type/Invalid input: expected array, received object
+[Attempt 2] Zod: rules.0.title: invalid_type/Invalid input: expected string, received undefined | rules.0.content: invalid_type/Invalid input: expected string, received undefined | rules.1.title: invalid_type/Invalid input: expected string, received undefined | rules.1.content: invalid_type/Invalid input: expected string, received undefined | rules.2.title: invalid_type/Invalid input: expected string, received undefined
+[Attempt 3] Zod: rules: invalid_type/Invalid input: expected array, received undefined
+[FINAL] All attempts exhausted: [
+  {
+    "expected": "array",
+    "code": "invalid_type",
+    "path": [
+      "rules"
+    ],
+    "message": "Invalid input: expected array, received undefined"
+  }
+]

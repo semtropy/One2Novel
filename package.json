@@ -1,0 +1,26 @@
+{
+  "name": "one2novel",
+  "private": true,
+  "description": "从一句灵感到一本小说 — AI 驱动的长篇小说创作工作台",
+  "packageManager": "pnpm@10.6.0",
+  "engines": {
+    "node": "^20.19.0 || ^22.12.0 || >=24.0.0",
+    "pnpm": ">=10.6.0"
+  },
+  "scripts": {
+    "dev": "pnpm dev:server & sleep 4 && pnpm dev:client",
+    "dev:server": "pnpm --filter @one2novel/server dev",
+    "dev:client": "pnpm --filter @one2novel/client dev",
+    "build": "pnpm --filter @one2novel/shared build && pnpm --filter @one2novel/server build && pnpm --filter @one2novel/client build",
+    "db:push": "pnpm --filter @one2novel/server db:push",
+    "db:studio": "pnpm --filter @one2novel/server db:studio",
+    "typecheck": "pnpm --filter @one2novel/shared build && pnpm --filter @one2novel/server typecheck && pnpm --filter @one2novel/client typecheck",
+    "test": "pnpm --filter @one2novel/server test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@prisma/engines", "better-sqlite3", "esbuild", "prisma"]
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
