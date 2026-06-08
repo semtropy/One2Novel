@@ -37,6 +37,7 @@ export interface ScenePlan {
   scenes: Scene[];
   scenePlanGenerated: boolean;
   generatedAt?: string;
+  enabled: boolean;
 }
 
 // ─── Helpers ───────────────────────────────────────
@@ -67,6 +68,7 @@ export async function getScenePlan(novelId: string, chapterId: string): Promise<
     scenes: cards.scenes as Scene[],
     scenePlanGenerated: !!cards.scenePlanGenerated,
     generatedAt: typeof cards.generatedAt === "string" ? cards.generatedAt : undefined,
+    enabled: cards.enabled !== false,
   };
 }
 
@@ -136,13 +138,14 @@ export async function generateScenePlan(novelId: string, chapterId: string): Pro
   existing.scenes = scenes;
   existing.scenePlanGenerated = true;
   existing.generatedAt = now;
+  existing.enabled = true;
 
   await prisma.chapter.update({
     where: { id: chapterId },
     data: { sceneCards: JSON.stringify(existing) },
   });
 
-  return { scenes, scenePlanGenerated: true, generatedAt: now };
+  return { scenes, scenePlanGenerated: true, generatedAt: now, enabled: true };
 }
 
 export async function updateScenePlan(
@@ -175,7 +178,26 @@ export async function updateScenePlan(
     scenes: reordered,
     scenePlanGenerated: true,
     generatedAt: existing.generatedAt as string,
+    enabled: existing.enabled !== false,
   };
+}
+
+export async function toggleScenePlan(
+  novelId: string, chapterId: string, enabled: boolean,
+): Promise<{ enabled: boolean }> {
+  const prisma = getPrisma();
+  const chapter = await prisma.chapter.findUnique({
+    where: { id: chapterId },
+    select: { sceneCards: true },
+  });
+  if (!chapter) throw new Error("Chapter not found");
+  const existing = parseSceneCards(chapter.sceneCards);
+  existing.enabled = enabled;
+  await prisma.chapter.update({
+    where: { id: chapterId },
+    data: { sceneCards: JSON.stringify(existing) },
+  });
+  return { enabled };
 }
 
 /**

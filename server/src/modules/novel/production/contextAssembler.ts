@@ -157,12 +157,12 @@ export async function assembleChapterContext(novelId: string, chapterId: string)
   const { getActivePayoffContext } = await import("../../payoff/payoffService");
   const payoffContext = await getActivePayoffContext(novelId, chapter.order);
 
-  // scene_plan — storyboard for this chapter
+  // scene_plan — storyboard for this chapter (only when enabled)
   let scenePlanContext = "";
   try {
     const cards = chapter.sceneCards ? JSON.parse(chapter.sceneCards) : null;
-    if (cards?.scenes && Array.isArray(cards.scenes) && cards.scenes.length > 0) {
-      scenePlanContext = compileScenePlanContext({ scenes: cards.scenes, scenePlanGenerated: true });
+    if (cards?.scenes && Array.isArray(cards.scenes) && cards.scenes.length > 0 && cards.enabled !== false) {
+      scenePlanContext = compileScenePlanContext({ scenes: cards.scenes, scenePlanGenerated: true, enabled: true });
     }
   } catch { /* sceneCards parse error — ignore */ }
 

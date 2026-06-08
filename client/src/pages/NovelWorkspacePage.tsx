@@ -111,9 +111,6 @@ export function NovelWorkspacePage() {
     return allChapters.reduce((sum, c) => sum + (c.content ? c.content.replace(/<[^>]*>/g, "").length : 0), 0);
   }, [allChapters]);
 
-  const volumeWords = (volChs: Array<{ id: string; content?: string }>) =>
-    volChs.reduce((sum, c) => sum + (c.content ? c.content.replace(/<[^>]*>/g, "").length : 0), 0);
-
   // Early returns AFTER all hooks
   if (isLoading) return <Loading text="加载中..." />;
   if (error || !novel) return (
@@ -149,8 +146,8 @@ export function NovelWorkspacePage() {
             const allDone = allChapters.length > 0 && allChapters.every(c => c.chapterStatus === "completed");
             return [
               { key: "framing", label: "定位", done: hasFraming, current: !hasFraming },
-              { key: "outline", label: "大纲", done: hasOutline, current: hasFraming && !hasOutline },
-              { key: "characters", label: "角色", done: hasChars, current: hasOutline && !hasChars },
+              { key: "characters", label: "角色", done: hasChars, current: hasFraming && !hasChars },
+              { key: "outline", label: "大纲", done: hasOutline, current: hasChars && !hasOutline },
               { key: "writing", label: "写作", done: hasWritten, current: hasOutline && !hasWritten },
               { key: "complete", label: "完本", done: allDone, current: false },
             ];
@@ -212,7 +209,6 @@ export function NovelWorkspacePage() {
                   <div className="px-2 py-0.5 text-xs font-medium text-slate-400 flex justify-between group/volh">
                     <span className="truncate">{vol.title}</span>
                     <div className="flex items-center gap-1">
-                      <span className="shrink-0">{volumeWords(vol.chapters).toLocaleString()}字</span>
                       <button onClick={async (e) => {
                         e.stopPropagation();
                         try { await api.post(`/novels/${novelId}/volumes/${vol.sortOrder}/chapters/writing`); qc.invalidateQueries({ queryKey: ["novel", novelId] }); } catch {}

@@ -10,6 +10,8 @@ import { injectSkillRules, getSkillModulesForPosition } from "../../../platform/
 import { detectChapterPosition } from "../../../platform/llm/promptBudgetProfiles";
 import { saveCheckpoint, clearCheckpoint, type DirectorCheckpoint } from "./checkpointService";
 import { afterChapterSave } from "../../timeline/timelineService";
+import { finalizeChapter } from "../production/finalization";
+import { diagnoseWorkspace } from "../production/revisionService";
 
 export const directorEmitter = new EventEmitter();
 directorEmitter.setMaxListeners(50);  // M8: prevent MaxListenersExceededWarning under concurrent SSE connections
@@ -24,6 +26,13 @@ export interface DirectorProgress {
 }
 
 const progressMap = new Map<string, DirectorProgress>();
+const stopFlags = new Map<string, boolean>();
+
+export function stopDirector(novelId: string): boolean {
+  const p = progressMap.get(novelId);
+  if (p?.stage === "running") { stopFlags.set(novelId, true); return true; }
+  return false;
+}
 
 export function getDirectorProgress(novelId: string): DirectorProgress | null {
   return progressMap.get(novelId) ?? null;
@@ -75,6 +84,13 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
     checkpointTaskId = checkpointTaskId;
 
     for (const chapter of chaptersToWrite) {
+      if (stopFlags.get(novelId)) {
+        stopFlags.delete(novelId);
+        progress.stage = "paused";
+        progress.message = `已在第${progress.currentChapter}章停止`;
+        clearCheckpoint(novelId);
+        return progress;
+      }
       progress.currentChapter = chapter.order;
       progress.message = `正在写第${chapter.order}章《${chapter.title}》...`;
 
@@ -107,27 +123,23 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
         let repairAttempts = 0;
         let lastQuality: Awaited<ReturnType<typeof runQualityGate>> | null = null;
 
-        for (let round = 0; round <= 3; round++) {
-          let qualityResult: Awaited<ReturnType<typeof runQualityGate>> | null = null;
-          try { qualityResult = await runQualityGate(currentContent, {
-            genre: ctx.novelGenre,
-            characterProhibitions: ctx.characterProhibitions,
-            chapterExpectation: ctx.chapterExpectation,
-          }); } catch { qualityResult = null; }
-          if (qualityResult) lastQuality = qualityResult;
+        let qualityResult: Awaited<ReturnType<typeof runQualityGate>> | null = null;
+        try { qualityResult = await runQualityGate(currentContent, {
+          genre: ctx.novelGenre,
+          characterProhibitions: ctx.characterProhibitions,
+          chapterExpectation: ctx.chapterExpectation,
+        }); } catch { qualityResult = null; }
+        if (qualityResult) lastQuality = qualityResult;
 
-          const totalScore = qualityResult ? totalQualityScore(qualityResult) : 25; // C6: low fallback when quality gate fails
-          const threshold = qualityResult ? passThreshold(ctx.novelGenre) : 99;     // impossible threshold forces repair
+        const totalScore = qualityResult ? totalQualityScore(qualityResult) : 25;
+        finalScore = totalScore;
+        const verdict = qualityResult?.verdict ?? "NEEDS_FIX";
 
-          finalScore = totalScore;
-
-          if (totalScore >= threshold || round === 3) {
-            finalStatus = totalScore >= threshold ? "completed" : "needs_repair";
-            break;
-          }
-
+        if (verdict === "PASS" || verdict === "WARNING") {
+          finalStatus = "completed";
+        } else if (verdict === "NEEDS_FIX") {
           repairAttempts++;
-          progress.message = `第${chapter.order}章质检${Math.round(totalScore)}分，第${repairAttempts}次自动修复...`;
+          progress.message = `第${chapter.order}章质检${Math.round(totalScore)}分，自动修复中...`;
           try {
             const issuesText = qualityResult?.issues?.map(i => `${i.type}: ${i.description}（建议：${i.fixSuggestion}）`).join("\n") ?? "提升质量";
             const { systemContext, repairPrompt } = assembleRepairContext(ctx, currentContent, issuesText);
@@ -135,10 +147,23 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
             currentContent = totalScore >= 28
               ? await import("../production/repairService").then(m => m.patchRepair(currentContent, enrichedIssues))
               : await import("../production/repairService").then(m => m.heavyRepair(currentContent, enrichedIssues));
+            let recheck: Awaited<ReturnType<typeof runQualityGate>> | null = null;
+            try { recheck = await runQualityGate(currentContent, {
+              genre: ctx.novelGenre, characterProhibitions: ctx.characterProhibitions,
+              chapterExpectation: ctx.chapterExpectation,
+            }); } catch { recheck = null; }
+            if (recheck) {
+              lastQuality = recheck;
+              finalScore = totalQualityScore(recheck);
+              finalStatus = (recheck.verdict === "PASS" || recheck.verdict === "WARNING") ? "completed" : "needs_repair";
+            } else {
+              finalStatus = "needs_repair";
+            }
           } catch {
             finalStatus = "needs_repair";
-            break;
           }
+        } else {
+          finalStatus = "blocked";
         }
 
         await prisma.chapter.update({
@@ -164,6 +189,32 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
             }),
           },
         });
+        // Run finalization consistency check (fire-and-forget)
+        finalizeChapter(novelId, chapter.id, chapter.order).then(r => {
+          if (r.consistencyIssues.length > 0) {
+            const prisma = getPrisma();
+            prisma.auditReport.create({
+              data: {
+                novelId, chapterId: chapter.id,
+                auditType: "finalization",
+                overallScore: r.consistencyIssues.filter(i => i.severity === "high").length > 0 ? 50 : r.consistencyIssues.filter(i => i.severity === "medium").length > 0 ? 70 : 90,
+                summary: r.summary,
+                details: JSON.stringify(r.consistencyIssues),
+              },
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+
+        // Run paragraph-level diagnosis (fire-and-forget, saves to DB)
+        if (finalStatus === "completed") {
+          diagnoseWorkspace(novelId, chapter.id).then(diag => {
+            getPrisma().chapter.update({
+              where: { id: chapter.id },
+              data: { diagnosis: JSON.stringify(diag) },
+            }).catch(() => {});
+          }).catch(() => {});
+        }
+
         if (finalStatus === "completed") {
           completedIds.push(chapter.id);
           await novelEventBus.emit("chapter.completed", { novelId, chapterId: chapter.id });

@@ -41,7 +41,7 @@ export function StorySeedPanel({ novelId }: Props) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-slate-800">故事种子</h3>
+          <h3 className="text-sm font-semibold text-slate-800">全书定位</h3>
         </div>
         <div className="flex items-center gap-2">
           <FakeProgress running={gen.isPending} />

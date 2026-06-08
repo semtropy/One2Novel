@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Loader2, Save, Eye, EyeOff } from "lucide-react";
 import { api } from "../../app/api";
+import { MODEL_OPTIONS } from "../../pages/SettingsPage";
 
 export interface ProviderInfo {
   provider: string;
@@ -79,14 +80,13 @@ export function ProviderConfigDialog({ provider, onClose, onSaved }: Props) {
 
           {/* Model */}
           <div>
-            <div className="text-xs text-slate-500 font-medium mb-1.5">模型名称</div>
-            <input
-              value={model}
-              onChange={e => setModel(e.target.value)}
-              placeholder={provider.defaultModel}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
-            />
-            <p className="text-xs text-slate-400 mt-1">默认: {provider.defaultModel}</p>
+            <div className="text-xs text-slate-500 font-medium mb-1.5">模型</div>
+            <select value={model} onChange={e => setModel(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none bg-white h-10">
+              {(MODEL_OPTIONS.find(g => g.provider === provider.provider)?.models ?? [provider.defaultModel]).map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
           </div>
         </div>
 

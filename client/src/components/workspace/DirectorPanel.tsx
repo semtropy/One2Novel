@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
-import { Play, Square, RefreshCw, CheckCircle, XCircle, AlertTriangle, RotateCcw } from "lucide-react";
+import { Play, RefreshCw, CheckCircle, AlertTriangle, XCircle, RotateCcw } from "lucide-react";
 import { api } from "../../app/api";
 import { cn } from "../../lib/cn";
+import AutoWriteModal from "./AutoWriteModal";
 
 interface Props { novelId: string; compact?: boolean }
 
@@ -11,31 +12,17 @@ interface DirectorProgress {
 }
 
 export function DirectorPanel({ novelId, compact }: Props) {
-  const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<DirectorProgress | null>(null);
   const [error, setError] = useState("");
   const [resuming, setResuming] = useState(false);
+  const [showAutoWrite, setShowAutoWrite] = useState(false);
 
-  // Check for interrupted runs on mount
-  useEffect(() => {
-    pollProgress();
-  }, [novelId]);
-
-  const handleRun = useCallback(async () => {
-    setRunning(true); setError(""); setProgress(null);
-    try {
-      await api.post(`/novels/${novelId}/director/run`);
-      // Start polling after kickoff
-      pollProgress();
-    } catch (e) { setError(e instanceof Error ? e.message : "启动失败"); }
-  }, [novelId]);
+  useEffect(() => { pollProgress(); }, [novelId]);
 
   const handleResume = useCallback(async () => {
     setResuming(true); setError("");
-    try {
-      await api.post(`/novels/${novelId}/director/resume`);
-      pollProgress();
-    } catch (e) { setError(e instanceof Error ? e.message : "恢复失败"); }
+    try { await api.post(`/novels/${novelId}/director/resume`); pollProgress(); }
+    catch (e) { setError(e instanceof Error ? e.message : "恢复失败"); }
     finally { setResuming(false); }
   }, [novelId]);
 
@@ -48,20 +35,20 @@ export function DirectorPanel({ novelId, compact }: Props) {
 
   if (compact) {
     return (
-      <div className="flex flex-col items-center gap-2">
-        <button onClick={handleRun} disabled={running || isRunning}
+      <>
+        <button onClick={() => setShowAutoWrite(true)}
           className="flex items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-6 py-3 text-sm text-slate-500 hover:border-slate-400 hover:text-slate-700 transition-colors">
-          {(running || isRunning) ? <RefreshCw size={18} className="animate-spin" /> : <Play size={18} />}
-          {(running || isRunning) ? "自动写作中..." : "一键自动写作（批量生成全部章节）"}
+          <Play size={18} />一键自动写作
         </button>
         {isBlocked && (
           <button onClick={handleResume} disabled={resuming}
             className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 font-medium">
             <RotateCcw size={14} className={resuming ? "animate-spin" : ""} />
-            {resuming ? "恢复中..." : `⚠ 检测到在第${progress.currentChapter}章中断，点击恢复`}
+            {resuming ? "恢复中..." : `⚠ 在第${progress.currentChapter}章中断，点击恢复`}
           </button>
         )}
-      </div>
+        {showAutoWrite && <AutoWriteModal novelId={novelId} onClose={() => setShowAutoWrite(false)} />}
+      </>
     );
   }
 
@@ -77,9 +64,10 @@ export function DirectorPanel({ novelId, compact }: Props) {
               <RotateCcw size={12} className={resuming ? "animate-spin" : ""} /> 恢复
             </button>
           )}
-          <button onClick={handleRun} disabled={running || isRunning} className={cn("flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium", (running || isRunning) ? "bg-slate-100 text-slate-400" : "bg-slate-800 text-white hover:bg-slate-700")}>
-            {(running || isRunning) ? <><RefreshCw size={12} className="animate-spin" /> 运行中...</> : <><Play size={12} /> 启动</>}
+          <button onClick={() => setShowAutoWrite(true)} disabled={isRunning} className={cn("flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium", isRunning ? "bg-slate-100 text-slate-400" : "bg-slate-800 text-white hover:bg-slate-700")}>
+            {isRunning ? <><RefreshCw size={12} className="animate-spin" /> 运行中...</> : <><Play size={12} /> 启动</>}
           </button>
+          {showAutoWrite && <AutoWriteModal novelId={novelId} onClose={() => setShowAutoWrite(false)} />}
         </div>
       </div>
       {error && <div className="rounded-lg bg-red-50 p-3 text-xs text-red-600">{error}</div>}

@@ -1,16 +1,53 @@
 import { useState, useEffect } from "react";
 import { api } from "../app/api";
-import { CheckCircle, XCircle, Loader2, Wrench, Zap } from "lucide-react";
-import { ProviderConfigDialog, type ProviderInfo } from "../components/settings/ProviderConfigDialog";
+import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
+import type { ProviderInfo } from "../components/settings/ProviderConfigDialog";
 
 const SELECT_STYLE = "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:ring-1 focus:ring-indigo-200 focus:outline-none bg-white";
+
+export const MODEL_OPTIONS = [
+  { provider: "deepseek", label: "DeepSeek", models: ["deepseek-chat", "deepseek-reasoner"] },
+  { provider: "openai", label: "OpenAI", models: ["gpt-5-mini", "gpt-5", "gpt-4o"] },
+  { provider: "anthropic", label: "Anthropic Claude", models: ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"] },
+  { provider: "gemini", label: "Google Gemini", models: ["gemini-2.5-flash", "gemini-2.5-pro"] },
+  { provider: "qwen", label: "通义千问", models: ["qwen-plus", "qwen-max"] },
+  { provider: "moonshot", label: "月之暗面 Moonshot", models: ["moonshot-v1-8k", "moonshot-v1-32k"] },
+];
 
 export function SettingsPage() {
   const [prefs, setPrefs] = useState<Record<string, unknown>>({});
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; provider: string; model: string; error?: string } | null>(null);
-  const [editingProvider, setEditingProvider] = useState<ProviderInfo | null>(null);
+  const [editingKeys, setEditingKeys] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem("providerKeys") ?? "{}"); } catch { return {}; }
+  });
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [testingProviders, setTestingProviders] = useState<Record<string, boolean>>({});
+  const [testPassed, setTestPassed] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    localStorage.setItem("providerKeys", JSON.stringify(editingKeys));
+  }, [editingKeys]);
+
+  async function saveProviderConfig(p: string, keyVal?: string, modelVal?: string) {
+    const body: Record<string, string> = {};
+    if (keyVal?.trim()) body.key = keyVal.trim();
+    if (modelVal?.trim()) body.model = modelVal.trim();
+    if (!Object.keys(body).length) return;
+    await api.post(`/settings/providers/${p}`, body).catch(() => {});
+  }
+
+  async function testProvider(p: string, keyVal: string, modelVal: string) {
+    setTestingProviders(prev => ({ ...prev, [p]: true })); setTestResult(null);
+    try {
+      if (keyVal.trim()) await api.post(`/settings/providers/${p}`, { key: keyVal.trim(), model: modelVal });
+      const r = await api.post(`/settings/providers/${p}/test`);
+      setTestResult(r.data.data);
+      setTestPassed(prev => ({ ...prev, [p]: !!(r.data.data?.ok) }));
+    } catch (e) {
+      setTestResult({ ok: false, provider: p, model: modelVal, error: e instanceof Error ? e.message : "测试失败" });
+    } finally { setTestingProviders(prev => ({ ...prev, [p]: false })); }
+  }
 
   useEffect(() => {
     api.get("/preferences").then(r => setPrefs(r.data.data?.preferences ?? {})).catch(() => {});
@@ -25,47 +62,35 @@ export function SettingsPage() {
     await api.post("/preferences", { [key]: value }).catch(() => {});
   }
 
-  async function testConnection() {
-    setTesting(true); setTestResult(null);
-    try { const res = await api.get("/llm/probe"); setTestResult(res.data.data); } catch (e) {
-      setTestResult({ ok: false, provider: "", model: "", error: e instanceof Error ? e.message : "失败" });
-    } finally { setTesting(false); }
-  }
-
   return (
     <div className="h-full overflow-y-auto">
-    <div className="max-w-3xl">
+    <div className="max-w-3xl mx-auto">
       <h2 className="mb-6 text-lg font-semibold text-slate-900">设置</h2>
       <div className="space-y-5">
 
-        {/* ════════════════ 模型配置 ════════════════ */}
+        {/* ════════════════ 模型 ════════════════ */}
         <section className="rounded-xl border border-slate-200 bg-white p-6">
-          <h3 className="text-sm font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <Zap size={15} className="text-amber-500" />默认模型 · 连接测试
-          </h3>
-          <div className="flex items-end gap-4">
-            <div className="flex-1">
-              <div className="text-xs text-slate-500 font-medium mb-1.5">默认模型</div>
-              <select
-                value={(prefs.defaultProvider as string) ?? "deepseek"}
-                onChange={e => { const v = e.target.value; setPrefs(p => ({ ...p, defaultProvider: v })); savePref("defaultProvider", v); }}
-                className={SELECT_STYLE + " w-full h-10"}
-              >
-                <option value="deepseek">DeepSeek (deepseek-chat)</option>
-                <option value="openai">OpenAI (gpt-5-mini)</option>
-                <option value="anthropic">Anthropic Claude (claude-sonnet-4-6)</option>
-              </select>
-            </div>
-            <div className="flex-1">
-              <div className="text-xs text-slate-500 font-medium mb-1.5">连接测试</div>
-              <button onClick={testConnection} disabled={testing}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50 w-full justify-center h-10">
-                {testing && <Loader2 size={14} className="animate-spin" />}测试连接
-              </button>
-            </div>
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">模型配置</h3>
+
+          {/* Default model */}
+          <div className="mb-4">
+            <div className="text-xs text-slate-500 font-medium mb-1.5">默认模型</div>
+            <select
+              value={(prefs.defaultProvider as string) ?? "deepseek:deepseek-chat"}
+              onChange={e => { const v = e.target.value; setPrefs(p => ({ ...p, defaultProvider: v })); savePref("defaultProvider", v); }}
+              className={SELECT_STYLE + " w-full h-10"}
+            >
+              {MODEL_OPTIONS.filter(g => providers.some(p => p.provider === g.provider && p.isConfigured)).map(g => (
+                <optgroup key={g.provider} label={g.label}>
+                  {g.models.map(m => (
+                    <option key={`${g.provider}:${m}`} value={`${g.provider}:${m}`}>{m}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
           {testResult && (
-            <div className={"mt-4 flex items-start gap-2 rounded-lg p-3 text-sm " + (testResult.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700")}>
+            <div className={"mb-4 flex items-start gap-2 rounded-lg p-3 text-sm " + (testResult.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700")}>
               {testResult.ok ? <CheckCircle size={16} /> : <XCircle size={16} />}
               <div>
                 <p className="font-medium">{testResult.ok ? `已连接 ${testResult.provider}（${testResult.model}）` : "连接失败"}</p>
@@ -73,62 +98,61 @@ export function SettingsPage() {
               </div>
             </div>
           )}
-        </section>
 
-        {/* ════════════════ 模型厂商 ════════════════ */}
-        <section className="rounded-xl border border-slate-200 bg-white p-6">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1 flex items-center gap-2">
-            <Wrench size={15} className="text-slate-500" />模型厂商
-          </h3>
-          <p className="text-xs text-slate-400 mb-4">管理各厂商的 API Key 和模型。点击厂商名即可配置。</p>
-
+          {/* All providers */}
           <div className="overflow-hidden rounded-lg border border-slate-100">
-            {/* Header */}
-            <div className="flex items-center gap-4 px-4 py-2.5 bg-slate-50 text-xs font-medium text-slate-500 border-b border-slate-100">
-              <span className="w-28 shrink-0">厂商</span>
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-50 text-xs font-medium text-slate-500 border-b border-slate-100">
+              <span className="w-24 shrink-0">厂商</span>
               <span className="flex-1">模型</span>
-              <span className="w-16 text-center">状态</span>
-              <span className="w-24 text-center">Key</span>
-              <span className="w-20 text-center">操作</span>
+              <span className="flex-1">API Key</span>
+              <span className="w-20 text-center">连接</span>
             </div>
-            {/* Rows */}
-            {providers.map(p => (
-              <div key={p.provider}
-                className={`flex items-center gap-4 px-4 py-3 border-b border-slate-50 last:border-b-0 transition-colors ${
-                  p.isConfigured ? "border-l-[3px] border-l-emerald-400 bg-white" : "border-l-[3px] border-l-slate-200 bg-white"
-                }`}
-              >
-                {/* Name */}
-                <button
-                  onClick={() => setEditingProvider(p)}
-                  className="w-28 shrink-0 text-sm font-medium text-slate-700 hover:text-indigo-600 text-left transition-colors"
-                >{p.name}</button>
-                {/* Model */}
-                <span className="flex-1 text-sm text-slate-500">
-                  {(p.currentModel || p.defaultModel) ? (p.currentModel || p.defaultModel) : "-"}
-                </span>
-                {/* Status */}
-                <span className="w-16 text-center">
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                    p.isConfigured ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${p.isConfigured ? "bg-emerald-500" : "bg-slate-300"}`} />
-                    {p.isConfigured ? "已配置" : "未配置"}
+            {MODEL_OPTIONS.map(g => {
+              const configured = providers.find(p => p.provider === g.provider);
+              const isConfig = !!(configured?.isConfigured);
+              const testing = testingProviders[g.provider];
+              const keyVal = editingKeys[g.provider] ?? "";
+              return (
+                <div key={g.provider}
+                  className={`flex items-center gap-3 px-4 py-2 border-b border-slate-50 last:border-b-0 ${
+                    testPassed[g.provider] ? "border-l-[3px] border-l-emerald-400 bg-white" : "border-l-[3px] border-l-slate-200 bg-white"
+                  }`}
+                >
+                  <span className="w-24 shrink-0 text-sm font-medium text-slate-700">{g.label}</span>
+                  {/* Model dropdown */}
+                  <select
+                    value={configured?.currentModel || configured?.defaultModel || g.models[0]}
+                    onChange={e => { saveProviderConfig(g.provider, undefined, e.target.value); loadProviders(); }}
+                    className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs focus:border-indigo-300 focus:outline-none bg-white"
+                  >
+                    {g.models.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  {/* Key input */}
+                  <div className="flex-1 relative">
+                    <input
+                      type={showKeys[g.provider] ? "text" : "password"}
+                      value={keyVal}
+                      onChange={e => setEditingKeys(prev => ({ ...prev, [g.provider]: e.target.value }))}
+                      onBlur={() => { if (keyVal.trim()) { saveProviderConfig(g.provider, keyVal); loadProviders(); } }}
+                      className="w-full rounded border border-slate-200 px-2 py-1 pr-8 text-xs focus:border-indigo-300 focus:outline-none [&::-ms-reveal]:hidden [&::-webkit-credentials-auto-fill-button]:hidden"
+                    />
+                    <button onClick={() => setShowKeys(prev => ({ ...prev, [g.provider]: !prev[g.provider] }))}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+                      {showKeys[g.provider] ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                  </div>
+                  {/* Test button */}
+                  <span className="w-20 text-center">
+                    <button onClick={() => testProvider(g.provider, keyVal, configured?.currentModel || configured?.defaultModel || g.models[0])} disabled={testing}
+                      className="text-xs rounded-lg border border-slate-200 px-2.5 py-1 text-slate-500 hover:bg-slate-50 disabled:opacity-50">
+                      {testing ? <Loader2 size={11} className="animate-spin inline" /> : "测试"}
+                    </button>
                   </span>
-                </span>
-                {/* Key */}
-                <span className="w-24 text-center text-xs text-slate-400 font-mono">
-                  {p.maskedKey || "-"}
-                </span>
-                {/* Action */}
-                <span className="w-20 text-center">
-                  <button
-                    onClick={() => setEditingProvider(p)}
-                    className="text-xs rounded-lg border border-slate-200 px-2.5 py-1 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
-                  >配置</button>
-                </span>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -211,14 +235,6 @@ export function SettingsPage() {
       </div>
     </div>
 
-    {/* Provider Config Dialog */}
-    {editingProvider && (
-      <ProviderConfigDialog
-        provider={editingProvider}
-        onClose={() => setEditingProvider(null)}
-        onSaved={() => { setEditingProvider(null); loadProviders(); }}
-      />
-    )}
     </div>
   );
 }

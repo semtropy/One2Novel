@@ -1,7 +1,8 @@
 import { Router } from "express";
 import {
-  listStyleProfiles, getStyleProfile, createStyleProfile, deleteStyleProfile,
+  listStyleProfiles, getStyleProfile, createStyleProfile, deleteStyleProfile, updateStyleProfile,
   extractStyle, bindStyle, unbindStyle, getStyleBindings,
+  updateRuleInProfile, addRuleToProfile, deleteRuleFromProfile,
 } from "./styleService";
 import { resolveStyleContext } from "./styleRuntimeResolver";
 
@@ -28,6 +29,11 @@ styleRoutes.post("/", async (req, res, next) => {
 // Delete
 styleRoutes.delete("/:id", async (req, res, next) => {
   try { await deleteStyleProfile(req.params.id); res.status(204).send(); } catch (e) { next(e); }
+});
+
+// Update name
+styleRoutes.patch("/:id", async (req, res, next) => {
+  try { res.json({ data: await updateStyleProfile(req.params.id, req.body) }); } catch (e) { next(e); }
 });
 
 // Extract style from source text
@@ -58,5 +64,27 @@ styleRoutes.get("/resolved/:novelId", async (req, res, next) => {
   try {
     const chapterId = req.query.chapterId as string | undefined;
     res.json({ data: await resolveStyleContext(req.params.novelId, chapterId) });
+  } catch (e) { next(e); }
+});
+
+// Rule-level CRUD
+styleRoutes.patch("/:id/rules", async (req, res, next) => {
+  try {
+    const { field, index, text } = req.body;
+    res.json({ data: await updateRuleInProfile(req.params.id, field, index, text) });
+  } catch (e) { next(e); }
+});
+
+styleRoutes.post("/:id/rules/add", async (req, res, next) => {
+  try {
+    const { field, text } = req.body;
+    res.json({ data: await addRuleToProfile(req.params.id, field, text) });
+  } catch (e) { next(e); }
+});
+
+styleRoutes.delete("/:id/rules/:index", async (req, res, next) => {
+  try {
+    const { field } = req.query;
+    res.json({ data: await deleteRuleFromProfile(req.params.id, field as string, parseInt(req.params.index)) });
   } catch (e) { next(e); }
 });

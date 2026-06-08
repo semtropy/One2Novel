@@ -1,6 +1,6 @@
 import { Users, History, ClipboardList, X, AlertTriangle, RefreshCw, Search } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
-import { useNovel, useTimelineReminders } from "../../api/novel";
+import { useNovel, useTimelineReminders, useResources } from "../../api/novel";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../app/api";
 import { SEVERITY_LABEL } from "@one2novel/shared";
@@ -19,8 +19,9 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
   const { data: novel, refetch: refetchNovel } = useNovel(novelId);
   const qc = useQueryClient();
   const [showDetail, setShowDetail] = useState(false);
-  const chars: Array<{ name: string; role?: string; currentGoal?: string; currentLocation?: string; currentStatus?: string; voiceTexture?: string; identityLabel?: string; factionLabel?: string }> = ((novel as unknown) as { characters?: Array<{ name: string; role?: string; currentGoal?: string; currentLocation?: string; currentStatus?: string; voiceTexture?: string; identityLabel?: string; factionLabel?: string }> }).characters ?? [];
+  const chars: Array<{ id: string; name: string; role?: string; currentGoal?: string; currentLocation?: string; currentStatus?: string; voiceTexture?: string; identityLabel?: string; factionLabel?: string }> = ((novel as unknown) as { characters?: Array<{ id: string; name: string; role?: string; currentGoal?: string; currentLocation?: string; currentStatus?: string; voiceTexture?: string; identityLabel?: string; factionLabel?: string }> }).characters ?? [];
   const [showCharDetail, setShowCharDetail] = useState(false);
+  const { data: resources } = useResources(showCharDetail ? novelId : undefined);
   const activeChars = chars.filter(c => c.currentGoal || c.currentLocation || c.currentStatus);
   const ROLE_LABEL: Record<string, string> = { protagonist: "主角", antagonist: "对手", supporting: "配角", minor: "次要" };
   const timelines: Array<{ title: string; category: string; sortOrder: number; status?: string }> =
@@ -366,19 +367,35 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
                       {[c.identityLabel, c.factionLabel].filter(Boolean).join(" · ")}
                     </div>
                   )}
-                  <div className="space-y-0.5 text-xs border-l-2 border-slate-100 pl-3">
+                  <div className="space-y-1 text-xs">
                     {c.currentLocation && (
-                      <div className="flex items-center gap-1"><span className="text-slate-400 shrink-0 w-8 text-right">位置</span><span className="text-slate-600">{c.currentLocation}</span></div>
+                      <div className="flex items-center gap-2"><span className="text-slate-400 shrink-0 w-8 text-right">位置</span><span className="text-slate-600">{c.currentLocation}</span></div>
                     )}
                     {c.currentGoal && (
-                      <div className="flex items-center gap-1"><span className="text-slate-400 shrink-0 w-8 text-right">目标</span><span className="text-slate-600">{c.currentGoal}</span></div>
+                      <div className="flex items-center gap-2"><span className="text-slate-400 shrink-0 w-8 text-right">目标</span><span className="text-slate-600">{c.currentGoal}</span></div>
                     )}
                     {c.currentStatus && (
-                      <div className="flex items-center gap-1"><span className="text-slate-400 shrink-0 w-8 text-right">状态</span><span className="text-slate-600">{c.currentStatus}</span></div>
+                      <div className="flex items-center gap-2"><span className="text-slate-400 shrink-0 w-8 text-right">状态</span><span className="text-slate-600">{c.currentStatus}</span></div>
                     )}
                     {c.voiceTexture && (
-                      <div className="flex items-center gap-1"><span className="text-slate-400 shrink-0 w-8 text-right">声线</span><span className="text-slate-600 italic">{c.voiceTexture}</span></div>
+                      <div className="flex items-center gap-2"><span className="text-slate-400 shrink-0 w-8 text-right">声线</span><span className="text-slate-600 italic">{c.voiceTexture}</span></div>
                     )}
+                    <div className="flex items-start gap-2">
+                      <span className="text-slate-400 shrink-0 w-8 text-right">资源</span>
+                      <div>
+                        {(() => {
+                          const charResources = (resources ?? []).filter(r => r.ownerId === c.id);
+                          if (!charResources.length) return <span className="text-slate-300 italic">暂无</span>;
+                          return charResources.map(r => (
+                            <div key={r.id} className="text-slate-500">
+                              <span className={r.status === "depleted" ? "text-slate-300 line-through" : "text-slate-600"}>{r.name}</span>
+                              <span className="text-slate-400 ml-1">{r.category}</span>
+                              {r.acquiredIn && <span className="text-slate-300 ml-1">第{r.acquiredIn}章</span>}
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    </div>
                   </div>
                   {i < activeChars.length - 1 && <div className="border-b border-slate-100 mt-3" />}
                 </div>

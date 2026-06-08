@@ -1,3 +1,4 @@
+import { getPrisma } from "../../platform/db/client";
 import { mergeStyleRules, resolveBindings } from "./styleBindingResolver";
 import type { ResolvedStyleRules } from "./styleBindingResolver";
 
@@ -46,6 +47,17 @@ export async function resolveStyleContext(
     resolveBindings(novelId, chapterId ?? undefined),
   ]);
 
+  // Extract overallDescription from primary binding's profile
+  let summary = "";
+  if (bindings.length > 0) {
+    const primary = bindings[0];
+    const prisma = getPrisma();
+    const profile = await prisma.styleProfile.findUnique({ where: { id: primary.styleProfileId }, select: { extractedFeatures: true } });
+    if (profile?.extractedFeatures) {
+      try { summary = JSON.parse(profile.extractedFeatures).overallDescription ?? ""; } catch {}
+    }
+  }
+
   return {
     styleBlock: rules.styleBlock,
     antiAiPrompt: rules.antiAiPrompt,
@@ -54,6 +66,7 @@ export async function resolveStyleContext(
     rules: rules.rules,
     sources: rules.sources,
     primaryProfileName: rules.primaryProfileName,
+    summary,
     maturity: rules.maturity,
     dedupStats: rules.dedupStats,
     bindings: bindings.map((b) => ({

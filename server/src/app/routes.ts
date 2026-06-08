@@ -2,9 +2,9 @@ import { type Express, Router } from "express";
 import { novelRoutes } from "../modules/novel/setup/http";
 import { styleRoutes } from "../modules/style/http";
 import { probeLLM } from "../platform/llm/connectivity";
-import { runDirector, getDirectorProgress, directorEmitter } from "../modules/novel/director/directorService";
+import { runDirector, getDirectorProgress, stopDirector, directorEmitter } from "../modules/novel/director/directorService";
 import { loadCheckpoint } from "../modules/novel/director/checkpointService";
-import { scanChapterForPayoffs, getPayoffs, createPayoff } from "../modules/payoff/payoffService";
+import { scanChapterForPayoffs, getPayoffs, createPayoff, updatePayoff, deletePayoff } from "../modules/payoff/payoffService";
 import { detectTimelineConflicts, getPreChapterReminders, reExtractChapterTimeline } from "../modules/timeline/timelineService";
 import { listRules, createRule, updateRule, deleteRule, batchGenerateRules, checkConflict, checkAllConflicts, resolveConflict } from "../modules/novel/world/worldRuleService";
 import { getActiveRulesContext } from "../modules/novel/world/ruleActivationService";
@@ -38,6 +38,10 @@ export function registerRoutes(app: Express) {
       runDirector(req.params.id, req.body.maxChapters).catch(console.error);
       res.json({ data: { started: true } });
     } catch (e) { next(e); }
+  });
+  api.post("/novels/:id/director/stop", (req, res) => {
+    const stopped = stopDirector(req.params.id);
+    res.json({ data: { stopped } });
   });
   api.get("/novels/:id/director/progress", (req, res) => {
     res.json({ data: getDirectorProgress(req.params.id) });
@@ -92,6 +96,14 @@ export function registerRoutes(app: Express) {
       if (!title) { res.status(400).json({ error: { code: "INVALID_INPUT", message: "title required" } }); return; }
       res.json({ data: await createPayoff(req.params.novelId, { title, summary, scopeType, targetStartOrder, targetEndOrder }) });
     } catch (e) { next(e); }
+  });
+
+  api.patch("/novels/:novelId/payoffs/:id", async (req, res, next) => {
+    try { res.json({ data: await updatePayoff(req.params.id, req.body) }); } catch (e) { next(e); }
+  });
+
+  api.delete("/novels/:novelId/payoffs/:id", async (req, res, next) => {
+    try { await deletePayoff(req.params.id); res.status(204).send(); } catch (e) { next(e); }
   });
 
   // Timeline conflict detection (Phase 16)

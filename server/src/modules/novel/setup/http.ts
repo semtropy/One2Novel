@@ -993,7 +993,7 @@ novelRoutes.post("/:novelId/chapters/:chapterId/undo", async (req, res, next) =>
 
 // ─── Phase 14: Storyboard ──────────────────────────────────
 
-import { generateScenePlan, getScenePlan, updateScenePlan } from "../production/scenePlanService";
+import { generateScenePlan, getScenePlan, updateScenePlan, toggleScenePlan } from "../production/scenePlanService";
 
 novelRoutes.get("/:novelId/chapters/:chapterId/scenes", async (req, res, next) => {
   try {
@@ -1018,6 +1018,13 @@ novelRoutes.put("/:novelId/chapters/:chapterId/scenes", async (req, res, next) =
     }
     const plan = await updateScenePlan(req.params.novelId, req.params.chapterId, scenes);
     res.json({ data: plan });
+  } catch (e) { next(e); }
+});
+
+novelRoutes.patch("/:novelId/chapters/:chapterId/scenes/toggle", async (req, res, next) => {
+  try {
+    const { enabled } = req.body;
+    res.json({ data: await toggleScenePlan(req.params.novelId, req.params.chapterId, !!enabled) });
   } catch (e) { next(e); }
 });
 

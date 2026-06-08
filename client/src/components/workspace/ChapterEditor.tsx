@@ -32,8 +32,6 @@ export function ChapterEditor({ content, onChange, placeholder, readOnly, aiGene
     }
     const range = sel.getRangeAt(0);
 
-    // Expand to full paragraph boundaries: walk up from start/end containers
-    // to find the nearest block-level elements, then extend the range
     const findBlock = (node: Node | null): Node | null => {
       while (node && node !== editorRef.current) {
         if (node.nodeType === 1) {
@@ -50,10 +48,8 @@ export function ChapterEditor({ content, onChange, placeholder, readOnly, aiGene
 
     const startBlock = findBlock(range.startContainer);
     const endBlock = findBlock(range.endContainer);
-
     if (!startBlock || !endBlock) { onParagraphSelect([]); return; }
 
-    // Iterate DOM nodes between startBlock and endBlock, collecting each block's text
     const paragraphs: string[] = [];
     let node: Node | null = startBlock;
     while (node) {
@@ -91,6 +87,8 @@ export function ChapterEditor({ content, onChange, placeholder, readOnly, aiGene
   useEffect(() => {
     if (editor && content !== prevRef.current) {
       prevRef.current = content;
+      // Don't overwrite if user is actively editing
+      if (editor.isFocused) return;
       programmaticRef.current = true;
       editor.commands.setContent(textToHtml(content));
       programmaticRef.current = false;
@@ -103,9 +101,8 @@ export function ChapterEditor({ content, onChange, placeholder, readOnly, aiGene
         .ProseMirror { min-height:400px; outline:none; padding:0 1.5rem 1.5rem 1.5rem; font-size:15px; line-height:2; }
         .ProseMirror p { margin:0.5em 0; }
         .ProseMirror p.is-editor-empty:first-child::before { content:attr(data-placeholder); color:#94a3b8; font-style:italic; float:left; pointer-events:none; height:0; }
-        .ai-active .ProseMirror p { border-left:2px solid #d1d5db; padding-left:12px; }
       `}</style>
-      <div className={aiGenerated ? "ai-active" : ""} ref={editorRef} onMouseUp={handleMouseUp}>
+      <div ref={editorRef} onMouseUp={handleMouseUp}>
         <EditorContent editor={editor} />
       </div>
     </div>

@@ -115,6 +115,19 @@ export async function createPayoff(
   });
 }
 
+/** Update a payoff item */
+export async function updatePayoff(
+  id: string,
+  data: { title?: string; summary?: string; scopeType?: string; currentStatus?: string; targetStartOrder?: number; targetEndOrder?: number },
+): Promise<unknown> {
+  return getPrisma().payoffLedgerItem.update({ where: { id }, data });
+}
+
+/** Delete a payoff item */
+export async function deletePayoff(id: string): Promise<void> {
+  await getPrisma().payoffLedgerItem.delete({ where: { id } });
+}
+
 /** Enhanced payoff context with overdue warnings and richer instructions */
 export async function getActivePayoffContext(novelId: string, chapterOrder: number): Promise<string> {
   const prisma = getPrisma();

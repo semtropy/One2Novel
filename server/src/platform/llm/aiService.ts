@@ -9,11 +9,21 @@ export type TaskType = "writer" | "reviewer" | "planner" | "extractor" | "compil
 
 export function getPreferredProvider(): LLMProvider {
   try {
-    // Dynamic import to avoid circular dependency
     const { getPreferences } = require("../../modules/settings/preferences");
     const prefs = getPreferences();
-    return (prefs?.defaultProvider as LLMProvider) ?? "deepseek";
+    const raw = (prefs?.defaultProvider as string) ?? "deepseek";
+    return (raw.includes(":") ? raw.split(":")[0] : raw) as LLMProvider;
   } catch { return "deepseek"; }
+}
+
+export function getPreferredModel(): string | undefined {
+  try {
+    const { getPreferences } = require("../../modules/settings/preferences");
+    const prefs = getPreferences();
+    const raw = (prefs?.defaultProvider as string) ?? "";
+    const parts = raw.split(":");
+    return parts.length > 1 ? parts.slice(1).join(":") : undefined;
+  } catch { return undefined; }
 }
 
 // ─── Context Group Definition ──────────────────────
@@ -189,6 +199,7 @@ export async function aiInvoke<T extends z.ZodType>(opts: {
     : opts.systemPrompt;
   return invokeStructuredLlm({
     provider: getPreferredProvider(),
+    model: getPreferredModel(),
     temperature: opts.temperature ?? route.temperature,
     maxTokens: opts.maxTokens ?? route.maxTokens,
     maxRetries: opts.maxRetries,
@@ -200,5 +211,5 @@ export async function aiInvoke<T extends z.ZodType>(opts: {
 
 export function aiGenerate(opts: { task: TaskType; temperature?: number }) {
   const route = TASK_MODEL[opts.task];
-  return createLLM(getPreferredProvider(), { temperature: opts.temperature ?? route.temperature, maxTokens: route.maxTokens });
+  return createLLM(getPreferredProvider(), { model: getPreferredModel(), temperature: opts.temperature ?? route.temperature, maxTokens: route.maxTokens });
 }

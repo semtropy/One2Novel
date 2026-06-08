@@ -108,7 +108,7 @@ export function BlueprintPanel({ novelId }: Props) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-slate-800">章节蓝图</h3>
+          <h3 className="text-sm font-semibold text-slate-800">章节大纲</h3>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={async () => { try { await api.post(`/novels/${novelId}/blueprint/restore`); refetch(); } catch {} }}
@@ -209,7 +209,7 @@ export function BlueprintPanel({ novelId }: Props) {
       ) : (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 py-8 text-center space-y-3">
           <AlertCircle size={32} className="mx-auto text-slate-300" />
-          <p className="text-sm text-slate-500">尚无章节蓝图</p>
+          <p className="text-sm text-slate-500">尚无章节大纲</p>
           <p className="text-xs text-slate-400">AI 生成自动规划卷和章节，或手动创建卷后逐章添加</p>
           <button onClick={handleAddVolume} disabled={addingVol}
             className="rounded-lg border border-slate-300 px-4 py-2 text-xs text-slate-600 hover:bg-white transition-colors">

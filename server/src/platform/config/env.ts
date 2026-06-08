@@ -21,6 +21,10 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_BASE_URL: z.string().default("https://api.anthropic.com/v1"),
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-6"),
+
+  GEMINI_API_KEY: z.string().optional(),
+  QWEN_API_KEY: z.string().optional(),
+  MOONSHOT_API_KEY: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

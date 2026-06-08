@@ -24,12 +24,15 @@ const RawQualitySchema = z.object({
   })).optional(),
 }).passthrough();
 
+export type Verdict = "PASS" | "WARNING" | "NEEDS_FIX" | "BLOCKED";
+
 export interface QualityResult {
   openingScore: number; plotScore: number; characterScore: number;
   dialogueScore: number; suspenseScore: number; pacingScore: number;
   showNotTellScore: number;  // Skill三大黄金法则之一
   languageScore: number; genreScore: number;
   overallComment: string;
+  verdict: Verdict;
   issues?: Array<{ type: string; severity: string; description: string; fixSuggestion: string }>;
 }
 
@@ -288,11 +291,23 @@ export async function runQualityGate(
     languageScore: raw.languageScore ?? 6,
     genreScore: raw.genreScore ?? 6,
     overallComment: raw.overallComment ?? raw.summary ?? raw.comment ?? "评估完成",
+    verdict: "NEEDS_FIX",
     issues: [...prohibitionIssues, ...llmIssues],
   };
 
   // Skill diagnostics: enrich issues with rule-based Skill diagnostics for low-scoring dimensions
   qualityResult.issues = enrichQualityIssues(qualityResult);
+
+  // Compute verdict from score and issues
+  const total = totalQualityScore(qualityResult);
+  const threshold = passThreshold(opts?.genre);
+  const hasBlocking = (qualityResult.issues ?? []).some(i => i.severity === "high" && (i.type.includes("硬约束") || i.type.includes("违反")));
+  const hasIssues = (qualityResult.issues ?? []).filter(i => i.severity === "high" || i.severity === "medium").length > 0;
+
+  qualityResult.verdict = hasBlocking ? "BLOCKED"
+    : total >= threshold && !hasIssues ? "PASS"
+    : total >= threshold - 10 ? "WARNING"
+    : "NEEDS_FIX";
 
   return qualityResult;
 }

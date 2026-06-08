@@ -11,3 +11,4 @@ dist/
 temp_*
 data/
 server/user-preferences.json
+CLAUDE.md

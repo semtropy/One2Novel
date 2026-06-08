@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Pencil, Target, Zap, Bookmark, Flag, Tag, RefreshCw } from "lucide-react";
 import { WorldPanel } from "./WorldPanel";
-import { StyleSelector } from "../style/StyleSelector";
 import { useNovel, useUpdateNovel, useGenerateEditorialInfo } from "../../api/novel";
 
 interface Props { novelId: string }
@@ -84,7 +83,6 @@ export function AdvancedSettings({ novelId }: Props) {
             </div>
           </section>
           <section><WorldPanel novelId={novelId} /></section>
-          <section><StyleSelector novelId={novelId} /></section>
         </div>
       )}
     </div>

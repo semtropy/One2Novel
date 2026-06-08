@@ -17,6 +17,7 @@ export interface ScenePlan {
   scenes: Scene[];
   scenePlanGenerated: boolean;
   generatedAt?: string;
+  enabled: boolean;
 }
 
 async function fetchScenePlan(novelId: string, chapterId: string): Promise<ScenePlan | null> {
@@ -66,6 +67,20 @@ export function useUpdateScenePlan(novelId: string, chapterId: string | undefine
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (scenes: Scene[]) => updateScenePlan(novelId!, chapterId!, scenes),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scenePlan", novelId, chapterId] });
+    },
+  });
+}
+
+export function useToggleScenePlan(novelId: string, chapterId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      await fetch(`/api/novels/${novelId}/chapters/${chapterId}/scenes/toggle`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scenePlan", novelId, chapterId] });
     },
