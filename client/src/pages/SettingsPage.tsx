@@ -219,16 +219,40 @@ export function SettingsPage() {
                 />
               </div>
             </div>
-            <div className="w-1/3">
-              <div className="text-xs text-slate-500 font-medium mb-1.5">默认目标章数</div>
-              <input type="number" min={1} max={1000}
-                value={(prefs.typicalChapterCount as number | null) ?? ""}
-                onChange={e => { const v = e.target.value ? parseInt(e.target.value) || null : null; setPrefs(p => ({ ...p, typicalChapterCount: v })); }}
-                onBlur={() => savePref("typicalChapterCount", prefs.typicalChapterCount)}
-                placeholder="不预设"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
-              />
-              <p className="text-xs text-slate-400 mt-1">留空则不预设总章数</p>
+            <div className="flex gap-4">
+              <div className="w-1/3">
+                <div className="text-xs text-slate-500 font-medium mb-1.5">默认目标章数</div>
+                <input type="number" min={1} max={1000}
+                  value={(prefs.typicalChapterCount as number | null) ?? ""}
+                  onChange={e => { const v = e.target.value ? parseInt(e.target.value) || null : null; setPrefs(p => ({ ...p, typicalChapterCount: v })); }}
+                  onBlur={() => savePref("typicalChapterCount", prefs.typicalChapterCount)}
+                  placeholder="不预设"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
+                />
+                <p className="text-xs text-slate-400 mt-1">留空则不预设总章数</p>
+              </div>
+              <div className="w-1/3">
+                <div className="text-xs text-slate-500 font-medium mb-1.5">默认卷数</div>
+                <input type="number" min={2} max={8}
+                  value={(prefs.preferredVolumes as number | null) ?? ""}
+                  onChange={e => { const v = e.target.value ? parseInt(e.target.value) || null : null; setPrefs(p => ({ ...p, preferredVolumes: v })); }}
+                  onBlur={() => savePref("preferredVolumes", prefs.preferredVolumes)}
+                  placeholder="2-8"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
+                />
+                <p className="text-xs text-slate-400 mt-1">留空则根据章数自动计算</p>
+              </div>
+              <div className="w-1/3">
+                <div className="text-xs text-slate-500 font-medium mb-1.5">每卷章数</div>
+                <input type="number" min={2} max={100}
+                  value={(prefs.preferredChaptersPerVolume as number | null) ?? ""}
+                  onChange={e => { const v = e.target.value ? parseInt(e.target.value) || null : null; setPrefs(p => ({ ...p, preferredChaptersPerVolume: v })); }}
+                  onBlur={() => savePref("preferredChaptersPerVolume", prefs.preferredChaptersPerVolume)}
+                  placeholder="12"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
+                />
+                <p className="text-xs text-slate-400 mt-1">默认12，留空自动计算</p>
+              </div>
             </div>
           </div>
         </section>

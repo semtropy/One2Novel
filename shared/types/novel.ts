@@ -4,7 +4,7 @@ import { z } from "zod";
 
 export const NovelCreateSchema = z.object({
   title: z.string().min(1, "标题不能为空").max(200),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(50000).optional(),
   genre: z.string().max(100).optional(),
   writingMode: z.enum(["original", "continuation"]).default("original"),
   narrativePov: z.enum(["first_person", "third_person", "mixed"]).optional(),
@@ -18,7 +18,7 @@ export type NovelCreate = z.infer<typeof NovelCreateSchema>;
 
 export const NovelUpdateSchema = z.object({
   title: z.string().min(1).max(200).optional(),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(50000).optional(),
   genre: z.string().max(100).optional(),
   targetAudience: z.string().max(500).optional(),
   bookSellingPoint: z.string().max(1000).optional(),
@@ -68,7 +68,7 @@ export type ChapterUpdate = z.infer<typeof ChapterUpdateSchema>;
 export const NovelCharacterCreateSchema = z.object({
   name: z.string().min(1).max(100),
   role: z.enum(["protagonist", "antagonist", "supporting", "minor"]),
-  personality: z.string().max(2000).optional(),
+  personality: z.string().max(50000).optional(),
   background: z.string().max(5000).optional(),
 });
 

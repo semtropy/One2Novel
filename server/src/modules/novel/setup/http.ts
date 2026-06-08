@@ -365,7 +365,7 @@ novelRoutes.post("/:id/quick-start", async (req, res, next) => {
             if (orphanChapters.length > 0) {
               await prisma.chapter.deleteMany({ where: { id: { in: orphanChapters.map(c => c.id) } } });
             }
-            for (const vol of (outline.volumes ?? [])) {
+            for (const vol of (outline?.volumes ?? [])) {
               const sortOrder = vol.sortOrder ?? vol.volume ?? 1;
               const volume = await prisma.volume.create({
                 data: { novelId, sortOrder, title: vol.title ?? "", summary: vol.summary ?? "" },
@@ -459,7 +459,7 @@ novelRoutes.post("/:novelId/blueprint/restore", async (req, res, next) => {
 
 novelRoutes.post("/:id/blueprint", async (req, res, next) => {
   try {
-    const result = await generateBlueprint(req.params.id);
+    const result = await generateBlueprint(req.params.id, req.body?.volumes);
     // Also populate DraftPlans from the generated structuredOutline
     const prisma = getPrisma();
     const novel = await prisma.novel.findUnique({ where: { id: req.params.id }, select: { structuredOutline: true } });
@@ -477,7 +477,7 @@ novelRoutes.post("/:id/blueprint", async (req, res, next) => {
         await prisma.chapter.deleteMany({ where: { id: { in: orphanChapters.map(c => c.id) } } });
       }
       // Create fresh volumes + draft plans from AI output
-      for (const vol of (outline.volumes ?? [])) {
+      for (const vol of (outline?.volumes ?? [])) {
         const sortOrder = vol.sortOrder ?? vol.volume ?? 1;
         const volume = await prisma.volume.create({
           data: { novelId: req.params.id, sortOrder, title: vol.title ?? "", summary: vol.summary ?? "" },
@@ -490,7 +490,7 @@ novelRoutes.post("/:id/blueprint", async (req, res, next) => {
       }
     }
     res.json({ data: result });
-  } catch (e) { next(e); }
+	  } catch (e) { next(e); }
 });
 novelRoutes.post("/:id/blueprint/confirm", async (req, res, next) => {
   try {

@@ -12,6 +12,8 @@ export interface UserPreferences {
     preferredPace: string;
     preferredTone: string;
     typicalChapterCount: number | null;
+	    preferredVolumes?: number | null;
+	    preferredChaptersPerVolume?: number | null;
     defaultChapterLength: number | null;
     creationHistory: Array<{ title: string; genre: string; createdAt: string }>;
     defaultProvider?: "deepseek" | "openai" | "anthropic";

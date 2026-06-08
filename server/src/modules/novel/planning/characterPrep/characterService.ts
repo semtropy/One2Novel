@@ -70,10 +70,11 @@ export async function generateCharacters(novelId: string): Promise<CharacterExtr
     "type：friend（朋友）/ enemy（敌人）/ lover（恋人）/ rival（竞争者）/ mentor（导师）/ family（家人）",
     "summary：15-30字，描述两人关系的核心冲突或纽带",
   ].join("\n");
+  const descriptionText = novel.description ? `\n原始灵感/大纲：\n${novel.description.slice(0, 8000)}` : "";
   const raw = await aiInvoke({
     task: "extractor",
     systemPrompt: injectSkillRules(basePrompt, ["character","fatal_flaw"]),
-    userPrompt: [`书名：《${novel.title}》`, novel.genre ? `题材：${novel.genre}` : null, `章节：${chList}`, outline ? `大纲：${outline.slice(0, 2000)}` : null, "请生成角色阵容。"].filter(Boolean).join("\n"),
+    userPrompt: [`书名：《${novel.title}》`, novel.genre ? `题材：${novel.genre}` : null, `章节：${chList}`, outline ? `大纲：${outline.slice(0, 4000)}` : null, descriptionText, "请基于以上信息生成角色阵容，不要凭空创造与大纲/灵感冲突的角色。"].filter(Boolean).join("\n"),
     schema: LLMCharExtractSchema, temperature: 0.85,
   });
 
