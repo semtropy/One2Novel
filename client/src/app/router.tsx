@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, createHashRouter } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell";
 import { StartPage } from "../pages/StartPage";
 import { NovelsPage } from "../pages/NovelsPage";
@@ -7,7 +7,7 @@ import { SettingsPage } from "../pages/SettingsPage";
 import { StylesPage } from "../pages/StylesPage";
 import { ChatPage } from "../pages/ChatPage";
 
-export const router = createBrowserRouter([
+const routes = [
   {
     element: <AppShell />,
     children: [
@@ -19,4 +19,7 @@ export const router = createBrowserRouter([
       { path: "/settings", element: <SettingsPage /> },
     ],
   },
-]);
+];
+
+export const browserRouter = createBrowserRouter(routes);
+export const hashRouter = createHashRouter(routes);

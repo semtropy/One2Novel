@@ -52,6 +52,12 @@ export function SettingsPage() {
   useEffect(() => {
     api.get("/preferences").then(r => setPrefs(r.data.data?.preferences ?? {})).catch(() => {});
     loadProviders();
+    // Auto-push stored keys to server on mount (survive desktop app restarts)
+    for (const [provider, keyVal] of Object.entries(editingKeys)) {
+      if (keyVal?.trim()) {
+        saveProviderConfig(provider, keyVal);
+      }
+    }
   }, []);
 
   async function loadProviders() {

@@ -11,8 +11,8 @@ import { getActiveRulesContext } from "../modules/novel/world/ruleActivationServ
 import { generateBeatSheet } from "../modules/novel/planning/volumeStrategy";
 import { getStateSnapshots } from "../modules/novel/production/stateSnapshot";
 import { getPrisma } from "../platform/db/client";
-import { getPreferences, savePreferences } from "../modules/settings/preferences";
-import { getEnv } from "../platform/config/env";
+import { getPreferences, savePreferences, saveApiKey } from "../modules/settings/preferences";
+import { getEnv, reloadEnv } from "../platform/config/env";
 import { createLLM } from "../platform/llm/provider";
 import { HumanMessage } from "@langchain/core/messages";
 import { processChatMessage, executeAction } from "../modules/creativeHub/chatService";
@@ -137,9 +137,11 @@ export function registerRoutes(app: Express) {
   });
   api.post("/settings", (req, res) => {
     const { key, provider } = req.body;
-    if (key && provider === "deepseek") process.env.DEEPSEEK_API_KEY = key;
-    if (key && provider === "openai") process.env.OPENAI_API_KEY = key;
-    if (key && provider === "anthropic") process.env.ANTHROPIC_API_KEY = key;
+    if (key && provider) {
+      process.env[`${provider.toUpperCase()}_API_KEY`] = key;
+      saveApiKey(provider, key);
+    }
+    reloadEnv();
     res.json({ data: { ok: true } });
   });
 
@@ -167,8 +169,11 @@ export function registerRoutes(app: Express) {
   // Save provider config
   api.post("/settings/providers/:provider", (req, res) => {
     const { key, model } = req.body;
-    const p = req.params.provider.toUpperCase() + "_API_KEY";
-    if (key) process.env[p] = key;
+    if (key) {
+      process.env[`${req.params.provider.toUpperCase()}_API_KEY`] = key;
+      saveApiKey(req.params.provider, key);
+      reloadEnv();
+    }
     if (model !== undefined) {
       const prefs = getPreferences();
       const providerModels = { ...(prefs.preferences.providerModels ?? {}), [req.params.provider]: model };

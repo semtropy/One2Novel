@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
+import { resolveDataRoot } from "../../platform/config/appPaths";
 
-const PREFS_FILE = path.resolve("user-preferences.json");
+const PREFS_FILE = path.join(resolveDataRoot(), "user-preferences.json");
 
 export interface UserPreferences {
   version: number;
@@ -12,17 +13,19 @@ export interface UserPreferences {
     preferredPace: string;
     preferredTone: string;
     typicalChapterCount: number | null;
-	    preferredVolumes?: number | null;
-	    preferredChaptersPerVolume?: number | null;
+    preferredVolumes?: number | null;
+    preferredChaptersPerVolume?: number | null;
     defaultChapterLength: number | null;
     creationHistory: Array<{ title: string; genre: string; createdAt: string }>;
     defaultProvider?: "deepseek" | "openai" | "anthropic";
     providerModels?: Record<string, string>;
+    /** Persisted API keys (masked on read from API, loaded to process.env on boot) */
+    apiKeys?: Record<string, string>;
   };
 }
 
 const defaults: UserPreferences = {
-  version: 1,
+  version: 2,
   updatedAt: new Date().toISOString(),
   preferences: {
     favoriteGenres: [],
@@ -33,6 +36,7 @@ const defaults: UserPreferences = {
     defaultChapterLength: 3000,
     creationHistory: [],
     providerModels: {},
+    apiKeys: {},
   },
 };
 
@@ -50,14 +54,35 @@ export function getPreferences(): UserPreferences {
 export function savePreferences(prefs: Partial<UserPreferences["preferences"]>): UserPreferences {
   const current = getPreferences();
   const updated: UserPreferences = {
-    version: 1,
+    version: 2,
     updatedAt: new Date().toISOString(),
     preferences: { ...current.preferences, ...prefs },
   };
   try {
+    fs.mkdirSync(path.dirname(PREFS_FILE), { recursive: true });
     fs.writeFileSync(PREFS_FILE, JSON.stringify(updated, null, 2), "utf-8");
   } catch {}
   return updated;
+}
+
+/** Load persisted API keys into process.env on server startup */
+export function loadApiKeysFromPreferences(): void {
+  try {
+    const prefs = getPreferences();
+    const keys = prefs.preferences.apiKeys ?? {};
+    for (const [provider, key] of Object.entries(keys)) {
+      if (key && !process.env[`${provider.toUpperCase()}_API_KEY`]) {
+        process.env[`${provider.toUpperCase()}_API_KEY`] = key;
+      }
+    }
+  } catch {}
+}
+
+/** Save a single provider's API key to preferences */
+export function saveApiKey(provider: string, key: string): void {
+  const prefs = getPreferences();
+  const apiKeys = { ...(prefs.preferences.apiKeys ?? {}), [provider]: key };
+  savePreferences({ apiKeys });
 }
 
 export function recordCreation(novel: { title: string; genre?: string; createdAt: string | Date }) {
@@ -65,7 +90,6 @@ export function recordCreation(novel: { title: string; genre?: string; createdAt
   const current = getPreferences();
   const history = current.preferences.creationHistory.slice(0, 9);
   history.unshift({ title: novel.title, genre: novel.genre ?? "", createdAt });
-  // Update genre frequency
   const genres = [...current.preferences.favoriteGenres];
   if (novel.genre && !genres.includes(novel.genre)) {
     genres.unshift(novel.genre);

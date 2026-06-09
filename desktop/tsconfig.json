@@ -5,11 +5,10 @@
     "moduleResolution": "Node",
     "outDir": "dist",
     "rootDir": "src",
-    "declaration": false
+    "typeRoots": ["../server/node_modules/@types", "./src/@types"],
+    "types": ["node"],
+    "noEmit": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": [
-    "src/modules/promptRegistry/prompts/**",
-    "src/modules/promptRegistry/core/**"
-  ]
+  "exclude": ["dist", "node_modules"]
 }

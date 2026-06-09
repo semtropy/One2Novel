@@ -1,13 +1,16 @@
 import dotenv from "dotenv";
 import { z } from "zod";
+import { resolveAppRuntimeMode, resolveDatabaseFilePath } from "./appPaths";
 
-// Load root .env first, then local .env (overrides if exists)
-dotenv.config({ path: "../.env" });
-dotenv.config();
+// Only load .env in dev/web mode — desktop has no .env file
+if (resolveAppRuntimeMode() !== "desktop") {
+  dotenv.config({ path: "../.env" });
+  dotenv.config();
+}
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
-  CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  CORS_ORIGIN: z.string().default("http://localhost:7457"),
   DATABASE_URL: z.string().default("file:./dev.db"),
 
   OPENAI_API_KEY: z.string().optional(),
@@ -33,7 +36,19 @@ let _env: EnvConfig;
 
 export function getEnv(): EnvConfig {
   if (!_env) {
+    // In desktop mode, rewrite file:./dev.db → app data directory
+    if (resolveAppRuntimeMode() === "desktop" && process.env.DATABASE_URL) {
+      process.env.DATABASE_URL = resolveDatabaseFilePath(process.env.DATABASE_URL);
+    }
     _env = envSchema.parse(process.env);
   }
+  return _env;
+}
+
+export function reloadEnv(): EnvConfig {
+  if (resolveAppRuntimeMode() === "desktop" && process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = resolveDatabaseFilePath(process.env.DATABASE_URL);
+  }
+  _env = envSchema.parse(process.env);
   return _env;
 }
