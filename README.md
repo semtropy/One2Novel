@@ -14,7 +14,8 @@
 
 打开后第一件事：进入**设置**页，填入你的 AI 服务 API Key，然后就可以开始创作了。
 
-> 支持 DeepSeek、OpenAI、Anthropic Claude、Google Gemini、通义千问、月之暗面 Moonshot 等多个 AI 厂商。
+> 目前支持 DeepSeek、OpenAI、Anthropic Claude、Google Gemini、通义千问、月之暗面 Moonshot 等多个 AI 厂商。
+
 
 ---
 
@@ -27,6 +28,13 @@
 ```
 灵 感 → 故事种子 → 角色生成 → 卷纲蓝图 → 批量写章 → 质检修复 → 导出
 ```
+
+<img width="2864" height="1536" alt="09a6585d4776ef1a4748925a9d37d567" src="https://github.com/user-attachments/assets/056ae4a7-9789-47d8-88ab-4a0629f34ac5" />
+
+<img width="2864" height="1536" alt="2d716e3f2f9c48cb31b6fba948c7cf09" src="https://github.com/user-attachments/assets/70e9578a-204d-4843-886b-192e30840d38" />
+
+<img width="2864" height="1536" alt="bae2da10f3e4e0463fe4a6880cfdc484" src="https://github.com/user-attachments/assets/3f3c170e-c3ab-4f0f-9266-332476c69c7d" />
+
 
 #### 1. 灵感到故事种子
 
@@ -52,7 +60,7 @@ AI 自动从故事大纲中提取所需角色阵容，每个角色包含：
 
 AI 根据故事方向和角色阵容，自动规划：
 
-- 分卷策略（2-4 卷，每卷 5-8 章）
+- 分卷策略
 - 每卷的主题、冲突、转折点
 - 卷间衔接和悬念承继
 - 章节任务书（每章的具体目标和要求）
