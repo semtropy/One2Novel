@@ -1,32 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../app/api";
+import type { NovelDetail, NovelCreate, NovelUpdate } from "@one2novel/shared/types/novel";
 
-export interface Novel {
-  id: string;
-  title: string;
-  description?: string;
-  genre?: string;
-  status: string;
-  projectStatus?: string;
-  targetAudience?: string;
-  bookSellingPoint?: string;
-  competingFeel?: string;
-  first30ChapterPromise?: string;
-  commercialTags?: string;
-  narrativePov?: string;
-  pacePreference?: string;
-  styleTone?: string;
-  emotionIntensity?: string;
-  defaultChapterLength?: number;
-  estimatedChapterCount?: number;
-  structuredOutline?: string;
-  draftSeed?: string;
-  outline?: string;
-  worldRules?: string;
-  titleSuggestions?: string;
-  updatedAt: string;
-  createdAt: string;
-}
+// Re-export shared types so consumers don't need direct shared imports
+export type Novel = NovelDetail;
+export type { NovelCreate, NovelUpdate };
 
 export interface BookFramingResult {
   targetAudience: string;
@@ -51,7 +29,7 @@ export function useNovel(id: string | undefined) {
     queryKey: ["novel", id],
     queryFn: async () => {
       const { data } = await api.get(`/novels/${id}`);
-      return data.data as Novel & { chapters: unknown[]; characters: unknown[] };
+      return data.data as NovelDetail;
     },
     enabled: !!id,
     staleTime: 0,
@@ -184,32 +162,13 @@ export function useGenerateStoryCore() {
   });
 }
 
-// ─── Editorial Info ──────────────────────────────────────
-
-export interface EditorialInfoResult {
-  targetAudience: string; bookSellingPoint: string;
-  competingFeel: string; first30ChapterPromise: string;
-  commercialTags: string[];
-}
-
-export function useGenerateEditorialInfo() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (novelId: string) => {
-      const { data } = await api.post(`/novels/${novelId}/editorial-info`);
-      return data.data as EditorialInfoResult;
-    },
-    onSuccess: (_, novelId) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
-  });
-}
-
-// ─── Quick Start (batch: story core → characters + blueprint + editorial) ──
+// ─── Quick Start (batch: story core → characters + blueprint + framing) ──
 
 export interface QuickStartResult {
   storyCore: StoryCoreResult;
   characters: { characters: unknown[]; relationships: unknown[] };
   blueprint: { volumes: unknown[] };
-  editorialInfo: EditorialInfoResult;
+  framing: BookFramingResult;
 }
 
 export function useQuickStart() {
@@ -223,27 +182,6 @@ export function useQuickStart() {
   });
 }
 
-// ─── Legacy Story Seed (kept for reference, replaced by story-core) ──
-
-export interface StorySeedResult {
-  premise: string; mainArc: string; mysteryBox: string; endingDirection: string;
-  genre: string | null; narrativePov: string | null; pacePreference: string | null;
-  styleTone: string | null; emotionIntensity: string | null;
-  targetAudience: string | null; bookSellingPoint: string | null;
-  competingFeel: string | null; first30ChapterPromise: string | null; commercialTags: string[];
-}
-
-/** @deprecated Use useGenerateStoryCore instead */
-export function useGenerateStorySeed() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (novelId: string) => {
-      const { data } = await api.post(`/novels/${novelId}/story-core`);
-      return data.data as StorySeedResult;
-    },
-    onSuccess: (_, novelId) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
-  });
-}
 
 // ─── Blueprint ──────────────────────────────────────────
 
@@ -558,6 +496,65 @@ export function useUpsertDraftRelation() {
 export function useUpsertRelation() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: async (input: { novelId: string; sourceCharacterId: string; targetCharacterId: string; type: string; attitudeSource?: string; attitudeTarget?: string; stage?: string }) => { const { data } = await api.post(`/novels/${input.novelId}/relations`, input); return data.data; }, onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["rel-graph", v.novelId] }); } });
+}
+
+// ─── Phase 2.5: Volume Rebalance ──────────────────────
+
+export interface RebalanceResult {
+  adjustedChapters: Array<{
+    chapterOrder: number;
+    changes: { conflictLevel?: number; shouldFeature?: string[]; payoffTouches?: string[] };
+    reason: string;
+  }>;
+  summary: string;
+}
+
+export function useRebalanceVolume() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ novelId, sortOrder }: { novelId: string; sortOrder: number }) => {
+      const { data } = await api.post(`/novels/${novelId}/volumes/${sortOrder}/rebalance`);
+      return data.data as RebalanceResult;
+    },
+    onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
+  });
+}
+
+// ─── Phase 2.8: Draft Optimize ─────────────────────────
+
+export interface OptimizeResult {
+  optimizedContent: string;
+  changesSummary: string;
+  preservedElements: string[];
+}
+
+export function useOptimizeChapter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ novelId, chapterId }: { novelId: string; chapterId: string }) => {
+      const { data } = await api.post(`/novels/${novelId}/chapters/${chapterId}/optimize`);
+      return data.data as OptimizeResult;
+    },
+    onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
+  });
+}
+
+// ─── Phase 2.1: Character Dynamics ─────────────────────
+
+export interface ChapterDynamics {
+  dynamics: unknown;
+  contextBlock: string;
+}
+
+export function useChapterDynamics(novelId?: string, chapterId?: string) {
+  return useQuery({
+    queryKey: ["character-dynamics", novelId, chapterId],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/character-dynamics?chapterId=${chapterId}`);
+      return data.data as ChapterDynamics;
+    },
+    enabled: !!novelId && !!chapterId,
+  });
 }
 
 // ─── Timeline ─────────────────────────────────────────

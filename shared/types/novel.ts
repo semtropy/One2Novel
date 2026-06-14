@@ -32,7 +32,6 @@ export const NovelUpdateSchema = z.object({
   defaultChapterLength: z.number().int().min(500).max(50000).optional(),
   estimatedChapterCount: z.number().int().min(1).max(1000).optional(),
   structuredOutline: z.string().optional(),
-  draftSeed: z.string().optional(),
   titleSuggestions: z.string().optional(),
 });
 
@@ -58,7 +57,7 @@ export const ChapterUpdateSchema = z.object({
   targetWordCount: z.number().int().min(500).max(50000).optional(),
   hook: z.string().optional(),
   expectation: z.string().optional(),
-  sceneCards: z.string().optional(),
+  scenePlan: z.string().optional(),
 });
 
 export type ChapterUpdate = z.infer<typeof ChapterUpdateSchema>;
@@ -74,10 +73,7 @@ export const NovelCharacterCreateSchema = z.object({
 
 export type NovelCharacterCreate = z.infer<typeof NovelCharacterCreateSchema>;
 
-// ─── Lock / Contract ──────────────────────────────────
-
-export const LOCK_SCOPES = ["story_seed", "characters", "blueprint"] as const;
-export type LockScope = (typeof LOCK_SCOPES)[number];
+// ─── Snapshots ────────────────────────────────────────
 
 export interface StorySeedSnapshot {
   premise: string;
@@ -135,10 +131,105 @@ export interface ConfirmationStatus {
   blueprint:   { confirmed: boolean; dirty: boolean; dirtyCount: number; lastConfirmedAt: string | null };
 }
 
-/** @deprecated — use ConfirmationStatus instead */
-export interface LockStatus {
-  locked: LockScope[];
-  unlocked: LockScope[];
+// ─── Read DTOs (Phase 0.6: aligned with GET /novels/:id include) ──
+
+export interface ChapterDetail {
+  id: string;
+  title: string;
+  order: number;
+  content?: string | null;
+  chapterStatus: string;
+  targetWordCount: number;
+  actualWordCount?: number | null;
+  expectation?: string | null;
+  hook?: string | null;
+  qualityScore?: number | null;
+  openingScore?: number | null;
+  plotScore?: number | null;
+  characterScore?: number | null;
+  dialogueScore?: number | null;
+  suspenseScore?: number | null;
+  pacingScore?: number | null;
+  showNotTellScore?: number | null;
+  languageScore?: number | null;
+  genreScore?: number | null;
+  coherenceScore?: number | null;
+  repairHistory?: string | null;
+  diagnosis?: string | null;
+  riskFlags?: string | null;
+  activeWorldRules?: string | null;
+  scenePlan?: string | null;
+  openConflicts?: string | null;
+  finalizationSnapshot?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VolumeDetail {
+  id: string;
+  sortOrder: number;
+  title: string;
+  summary?: string | null;
+  chapterPlans: Array<{
+    id: string;
+    chapterId: string | null;
+    chapterOrder: number;
+    title: string;
+    summary?: string | null;
+    chapter?: { id: string; title: string; content?: string | null; chapterStatus: string } | null;
+  }>;
+  draftPlans: Array<{
+    id: string;
+    chapterOrder: number;
+    title: string;
+    summary?: string | null;
+  }>;
+}
+
+export interface NovelDetail {
+  id: string;
+  title: string;
+  description?: string | null;
+  genre?: string | null;
+  status: string;
+  writingMode?: string;
+  narrativePov?: string | null;
+  pacePreference?: string | null;
+  styleTone?: string | null;
+  emotionIntensity?: string | null;
+  defaultChapterLength?: number | null;
+  estimatedChapterCount?: number | null;
+  structuredOutline?: string | null;
+  targetAudience?: string | null;
+  bookSellingPoint?: string | null;
+  competingFeel?: string | null;
+  first30ChapterPromise?: string | null;
+  commercialTags?: string | null;
+  titleSuggestions?: string | null;
+  projectStatus?: string;
+  updatedAt: string;
+  createdAt: string;
+  // Relations
+  chapters: ChapterDetail[];
+  characters: Array<{
+    id: string; name: string; role: string; personality?: string | null;
+    background?: string | null; appearance?: string | null; quirks?: string | null;
+    currentStatus?: string | null; currentGoal?: string | null; voiceTexture?: string | null;
+    identityLabel?: string | null; factionLabel?: string | null;
+    prohibitions?: string | null; currentState?: string | null;
+    currentLocation?: string | null; availability?: string | null;
+  }>;
+  volumes: VolumeDetail[];
+  draftCharacters: Array<{
+    id: string; name: string; role: string; personality?: string | null;
+    background?: string | null; appearance?: string | null; quirks?: string | null;
+    currentStatus?: string | null; currentGoal?: string | null;
+    voiceTexture?: string | null; identityLabel?: string | null;
+    prohibitions?: string | null; synced: boolean;
+  }>;
+  draftStorySeed?: { content: string; synced: boolean } | null;
+  timelineItems: Array<{ title: string; category: string; sortOrder: number; status?: string }>;
+  worldRules?: Array<{ id: string; category: string; title: string; content: string; priority: number; status: string }>;
 }
 
 // ─── API Response ─────────────────────────────────────

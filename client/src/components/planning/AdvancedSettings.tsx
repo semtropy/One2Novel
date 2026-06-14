@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Pencil, Target, Zap, Bookmark, Flag, Tag, RefreshCw } from "lucide-react";
 import { WorldPanel } from "./WorldPanel";
-import { useNovel, useUpdateNovel, useGenerateEditorialInfo } from "../../api/novel";
+import { useNovel, useUpdateNovel, useGenerateFraming } from "../../api/novel";
 
 interface Props { novelId: string }
 
@@ -9,7 +9,7 @@ export function AdvancedSettings({ novelId }: Props) {
   const [open, setOpen] = useState(false);
   const { data: novel, refetch } = useNovel(novelId);
   const update = useUpdateNovel();
-  const genEditorial = useGenerateEditorialInfo();
+  const genFraming = useGenerateFraming();
   const [genError, setGenError] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editVal, setEditVal] = useState("");
@@ -37,9 +37,9 @@ export function AdvancedSettings({ novelId }: Props) {
           <section>
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold text-slate-800">编辑向信息</h4>
-              <button onClick={() => { setGenError(""); genEditorial.mutate(novelId, { onError: (e) => setGenError(e instanceof Error ? e.message : "生成失败，请重试") }); }} disabled={genEditorial.isPending}
+              <button onClick={() => { setGenError(""); genFraming.mutate(novelId, { onError: (e) => setGenError(e instanceof Error ? e.message : "生成失败，请重试") }); }} disabled={genFraming.isPending}
                 className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50 flex items-center gap-1">
-                {genEditorial.isPending ? <RefreshCw size={11} className="animate-spin" /> : "AI生成"}
+                {genFraming.isPending ? <RefreshCw size={11} className="animate-spin" /> : "AI生成"}
               </button>
               {genError && <span className="text-xs text-red-500 ml-2">{genError.slice(0, 80)}</span>}
             </div>

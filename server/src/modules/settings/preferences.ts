@@ -7,6 +7,13 @@ const PREFS_FILE = path.join(resolveDataRoot(), "user-preferences.json");
 export interface UserPreferences {
   version: number;
   updatedAt: string;
+  /** @deprecated Legacy v1 fields — migrated to preferences.* in v2. Read for backward compat only. */
+  writingPov?: string;
+  pacePreference?: string;
+  styleTone?: string;
+  favoriteGenre?: string;
+  defaultChapterLength?: number;
+  estimatedChapterCount?: number;
   preferences: {
     favoriteGenres: string[];
     preferredPerspective: string;

@@ -22,72 +22,64 @@ export async function saveCheckpoint(
   snapshot: Omit<DirectorCheckpoint, "taskId"> & { taskId?: string },
 ): Promise<string> {
   const prisma = getPrisma();
-  const now = new Date().toISOString();
+  const taskId = snapshot.taskId ?? `cp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-  const data = {
-    result: JSON.stringify({
-      ...snapshot,
-      lastCheckpointAt: now,
-    }),
-    progress: Math.round(
-      (snapshot.completedChapterIds.length / Math.max(snapshot.totalChaptersToWrite, 1)) * 100,
-    ),
-    stage: snapshot.stage === "blocked" ? "第" + snapshot.currentChapterOrder + "章失败" : "写作中",
-    status: snapshot.stage === "blocked" ? "failed" as const : "running" as const,
+  const checkpoint: DirectorCheckpoint = {
+    ...snapshot,
+    taskId,
+    lastCheckpointAt: new Date().toISOString(),
   };
 
-  if (snapshot.taskId) {
-    await prisma.backgroundTask.update({
-      where: { id: snapshot.taskId },
-      data,
-    });
-    return snapshot.taskId;
-  }
-
-  // Create new task record
-  const task = await prisma.backgroundTask.create({
-    data: {
-      novelId,
-      type: "director_run",
-      status: data.status,
-      progress: data.progress,
-      stage: data.stage,
-      result: data.result,
-    },
+  await prisma.novel.update({
+    where: { id: novelId },
+    data: { directorCheckpoint: JSON.stringify(checkpoint) },
   });
-  return task.id;
+
+  return taskId;
 }
 
 /** Load incomplete director checkpoint for a novel */
 export async function loadCheckpoint(novelId: string): Promise<DirectorCheckpoint | null> {
   const prisma = getPrisma();
-  const task = await prisma.backgroundTask.findFirst({
-    where: { novelId, type: "director_run", status: { in: ["running", "failed"] } },
-    orderBy: { createdAt: "desc" },
+  const novel = await prisma.novel.findUnique({
+    where: { id: novelId },
+    select: { directorCheckpoint: true },
   });
-  if (!task?.result) return null;
+
+  if (!novel?.directorCheckpoint) return null;
 
   try {
-    const parsed = JSON.parse(task.result);
-    return { taskId: task.id, ...parsed };
+    const parsed = JSON.parse(novel.directorCheckpoint) as DirectorCheckpoint;
+    if (parsed.stage === "completed") return null; // completed checkpoints are dead
+    return parsed;
   } catch {
     return null;
   }
 }
 
-/** Clear checkpoint on successful completion */
-export async function clearCheckpoint(novelId: string, taskId?: string): Promise<void> {
+/** Clear checkpoint on successful completion or stop */
+export async function clearCheckpoint(novelId: string, _taskId?: string): Promise<void> {
   const prisma = getPrisma();
-  if (taskId) {
-    await prisma.backgroundTask.update({
-      where: { id: taskId },
-      data: { status: "succeeded", progress: 100, stage: "全部完成" },
-    });
-    return;
-  }
-  // Bulk-clear all running director tasks for this novel
-  await prisma.backgroundTask.updateMany({
-    where: { novelId, type: "director_run", status: "running" },
-    data: { status: "succeeded", progress: 100 },
+  // Mark as completed in the JSON so resume doesn't pick it up
+  const novel = await prisma.novel.findUnique({
+    where: { id: novelId },
+    select: { directorCheckpoint: true },
   });
+  if (!novel?.directorCheckpoint) return;
+
+  try {
+    const cp = JSON.parse(novel.directorCheckpoint) as DirectorCheckpoint;
+    cp.stage = "completed";
+    cp.lastCheckpointAt = new Date().toISOString();
+    await prisma.novel.update({
+      where: { id: novelId },
+      data: { directorCheckpoint: JSON.stringify(cp) },
+    });
+  } catch {
+    // If JSON is corrupt, just clear it
+    await prisma.novel.update({
+      where: { id: novelId },
+      data: { directorCheckpoint: null },
+    });
+  }
 }

@@ -7,9 +7,5 @@
     "rootDir": "src",
     "declaration": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": [
-    "src/modules/promptRegistry/prompts/**",
-    "src/modules/promptRegistry/core/**"
-  ]
+  "include": ["src/**/*.ts"]
 }

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { aiInvoke } from "../../../platform/llm/aiService";
 import { getPrisma } from "../../../platform/db/client";
 import { getPreferences } from "../../settings/preferences";
-import { generateBeatSheet } from "./volumeStrategy";
+import { generateBeatSheet } from "./storyMacro/beatSheetService";
 
 // Note: chapter/volume indices + chapters array are optional with server-side defaults
 const LLMChapterSchema = z.object({
@@ -42,16 +42,17 @@ export async function generateBlueprint(novelId: string, preferredVolumes?: numb
     chaptersPerVolume = (prefs?.preferences?.preferredChaptersPerVolume as number) || undefined;
   } catch (e) { console.error("[Blueprint prefs]", e instanceof Error ? e.message : e); }
 
-  // Extract story core for context (from structuredOutline or live fields)
+  // Read story core from DraftStorySeed (single source of truth for planning)
   let storyCoreContext = "";
-  if (novel.structuredOutline) {
+  const draftSeed = await prisma.draftStorySeed.findUnique({ where: { novelId } });
+  if (draftSeed?.content) {
     try {
-      const o = JSON.parse(novel.structuredOutline);
+      const seed = JSON.parse(draftSeed.content);
       storyCoreContext = [
-        o.premise ? `前提：${o.premise}` : null,
-        o.mainArc ? `主线：${o.mainArc}` : null,
-        o.mysteryBox ? `核心悬念：${o.mysteryBox}` : null,
-        o.endingDirection ? `结局方向：${o.endingDirection}` : null,
+        seed.premise ? `前提：${seed.premise}` : null,
+        seed.mainArc ? `主线：${seed.mainArc}` : null,
+        seed.mysteryBox ? `核心悬念：${seed.mysteryBox}` : null,
+        seed.endingDirection ? `结局方向：${seed.endingDirection}` : null,
       ].filter(Boolean).join("\n");
     } catch {}
   }
@@ -76,20 +77,10 @@ export async function generateBlueprint(novelId: string, preferredVolumes?: numb
     ? chaptersPerVolume
     : Math.max(4, Math.min(12, Math.round(targetChapters / volCount)));
 
-  const systemPrompt = [
-    "你是资深小说作者+剧情策划编辑。根据已确定的故事核心（前提/主线/悬念/结局方向），生成卷→章结构蓝图。",
-    "",
-    "核心原则：",
-    "1. 卷结构必须服务于前提和主线，每卷有一个明确的阶段目标和主题（填入 theme 字段）。",
-    "2. 每章必须填写 coreEvent（核心事件一句话，20-50字）和 hook（章尾悬念钩子，15-30字），以及 summary（章节摘要，20-40字）。这三个字段不能为空。",
-    `3. 生成${volCount}卷，每卷约${chPerVol}章，总章数接近${targetChapters}章。章节标题<=8字。`,
-    "4. 卷与卷之间形成递进关系：铺垫→升级→高潮→收束。",
-    "5. 不要在章节中引入与故事核心矛盾的新设定。",
-  ].join("\n");
-
+  
   const raw = await aiInvoke({
-    task: "planner",
-    systemPrompt,
+    assetId: "novel.blueprint.generate",
+    templateVars: { volCount: String(volCount), chPerVol: String(chPerVol), targetChapters: String(targetChapters) },
     userPrompt: `为以下小说生成章节蓝图：\n\n${context}`,
     schema: BlueprintSchema,
     temperature: 0.8,
@@ -106,29 +97,13 @@ export async function generateBlueprint(novelId: string, preferredVolumes?: numb
     })),
   };
 
-  // Update structuredOutline: merge story core + new volumes
-  let storyCore = {};
-  if (novel.structuredOutline) {
-    try { const o = JSON.parse(novel.structuredOutline); storyCore = { premise: o.premise, mainArc: o.mainArc, mysteryBox: o.mysteryBox, endingDirection: o.endingDirection }; } catch {}
-  }
-  const structuredOutline = JSON.stringify({ ...storyCore, volumes: result.volumes });
-
+  // Update estimated chapter count only (blueprint data lives in DraftPlan/Volume tables)
   await prisma.novel.update({
     where: { id: novelId },
     data: {
-      structuredOutline,
-      outlineStatus: "completed", storylineStatus: "completed",
       estimatedChapterCount: result.volumes.reduce((s, v) => s + v.chapters.length, 0),
     },
   });
-
-  // Auto-generate beat sheets if volumes exist in DB (after apply)
-  const existingVolumes = await prisma.volume.findFirst({ where: { novelId } });
-  if (existingVolumes) {
-    for (const vol of result.volumes) {
-      try { await generateBeatSheet(novelId, vol.sortOrder); } catch {}
-    }
-  }
 
   return result;
 }

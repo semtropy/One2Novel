@@ -11,7 +11,8 @@
  */
 
 import { getPrisma } from "../../../platform/db/client";
-import { syncDraftPlansToWriting } from "../setup/volumeChapterSync";
+import { parseTags } from "../../../platform/data/tagHelpers";
+import { syncDraftPlansToWriting, syncDraftCharactersToWriting, syncDraftRelationsToWriting } from "../setup/volumeChapterSync";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -133,20 +134,6 @@ async function confirmStorySeed(novelId: string): Promise<void> {
 
   if (draftSeed?.content) {
     try { seedContent = JSON.parse(draftSeed.content); } catch { /* ignore */ }
-    // Sync DraftStorySeed → Novel.structuredOutline
-    // Merge seed content into structuredOutline, preserving volumes from blueprint
-    let structuredOutline: Record<string, unknown> = { premise: "", mainArc: "", mysteryBox: "", endingDirection: "" };
-    if (novel.structuredOutline) {
-      try { structuredOutline = JSON.parse(novel.structuredOutline); } catch { /* ignore */ }
-    }
-    structuredOutline.premise = seedContent.premise ?? structuredOutline.premise ?? "";
-    structuredOutline.mainArc = seedContent.mainArc ?? structuredOutline.mainArc ?? "";
-    structuredOutline.mysteryBox = seedContent.mysteryBox ?? structuredOutline.mysteryBox ?? "";
-    structuredOutline.endingDirection = seedContent.endingDirection ?? structuredOutline.endingDirection ?? "";
-    await prisma.novel.update({
-      where: { id: novelId },
-      data: { structuredOutline: JSON.stringify(structuredOutline) },
-    });
   }
 
   // Mark draft as synced
@@ -157,7 +144,7 @@ async function confirmStorySeed(novelId: string): Promise<void> {
   // Build snapshot from Novel fields (these are always live — genre, tone, etc.)
   let tags: string[] = [];
   if (novel.commercialTags) {
-    try { tags = JSON.parse(novel.commercialTags); if (!Array.isArray(tags)) tags = []; } catch { tags = []; }
+    tags = parseTags(novel.commercialTags);
   }
 
   const snapshot = {
@@ -188,68 +175,9 @@ async function confirmStorySeed(novelId: string): Promise<void> {
 async function confirmCharacters(novelId: string): Promise<void> {
   const prisma = getPrisma();
 
-  // Sync DraftCharacter → NovelCharacter (upsert)
-  const draftChars = await prisma.draftCharacter.findMany({ where: { novelId } });
-  const draftCharNames = new Set(draftChars.map(dc => dc.name));
-
-  for (const dc of draftChars) {
-    const existing = await prisma.novelCharacter.findFirst({ where: { novelId, name: dc.name } });
-    if (existing) {
-      await prisma.novelCharacter.update({
-        where: { id: existing.id },
-        data: { role: dc.role, personality: dc.personality, background: dc.background, appearance: dc.appearance, quirks: dc.quirks, currentStatus: dc.currentStatus, currentGoal: dc.currentGoal, voiceTexture: dc.voiceTexture, identityLabel: dc.identityLabel, prohibitions: dc.prohibitions },
-      });
-    } else {
-      await prisma.novelCharacter.create({
-        data: { novelId, name: dc.name, role: dc.role, personality: dc.personality, background: dc.background, appearance: dc.appearance, quirks: dc.quirks, currentStatus: dc.currentStatus, currentGoal: dc.currentGoal, voiceTexture: dc.voiceTexture, identityLabel: dc.identityLabel, prohibitions: dc.prohibitions },
-      });
-    }
-    await prisma.draftCharacter.update({ where: { id: dc.id }, data: { synced: true } });
-  }
-
-  // Delete NovelCharacters no longer in DraftCharacter
-  const novelChars = await prisma.novelCharacter.findMany({ where: { novelId } });
-  for (const nc of novelChars) {
-    if (!draftCharNames.has(nc.name)) {
-      await prisma.novelCharacterRelation.deleteMany({ where: { OR: [{ sourceCharacterId: nc.id }, { targetCharacterId: nc.id }] } });
-      await prisma.novelCharacter.delete({ where: { id: nc.id } });
-    }
-  }
-
-  // Sync DraftCharacterRelation → NovelCharacterRelation
-  const draftRels = await prisma.draftCharacterRelation.findMany({ where: { novelId } });
-  const dcIdToNcId: Record<string, string> = {};
-  for (const dc of draftChars) {
-    const nc = await prisma.novelCharacter.findFirst({ where: { novelId, name: dc.name } });
-    if (nc) dcIdToNcId[dc.id] = nc.id;
-  }
-
-  for (const dr of draftRels) {
-    const srcNcId = dcIdToNcId[dr.sourceCharacterId];
-    const tgtNcId = dcIdToNcId[dr.targetCharacterId];
-    if (!srcNcId || !tgtNcId) continue;
-    const existingRel = await prisma.novelCharacterRelation.findFirst({
-      where: { novelId, sourceCharacterId: srcNcId, targetCharacterId: tgtNcId },
-    });
-    if (existingRel) {
-      await prisma.novelCharacterRelation.update({ where: { id: existingRel.id }, data: { type: dr.type, summary: dr.summary } });
-    } else {
-      await prisma.novelCharacterRelation.create({ data: { novelId, sourceCharacterId: srcNcId, targetCharacterId: tgtNcId, type: dr.type, summary: dr.summary } });
-    }
-    await prisma.draftCharacterRelation.update({ where: { id: dr.id }, data: { synced: true } });
-  }
-
-  // Delete orphaned relations
-  const draftRelKeys = new Set(draftRels.map(r => `${r.sourceCharacterId}:${r.targetCharacterId}`));
-  const novelRels = await prisma.novelCharacterRelation.findMany({ where: { novelId } });
-  for (const nr of novelRels) {
-    // Find the source/target draft IDs by name
-    const srcDc = draftChars.find(dc => dcIdToNcId[dc.id] === nr.sourceCharacterId);
-    const tgtDc = draftChars.find(dc => dcIdToNcId[dc.id] === nr.targetCharacterId);
-    if (srcDc && tgtDc && !draftRelKeys.has(`${srcDc.id}:${tgtDc.id}`)) {
-      await prisma.novelCharacterRelation.delete({ where: { id: nr.id } });
-    }
-  }
+  // Delegate DraftChar → NovelChar + DraftRel → NovelRel sync to shared helpers
+  await syncDraftCharactersToWriting(novelId);
+  await syncDraftRelationsToWriting(novelId);
 
   // Snapshot characters for contextAssembler
   const chars = await prisma.novelCharacter.findMany({ where: { novelId }, take: 50 });
@@ -281,22 +209,36 @@ async function confirmBlueprint(
   opts?: { mode?: "replace" | "merge" },
 ): Promise<void> {
   const prisma = getPrisma();
-  const novel = await prisma.novel.findUnique({ where: { id: novelId } });
-  if (!novel?.structuredOutline) throw new Error("No outline to confirm");
 
   // Sync DraftPlans → VolumeChapterPlan + Chapter
   await syncDraftPlansToWriting(novelId, opts);
 
-  // Build blueprint snapshot
-  const outline = JSON.parse(novel.structuredOutline);
-  const volumes = (outline.volumes ?? []).map((v: { sortOrder: number; title: string; summary?: string; chapters: Array<{ order: number; title: string; summary?: string; coreEvent?: string; hook?: string; characters?: string[]; conflictLevel?: number; revealLevel?: number }> }) => ({
+  // Build blueprint snapshot from Volume + VolumeChapterPlan (DB ground truth)
+  const dbVolumes = await prisma.volume.findMany({
+    where: { novelId },
+    orderBy: { sortOrder: "asc" },
+    include: {
+      chapterPlans: { orderBy: { chapterOrder: "asc" } },
+      draftPlans: { orderBy: { chapterOrder: "asc" } },
+    },
+  });
+  if (dbVolumes.length === 0) throw new Error("No volumes to confirm — generate blueprint first");
+
+  const volumes = dbVolumes.map(v => ({
     sortOrder: v.sortOrder, title: v.title, summary: v.summary ?? "",
-    chapters: (v.chapters ?? []).map((c: { order: number; title: string; summary?: string; coreEvent?: string; hook?: string; characters?: string[]; conflictLevel?: number; revealLevel?: number }) => ({
-      order: c.order, title: c.title, summary: c.summary ?? "",
-      coreEvent: c.coreEvent ?? "", hook: c.hook ?? "",
-      characters: c.characters ?? [],
-      conflictLevel: c.conflictLevel ?? 5, revealLevel: c.revealLevel ?? 5,
-    })),
+    chapters: v.chapterPlans.length > 0
+      ? v.chapterPlans.map(cp => ({
+          order: cp.chapterOrder, title: cp.title, summary: cp.summary ?? "",
+          coreEvent: cp.purpose ?? "", hook: cp.endingState ?? "",
+          characters: [] as string[],
+          conflictLevel: cp.conflictLevel ?? 5, revealLevel: cp.revealLevel ?? 5,
+        }))
+      : v.draftPlans.map(dp => ({
+          order: dp.chapterOrder, title: dp.title, summary: dp.summary ?? "",
+          coreEvent: "", hook: "",
+          characters: [] as string[],
+          conflictLevel: 5, revealLevel: 5,
+        })),
   }));
 
   // Snapshot existing beat sheets

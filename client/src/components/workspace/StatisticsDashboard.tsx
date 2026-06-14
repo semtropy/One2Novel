@@ -13,7 +13,7 @@ export default function StatisticsDashboard({ novelId, onClose }: Props) {
 
   const s = stats.data;
   const maxDaily = Math.max(1, ...(daily.data ?? []).map(d => d.chars));
-  const maxScore = Math.max(1, ...(quality.data ?? []).map(q => q.totalScore), 80);
+  const maxScore = Math.max(1, ...(quality.data ?? []).map(q => q.totalScore), 100);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
@@ -62,7 +62,7 @@ export default function StatisticsDashboard({ novelId, onClose }: Props) {
                 <div className="flex items-end gap-0.5 h-16 bg-slate-50 rounded-lg p-2">
                   {quality.data.map((q, i) => {
                     const pct = Math.max(8, (q.totalScore / maxScore) * 100);
-                    const color = q.totalScore >= 52 ? "bg-green-400" : q.totalScore >= 42 ? "bg-amber-400" : "bg-red-400";
+                    const color = q.totalScore >= 60 ? "bg-green-400" : q.totalScore >= 45 ? "bg-amber-400" : "bg-red-400";
                     return (
                       <div
                         key={i}

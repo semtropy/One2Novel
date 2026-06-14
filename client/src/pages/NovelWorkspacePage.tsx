@@ -69,13 +69,12 @@ export function NovelWorkspacePage() {
   }
 
   // ALL hooks MUST be before any conditional returns (React rule)
-  const allChapters: Array<{ id: string; order: number; title: string; content?: string; chapterStatus: string }> =
-    ((novel as unknown) as { chapters?: Array<{ id: string; order: number; title: string; content?: string; chapterStatus: string }> } | undefined)?.chapters ?? [];
+  const allChapters = novel?.chapters ?? [];
 
-  type ChapterWithVol = { id: string; order: number; title: string; content?: string; chapterStatus: string; chapterOrder: number };
+  type ChapterWithVol = { id: string; order: number; title: string; content?: string | null; chapterStatus: string; chapterOrder: number };
   const volumeGroups = useMemo(() => {
     if (!novel) return [];
-    const vols = ((novel as unknown) as { volumes?: Array<{ sortOrder: number; title: string; chapterPlans: Array<{ chapterId: string | null; chapterOrder: number; title: string }> }> } | undefined)?.volumes?.filter(v => v.chapterPlans.some(p => p.chapterId));
+    const vols = novel.volumes?.filter(v => v.chapterPlans.some(p => p.chapterId));
     if (!vols || vols.length === 0) return [{ sortOrder: 1, title: "章节", chapters: allChapters.map(c => ({ ...c, chapterOrder: c.order })) }];
 
     const groups: Array<{ sortOrder: number; title: string; chapters: ChapterWithVol[] }> = [];
@@ -138,7 +137,7 @@ export function NovelWorkspacePage() {
         </div>
         <div className="shrink-0">
           <ProgressBar steps={(() => {
-            const n = novel as unknown as Record<string, unknown>;
+            const n = novel ?? {};
             const hasFraming = !!(n.targetAudience || n.bookSellingPoint);
             const hasOutline = !!n.structuredOutline;
             const hasChars = Array.isArray(n.characters) && n.characters.length > 0;
@@ -185,12 +184,7 @@ export function NovelWorkspacePage() {
           <section><CharacterPanel novelId={novel.id} /></section>
           <section><BlueprintPanel novelId={novel.id} /></section>
           <AdvancedSettings novelId={novel.id} />
-          <BottomLockBanner novelId={novel.id} onStartWriting={async () => {
-            if (novel.structuredOutline && !volumeGroups.some(v => v.chapters.length > 0)) {
-              try { await api.post(`/novels/${novelId}/outline/apply`); } catch {}
-            }
-            setTab("writing");
-          }} />
+          <BottomLockBanner novelId={novel.id} onStartWriting={() => setTab("writing")} />
         </div>
       ) : (
         <div className="flex-1 flex gap-4 min-h-0">

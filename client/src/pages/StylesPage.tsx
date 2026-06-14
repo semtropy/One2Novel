@@ -52,7 +52,8 @@ export function StylesPage() {
     } catch {}
   }
 
-  function parseRules(profile: Record<string, unknown>, field: string): string[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function parseRules(profile: any, field: string): string[] {
     try { const arr = JSON.parse((profile[field] as string) ?? "[]"); return Array.isArray(arr) ? arr : []; }
     catch { return []; }
   }
@@ -88,7 +89,6 @@ export function StylesPage() {
         ) : profiles.map((p) => {
           const features = (() => { try { return p.extractedFeatures ? JSON.parse(p.extractedFeatures) : null; } catch { return null; } })();
           const isExpanded = expandedId === p.id;
-          const profile = p as unknown as Record<string, unknown>;
           return (
             <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between mb-2">
@@ -129,7 +129,7 @@ export function StylesPage() {
               {isExpanded && (
                 <div className="mt-3 pt-3 border-t space-y-2">
                   {FIELD_ORDER.map(field => {
-                    const rules = parseRules(profile, field);
+                    const rules = parseRules(p, field);
                     return (
                       <div key={field}>
                         <div className="flex items-center gap-1 mb-1">

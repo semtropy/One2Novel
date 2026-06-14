@@ -46,7 +46,7 @@ function cuid(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function parseSceneCards(raw: string | null): Record<string, unknown> {
+function parseScenePlan(raw: string | null): Record<string, unknown> {
   if (!raw) return {};
   try { return JSON.parse(raw); } catch { return {}; }
 }
@@ -57,11 +57,11 @@ export async function getScenePlan(novelId: string, chapterId: string): Promise<
   const prisma = getPrisma();
   const chapter = await prisma.chapter.findUnique({
     where: { id: chapterId },
-    select: { sceneCards: true },
+    select: { scenePlan: true },
   });
   if (!chapter) throw new Error("Chapter not found");
 
-  const cards = parseSceneCards(chapter.sceneCards);
+  const cards = parseScenePlan(chapter.scenePlan);
   if (!cards.scenes || !Array.isArray(cards.scenes)) return null;
 
   return {
@@ -76,24 +76,12 @@ export async function generateScenePlan(novelId: string, chapterId: string): Pro
   const prisma = getPrisma();
   const chapter = await prisma.chapter.findUnique({
     where: { id: chapterId },
-    select: { title: true, expectation: true, order: true, sceneCards: true },
+    select: { title: true, expectation: true, order: true, scenePlan: true },
   });
   if (!chapter) throw new Error("Chapter not found");
 
   // Assemble context for scene planning (lighter than full writing context)
   const ctx = await assembleChapterContext(novelId, chapterId);
-
-  const systemPrompt = [
-    "你是专业小说分镜师。将章节拆分为3-6个场景，每个场景是章节内的一个独立叙事单元。",
-    "",
-    "【分镜原则】",
-    "1. 场景之间必须有因果推进关系（前一场景的结果触发后一场景）",
-    "2. 首场景必须承接上一章的结尾情绪/情境",
-    "3. 末场景必须设置本章的悬念钩子，推动读者进入下一章",
-    "4. 每个场景有明确的叙事目标（推进主线/揭示信息/建立关系/制造冲突/释放压力）",
-    "5. 场景字数分配符合章节节奏：关键场景偏长，过渡场景偏短",
-    "6. POV角色是该场景的主要视点人物",
-  ].join("\n");
 
   const userPrompt = [
     `书名：《${ctx.novelTitle}》${ctx.novelGenre ? ` · ${ctx.novelGenre}` : ""}`,
@@ -112,8 +100,7 @@ export async function generateScenePlan(novelId: string, chapterId: string): Pro
   ].filter(Boolean).join("\n");
 
   const result = await aiInvoke({
-    task: "planner",
-    systemPrompt,
+    assetId: "novel.scene-plan.generate",
     userPrompt,
     schema: ScenePlanOutputSchema,
     temperature: 0.7,
@@ -133,8 +120,8 @@ export async function generateScenePlan(novelId: string, chapterId: string): Pro
     estimatedWords: s.estimatedWords ?? Math.round(3000 / result.scenes.length),
   }));
 
-  // Persist to sceneCards JSON
-  const existing = parseSceneCards(chapter.sceneCards);
+  // Persist to scenePlan JSON
+  const existing = parseScenePlan(chapter.scenePlan);
   existing.scenes = scenes;
   existing.scenePlanGenerated = true;
   existing.generatedAt = now;
@@ -142,7 +129,7 @@ export async function generateScenePlan(novelId: string, chapterId: string): Pro
 
   await prisma.chapter.update({
     where: { id: chapterId },
-    data: { sceneCards: JSON.stringify(existing) },
+    data: { scenePlan: JSON.stringify(existing) },
   });
 
   return { scenes, scenePlanGenerated: true, generatedAt: now, enabled: true };
@@ -156,11 +143,11 @@ export async function updateScenePlan(
   const prisma = getPrisma();
   const chapter = await prisma.chapter.findUnique({
     where: { id: chapterId },
-    select: { sceneCards: true },
+    select: { scenePlan: true },
   });
   if (!chapter) throw new Error("Chapter not found");
 
-  const existing = parseSceneCards(chapter.sceneCards);
+  const existing = parseScenePlan(chapter.scenePlan);
 
   // Re-number order by array position
   const reordered = scenes.map((s, i) => ({ ...s, order: i + 1 }));
@@ -171,7 +158,7 @@ export async function updateScenePlan(
 
   await prisma.chapter.update({
     where: { id: chapterId },
-    data: { sceneCards: JSON.stringify(existing) },
+    data: { scenePlan: JSON.stringify(existing) },
   });
 
   return {
@@ -188,14 +175,14 @@ export async function toggleScenePlan(
   const prisma = getPrisma();
   const chapter = await prisma.chapter.findUnique({
     where: { id: chapterId },
-    select: { sceneCards: true },
+    select: { scenePlan: true },
   });
   if (!chapter) throw new Error("Chapter not found");
-  const existing = parseSceneCards(chapter.sceneCards);
+  const existing = parseScenePlan(chapter.scenePlan);
   existing.enabled = enabled;
   await prisma.chapter.update({
     where: { id: chapterId },
-    data: { sceneCards: JSON.stringify(existing) },
+    data: { scenePlan: JSON.stringify(existing) },
   });
   return { enabled };
 }

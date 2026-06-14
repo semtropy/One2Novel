@@ -8,10 +8,8 @@ export type {
   ApiResponse,
   ApiError,
   PaginatedResponse,
-  LockScope,
   StorySeedSnapshot,
   CharacterSnapshot,
   BlueprintSnapshot,
-  LockStatus,
   ConfirmationStatus,
 } from "./types/novel.js";

@@ -15,20 +15,20 @@ export function StorySeedPanel({ novelId }: Props) {
   const [genError, setGenError] = useState("");
 
   // Parse story core from DraftStorySeed (single source of truth for planning)
-  const draftSeedContent = (novel as unknown as { draftStorySeed?: { content: string; synced: boolean } } | undefined)?.draftStorySeed?.content;
-  const seed = parseSeed(draftSeedContent ?? novel?.structuredOutline);
-  const draftSeedSynced = (novel as unknown as { draftStorySeed?: { synced: boolean } } | undefined)?.draftStorySeed?.synced ?? true;
+  const draftSeedContent = novel?.draftStorySeed?.content;
+  const seed = parseSeed(draftSeedContent);
+  const draftSeedSynced = novel?.draftStorySeed?.synced ?? true;
 
   // Editable story core fields
   const storyFields = [
-    { key: "premise", label: "前提", value: seed?.premise ?? "", rows: 2 },
-    { key: "mainArc", label: "主线", value: seed?.mainArc ?? "", rows: 2 },
-    { key: "mysteryBox", label: "核心悬念", value: seed?.mysteryBox ?? "", rows: 2 },
-    { key: "endingDirection", label: "结局方向", value: seed?.endingDirection ?? "", rows: 2 },
+    { key: "premise", label: "前提", value: (seed?.premise as string) ?? "", rows: 2 },
+    { key: "mainArc", label: "主线", value: (seed?.mainArc as string) ?? "", rows: 2 },
+    { key: "mysteryBox", label: "核心悬念", value: (seed?.mysteryBox as string) ?? "", rows: 2 },
+    { key: "endingDirection", label: "结局方向", value: (seed?.endingDirection as string) ?? "", rows: 2 },
   ];
 
   const saveStoryField = async (field: string, value: string) => {
-    const current = parseSeedJson(draftSeedContent ?? novel?.structuredOutline);
+    const current = parseSeed(draftSeedContent);
     current[field] = value;
     try {
       await api.put(`/novels/${novelId}/draft-story-seed`, { content: JSON.stringify(current) });
@@ -80,14 +80,9 @@ export function StorySeedPanel({ novelId }: Props) {
 
 // ─── Helpers ────────────────────────────────────────────
 
-function parseSeed(raw?: string | null): { premise: string; mainArc: string; mysteryBox: string; endingDirection: string } | null {
-  if (!raw) return null;
-  try { const o = JSON.parse(raw); return { premise: o.premise ?? "", mainArc: o.mainArc ?? "", mysteryBox: o.mysteryBox ?? "", endingDirection: o.endingDirection ?? "" }; } catch { return null; }
-}
-
-function parseSeedJson(raw?: string | null): Record<string, unknown> {
+function parseSeed(raw?: string | null): Record<string, unknown> {
   if (!raw) return {};
-  try { return JSON.parse(raw); } catch { return {}; }
+  try { return JSON.parse(raw) as Record<string, unknown>; } catch { return {}; }
 }
 
 function SelectField({ label, value, onChange, options, labels }: { label: string; value: string; onChange: (v: string) => void; options: string[]; labels?: string[] }) {

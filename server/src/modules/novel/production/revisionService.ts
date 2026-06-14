@@ -10,15 +10,13 @@ import { aiInvoke } from "../../../platform/llm/aiService";
 import { getPrisma } from "../../../platform/db/client";
 import { assembleChapterContext } from "./contextAssembler";
 import { computeDiff, diffSummary, type DiffChunk } from "./diffService";
+import { splitParagraphs } from "./textUtils";
 
 // ─── 4.1: Undo snapshot helper ───────────────────────
-function saveToHistory(currentContent: string, existingSceneCards: string | null): string {
-  let cards: Record<string, unknown> = {};
-  try { if (existingSceneCards) cards = JSON.parse(existingSceneCards); } catch {}
-  const history: Array<{ ts: string; chars: number; content: string }> = (cards.editHistory as []) ?? [];
-  history.push({ ts: new Date().toISOString(), chars: currentContent.length, content: currentContent });
-  cards.editHistory = history.slice(-5); // keep last 5
-  return JSON.stringify(cards);
+async function saveToHistory(prisma: ReturnType<typeof getPrisma>, chapterId: string, currentContent: string, scenePlan: string | null) {
+  await prisma.chapterEditHistory.create({
+    data: { chapterId, content: currentContent, sceneState: scenePlan },
+  });
 }
 
 // ─── Types ─────────────────────────────────────────────
@@ -65,103 +63,39 @@ export interface WorkspaceDiagnosis {
 // ─── Operation configs ─────────────────────────────────
 
 const OPERATION_CONFIG: Record<RevisionOperation, {
+  assetId: string;
   label: string;
-  systemPrompt: string;
   strength: string;
 }> = {
   polish: {
+    assetId: "novel.chapter.rewrite.polish",
     label: "润色",
     strength: "conservative",
-    systemPrompt: [
-      "你是资深中文小说润色编辑。你的任务是优化表达，让文字更流畅、更有画面感。",
-      "",
-      "原则：",
-      "1. 保留原文的所有核心信息、情节事实、人物状态。不做任何剧情修改。",
-      "2. 优化句式节奏：打破连续同主语开头、打破单调的长短句模式。",
-      "3. 增强画面感：用具体动作和感官细节替代抽象概括。",
-      "4. 去除AI痕迹：删除「璀璨」「心潮澎湃」等套话、删除总结性语句。",
-      "5. 保持原文的语气和叙事视角不变。",
-      "",
-      "只输出JSON，不要解释。",
-    ].join("\n"),
   },
   expand: {
+    assetId: "novel.chapter.rewrite.expand",
     label: "扩写",
     strength: "moderate",
-    systemPrompt: [
-      "你是资深中文小说编辑。你的任务是在不改变情节方向的前提下，为段落增加细节和层次。",
-      "",
-      "原则：",
-      "1. 扩充感官描写：视觉（光/色/形）、听觉（声音/节奏）、触觉（温度/质感）、嗅觉、空间感。",
-      "2. 增加动作层次：把单一动作拆成「准备→执行→后果→反应」的微节奏。",
-      "3. 丰富内心活动：通过身体反应间接表现情感（手指发抖 > 他很紧张）。",
-      "4. 不改变对话内容、不新增角色、不推进剧情时间线。",
-      "5. 扩充后长度约为原文的1.5-2倍，但不得注水。",
-      "",
-      "只输出JSON，不要解释。",
-    ].join("\n"),
   },
   compress: {
+    assetId: "novel.chapter.rewrite.compress",
     label: "压缩",
     strength: "moderate",
-    systemPrompt: [
-      "你是资深中文小说编辑。你的任务是精简段落，保留核心信息，删除冗余。",
-      "",
-      "原则：",
-      "1. 合并重复信息（同一件事说了两遍→保留最有画面感的版本）。",
-      "2. 删除无效修饰：无信息量的形容词和副词。",
-      "3. 压缩内心独白：保留最强的一个念头，删除反复琢磨的部分。",
-      "4. 短句化：长句拆成2-3个短句，增强节奏感。",
-      "5. 不删除情节推进、关键对话、伏笔线索。",
-      "6. 压缩后长度约为原文的60-70%。",
-      "",
-      "只输出JSON，不要解释。",
-    ].join("\n"),
   },
   rewrite_perspective: {
+    assetId: "novel.chapter.rewrite.perspective",
     label: "视角重写",
     strength: "moderate",
-    systemPrompt: [
-      "你是资深中文小说编辑。你的任务是用另一个角色的视角重写这段内容。",
-      "",
-      "原则：",
-      "1. 切换到指定角色的感知范围：只写ta能看到、听到、推测到的事。",
-      "2. 调整认知偏差：如果该角色不知道某个信息，就不得在叙述中透露。",
-      "3. 保留原文的事件事实（发生了什么不变），但感知和解读可以不同。",
-      "4. 保持该角色的语感和性格特征。",
-      "",
-      "只输出JSON，不要解释。",
-    ].join("\n"),
   },
   adjust_tone: {
+    assetId: "novel.chapter.rewrite.tone",
     label: "调整语气",
     strength: "conservative",
-    systemPrompt: [
-      "你是资深中文小说编辑。你的任务是调整段落的语气和情感基调。",
-      "",
-      "原则：",
-      "1. 按用户指定的方向调整语气（更克制/更激烈/更温柔/更冷峻/更幽默）。",
-      "2. 通过用词选择、句式长短、节奏快慢来实现语气变化，不要直接陈述情感。",
-      "3. 保持原文的事件事实和角色行为不变。",
-      "",
-      "只输出JSON，不要解释。",
-    ].join("\n"),
   },
   fix_ai_traces: {
+    assetId: "novel.chapter.rewrite.fix-ai",
     label: "去AI痕迹",
     strength: "moderate",
-    systemPrompt: [
-      "你是资深中文小说编辑，专精于去除AI生成文本的痕迹。",
-      "",
-      "识别并修复以下AI典型问题：",
-      "1. 套话删除：「璀璨」「心潮澎湃」「油然而生」「不禁」「仿佛」「此情此景」→替换为具体描写。",
-      "2. 成语堆砌：连续四字短语→至少一半展开为动作/场景细节。",
-      "3. 连接词删除：「此外」「然而」「值得注意的是」→用动作切换代替逻辑连接。",
-      "4. 总结句删除：段落结尾的「这一天的经历让ta...」「通过这次...」→删除，用剧情推进代替结论。",
-      "5. 句式模板化：连续多句同主语→变换句式。",
-      "",
-      "只输出JSON，不要解释。",
-    ].join("\n"),
   },
 };
 
@@ -229,14 +163,7 @@ export async function generateRewriteCandidates(
   const ctx = await assembleChapterContext(input.novelId, input.chapterId);
   const opConfig = OPERATION_CONFIG[input.operation];
 
-  // Split chapter into paragraphs — replace closing+opening p tags with double newline
-  const allParagraphs = chapter.content
-    .replace(/<\/p>\s*<p>/gi, "\n\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]*>/g, "")
-    .split(/\n{2,}/)
-    .map(p => p.trim())
-    .filter(Boolean);
+  const allParagraphs = splitParagraphs(chapter.content);
 
   // Find selected paragraphs in content — frontend now sends full paragraphs,
   // so exact match should work; fuzzy match for edge cases (whitespace diffs)
@@ -269,8 +196,7 @@ export async function generateRewriteCandidates(
   ].filter(Boolean).join("\n");
 
   const raw = await aiInvoke({
-    task: "repairer",
-    systemPrompt: opConfig.systemPrompt,
+    assetId: opConfig.assetId,
     userPrompt,
     schema: RewriteResponseSchema,
     temperature: input.operation === "polish" || input.operation === "fix_ai_traces" ? 0.3 : 0.5,
@@ -304,17 +230,11 @@ export async function applyRevision(
   const chapter = await prisma.chapter.findUnique({ where: { id: chapterId } });
   if (!chapter?.content) throw new Error("Chapter not found");
 
-  // 4.1: Save snapshot before modification
-  const history = saveToHistory(chapter.content, chapter.sceneCards);
-  await prisma.chapter.update({ where: { id: chapterId }, data: { sceneCards: history } });
+  // 4.1: Save snapshot before modification to edit history
+  await saveToHistory(prisma, chapterId, chapter.content, chapter.scenePlan);
 
   // Find the selected paragraphs in content — build a replacement range
-  const paragraphs = chapter.content
-    .replace(/<\/p>\s*<p>/gi, "\n\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]*>/g, "")
-    .split(/\n{2,}/)
-    .map(p => p.trim());
+  const paragraphs = splitParagraphs(chapter.content);
 
   const indices: number[] = [];
   for (const selPara of selectedParagraphs) {
@@ -360,38 +280,20 @@ export async function diagnoseWorkspace(
   if (!chapter?.content) throw new Error("Chapter has no content");
 
   const ctx = await assembleChapterContext(novelId, chapterId);
-  const text = chapter.content.replace(/<[^>]*>/g, "");
+  const paragraphs = splitParagraphs(chapter.content).filter(p => p.length > 20);
 
-  const paragraphs = text.split(/\n{2,}/).filter(p => p.trim().length > 20);
-
-  const systemPrompt = [
-    "你是资深中文小说诊断编辑。扫描章节内容，找出需要修改的问题段落。",
-    "",
-    "检查维度：",
-    "- AI痕迹：套话、成语堆砌、连接词滥用、总结句",
-    "- 节奏问题：段落过长/过短、连续单调句式",
-    "- 对话质量：无信息量寒暄、对话标签滥用",
-    "- 情感表达：直接陈述情感（很愤怒→应改为握紧拳头）",
-    "- 场景描写：缺乏感官细节、空间感模糊",
-    "- 逻辑问题：角色行为不符性格、前后矛盾",
-    "",
-    "为每个问题输出诊断卡片(card)，包含：标题、问题摘要、为什么重要、推荐操作(polish|expand|compress|adjust_tone|fix_ai_traces)、问题段落索引(从1开始)、严重度(low|medium|high|critical)。",
-    "如果有一个最值得优先修复的问题，输出recommendedTask。",
-    "只输出JSON。",
-  ].join("\n");
-
+  
   const userPrompt = [
     ctx.characters ? `[角色约束]\n${ctx.characters.slice(0, 300)}` : "",
     ctx.outline ? `[本章义务]\n${ctx.outline}` : "",
     "",
     paragraphs.length > 0
       ? paragraphs.map((p, i) => `[段落${i + 1}]\n${p.slice(0, 500)}${p.length > 500 ? "..." : ""}`).join("\n\n")
-      : text.slice(0, 6000),
+      : chapter.content.replace(/<[^>]*>/g, "").slice(0, 6000),
   ].filter(Boolean).join("\n");
 
   const raw = await aiInvoke({
-    task: "reviewer",
-    systemPrompt,
+    assetId: "novel.chapter.diagnose",
     userPrompt,
     schema: DiagnosisSchema,
     temperature: 0.3,

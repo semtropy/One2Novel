@@ -30,6 +30,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
   const [showAutoWrite, setShowAutoWrite] = useState(false);
   const [aiDetection, setAiDetection] = useState<AiDetectionResult | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [showGenerateMenu, setShowGenerateMenu] = useState(false);
 
   // ─── Revision state ──────────────────────────────────
@@ -57,8 +58,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
     refetch();
   }, [novelId, chapterId, refetch]);
 
-  const chapters: Array<{ id: string; order: number; title: string; content?: string; chapterStatus: string }> =
-    ((novel as unknown) as { chapters?: Array<{ id: string; order: number; title: string; content?: string; chapterStatus: string }> }).chapters ?? [];
+  const chapters = novel?.chapters ?? [];
   const chapter = chapters.find((c) => c.id === chapterId);
   // Reset state when chapter changes
   useEffect(() => {
@@ -92,29 +92,65 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
     }
   }, [displayContent]);
 
-  // H5: Cleanup EventSource on unmount
+  // H5: Cleanup streaming on unmount
   useEffect(() => () => {
     eventSourceRef.current?.close();
     eventSourceRef.current = null;
+    abortRef.current?.abort();
+    abortRef.current = null;
   }, []);
 
-  function handleGenerate() {
+  async function handleGenerate() {
     setGenerating(true); setStage(""); setError(""); setContent(""); setAiGenerated(false);
-    api.post(`/novels/${novelId}/director/run`, { maxChapters: 1 }).catch(() => {});
-    const es = new EventSource(`/api/novels/${novelId}/director/stream`);
-    eventSourceRef.current = es;
-    es.addEventListener("token", (e) => {
-      const d = JSON.parse(e.data);
-      setContent((p) => p + d.text);
-    });
-    es.addEventListener("done", () => {
-      es.close(); eventSourceRef.current = null;
-      setGenerating(false); setAiGenerated(true); refetch();
-    });
-    es.addEventListener("error", (e) => {
-      es.close(); eventSourceRef.current = null; setGenerating(false);
-      try { const d = JSON.parse((e as MessageEvent).data); setError(d.message); } catch { setError("生成失败"); }
-    });
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const response = await fetch(`/api/novels/${novelId}/chapters/${chapterId}/write`, {
+        method: "POST",
+        headers: { "Accept": "text/event-stream" },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        setError(`请求失败 (${response.status})`);
+        setGenerating(false);
+        return;
+      }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        let currentEvent = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) { currentEvent = line.slice(7).trim(); }
+          else if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6));
+            switch (currentEvent) {
+              case "stage": setStage(data.stage); break;
+              case "token": setContent(p => p + data.text); break;
+              case "complete":
+                setGenerating(false); setAiGenerated(true); refetch();
+                break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "生成失败");
+    } finally {
+      setGenerating(false);
+      abortRef.current = null;
+    }
   }
 
   const handleSave = useCallback(async () => {

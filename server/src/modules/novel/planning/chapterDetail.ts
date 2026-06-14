@@ -23,13 +23,7 @@ export async function refineChapterDetails(novelId: string, volumeSortOrder: num
   const chapters = vol.chapterPlans.map(p => `第${p.chapterOrder}章 ${p.title ?? ""}: ${p.summary ?? ""}`).join("\n");
 
   const result = await aiInvoke({
-    task: "planner",
-    systemPrompt: [
-      "你是小说创作规划师。为每章生成详细的创作任务单(taskSheet)。",
-      "任务单应包含3-5条具体创作指令，每条15-30字，如：开场用对话制造紧张感、确保主角的内心挣扎在本章有可见进展、章尾留下悬念等。",
-      "每章还需填写：purpose(目的)、exclusiveEvent(独有事件)、endingState(结束状态)、conflictLevel(冲突1-10)、revealLevel(揭示1-10)、targetWordCount(建议字数)、mustAvoid(必须避免)。",
-      "输出JSON。只输出JSON。",
-    ].join("\n"),
+    assetId: "novel.chapter.refine",
     userPrompt: `书名：《${novel.title}》\n题材：${novel.genre ?? ""}\n卷：${vol.title}\n概要：${vol.summary ?? ""}\n\n章节列表：\n${chapters}`,
     schema: DetailSchema, temperature: 0.7,
   });

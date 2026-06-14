@@ -47,7 +47,6 @@ model Novel {
   competingFeel    String?
   first30ChapterPromise String?
   commercialTags   String?
-  worldRulesLegacy String?                    // Legacy: replaced by WorldRule model (Phase 11)
   titleSuggestions String?
 
   // Creative parameters
@@ -58,18 +57,12 @@ model Novel {
   defaultChapterLength Int?
   estimatedChapterCount Int?
 
-  // Outline
-  outline            String?                   // Markdown outline
+  // Outline (Phase 18: removed deprecated `outline` column; use structuredOutline only)
   structuredOutline  String?                   // JSON structured outline
+  directorCheckpoint String?                   // JSON DirectorCheckpoint for batch-write resume
 
-  // Lock / Contract — replaced by Confirmation table (Phase 17)
-  // lockedScopes, storySeedSnapshot, characterSnapshot, blueprintSnapshot removed
-
-  // Progress
+  // Progress (managed via Confirmation table)
   projectStatus    ProjectProgressStatus @default(not_started)
-  storylineStatus  ProjectProgressStatus @default(not_started)
-  outlineStatus    ProjectProgressStatus @default(not_started)
-  resourceReady    Boolean               @default(false)
 
   // Style
   postGenerationStyleReviewEnabled Boolean @default(true)
@@ -83,7 +76,6 @@ model Novel {
   characters       NovelCharacter[]
   draftRelations   DraftCharacterRelation[]
   confirmations    Confirmation[]
-  storyPlans       StoryPlan[]
   volumes          Volume[]
   chapterSummaries ChapterSummary[]
   auditReports     AuditReport[]
@@ -92,7 +84,6 @@ model Novel {
   worldRules       WorldRule[]
   characterResources CharacterResource[]
   infoProfiles     CharacterInfoProfile[]
-  backgroundTasks  BackgroundTask[]  // H2
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 }
@@ -118,26 +109,45 @@ model Chapter {
   showNotTellScore Int?                     // Skill维度7: 展示而非讲述
   languageScore    Int?
   genreScore       Int?
+  coherenceScore   Int?                     // Phase 3: 跨章连贯性评分
   activeWorldRules String?                    // JSON array: rule IDs active for this chapter
   hook             String?                    // Chapter end hook text
   expectation      String?                    // What this chapter should achieve
   repairHistory    String?                    // JSON repair log
   diagnosis        String?                    // JSON WorkspaceDiagnosis
   riskFlags        String?                    // JSON string array
-  sceneCards       String?                    // JSON scene plan
+
+  // Phase 0.2: 拆分为独立列（原 sceneCards 一列被 5 子系统串用）
+  scenePlan            String?                // JSON {scenes:[...], enabled:bool} — 归 scenePlanService
+  openConflicts        String?                // JSON {conflicts:[...]}              — 归 openConflict
+  finalizationSnapshot String?                // JSON {snapshotVersion,timestamp,...} — 归 finalization
 
   // Relations
   novel          Novel             @relation(fields: [novelId], references: [id], onDelete: Cascade)
   chapterSummary ChapterSummary?
   auditReports   AuditReport[]
-  storyPlans     StoryPlan[]
   volumeChapterPlans VolumeChapterPlan[]  // H8
   timelineItems  TimelineItem[]
+  editHistory    ChapterEditHistory[]
+  acquiredResources  CharacterResource[]     @relation("ResourceAcquiredIn")
+  depletedResources  CharacterResource[]     @relation("ResourceDepletedIn")
+  revealedInfoProfiles CharacterInfoProfile[] @relation("InfoProfileRevealedIn")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   @@unique([novelId, order])
   @@index([novelId, chapterStatus])
+}
+
+model ChapterEditHistory {
+  id         String   @id @default(cuid())
+  chapterId  String
+  chapter    Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  content    String                     // 编辑前正文快照
+  sceneState String?                    // 当时的 scenePlan 快照（用于 undo 一并恢复）
+  createdAt  DateTime @default(now())
+
+  @@index([chapterId, createdAt])
 }
 
 model ChapterSummary {
@@ -353,12 +363,14 @@ model CharacterResource {
   name        String
   category    String
   description String?
-  acquiredIn  Int?
-  depletedIn  Int?
+  acquiredInChapterId String?
+  depletedInChapterId String?
   status      String   @default("active")
   constraints String?
   novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
   owner       NovelCharacter @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  acquiredInChapter Chapter?  @relation("ResourceAcquiredIn", fields: [acquiredInChapterId], references: [id], onDelete: SetNull)
+  depletedInChapter Chapter?  @relation("ResourceDepletedIn", fields: [depletedInChapterId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -372,41 +384,14 @@ model CharacterInfoProfile {
   subject     String
   content     String
   certainty   String   @default("certain")
-  revealedIn  Int?
+  revealedInChapterId String?
   novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
   knower      NovelCharacter @relation(fields: [knowerId], references: [id], onDelete: Cascade)
+  revealedInChapter Chapter? @relation("InfoProfileRevealedIn", fields: [revealedInChapterId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([novelId, knowerId])
-}
-
-// ─── Story Plan ───────────────────────────────────────
-
-model StoryPlan {
-  id              String   @id @default(cuid())
-  novelId         String
-  chapterId       String?  @unique
-  parentId        String?
-  level           String   @default("chapter")  // book | arc | chapter
-  planRole        String?                       // setup | progress | pressure | turn | payoff | cooldown
-  title           String
-  objective       String?
-  participants    String?                       // JSON string array (character IDs)
-  reveals         String?                       // JSON string array
-  riskNotes       String?
-  mustAdvance     String?
-  mustPreserve    String?
-  hookTarget      String?
-  status          String   @default("draft")
-  novel           Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  chapter         Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
-  parent          StoryPlan? @relation("PlanHierarchy", fields: [parentId], references: [id])
-  children        StoryPlan[] @relation("PlanHierarchy")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([novelId, level])
 }
 
 // ─── Quality Audit ────────────────────────────────────
@@ -541,39 +526,4 @@ model WorldRule {
 
   @@index([novelId, category])
   @@index([novelId, status])
-}
-
-// ─── Prompt Registry ──────────────────────────────────
-
-model PromptAsset {
-  id               String   @id               // e.g. 'chapter-write-v1'
-  version          Int
-  taskType         String                     // writer | reviewer | planner | extractor | compiler
-  mode             String   @default("default")
-  contextPolicy    String   @default("full")  // full | summary | minimal
-  outputSchema     String?                    // JSON: Zod schema definition
-  systemPrompt     String
-  userPromptTemplate String
-  active           Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-}
-
-// ─── Tasks ────────────────────────────────────────────
-
-model BackgroundTask {
-  id          String   @id @default(cuid())
-  novelId     String?
-  type        String                     // generation | extraction | repair | export | rebuild
-  status      String   @default("queued") // queued | running | succeeded | failed | cancelled
-  progress    Int      @default(0)       // 0-100
-  stage       String?
-  result      String?                    // JSON result payload
-  error       String?
-  novel       Novel?   @relation(fields: [novelId], references: [id], onDelete: Cascade)  // H2
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([status])    // H9
-  @@index([novelId])   // H9
 }

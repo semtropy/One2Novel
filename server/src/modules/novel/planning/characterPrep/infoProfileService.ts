@@ -9,7 +9,7 @@ export async function listInfoProfiles(novelId: string, knowerId?: string) {
   return getPrisma().characterInfoProfile.findMany({ where, include: { knower: { select: { name: true } } } });
 }
 
-export async function createInfoProfile(data: { novelId: string; knowerId: string; subject: string; content: string; certainty?: string; revealedIn?: number }) {
+export async function createInfoProfile(data: { novelId: string; knowerId: string; subject: string; content: string; certainty?: string; revealedInChapterId?: string }) {
   return getPrisma().characterInfoProfile.create({ data });
 }
 
@@ -32,7 +32,7 @@ export async function getDramaticIronyReport(novelId: string): Promise<string> {
   const charKnows = new Map<string, string[]>();
 
   for (const p of profiles) {
-    if (p.revealedIn) readerKnows.add(p.subject);
+    if (p.revealedInChapterId) readerKnows.add(p.subject);
     charKnows.set(p.knower.name, [...(charKnows.get(p.knower.name) ?? []), p.subject]);
   }
 

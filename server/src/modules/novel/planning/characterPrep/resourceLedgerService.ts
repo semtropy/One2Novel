@@ -6,7 +6,7 @@ import { getPrisma } from "../../../../platform/db/client";
 
 export interface ResourceData {
   novelId: string; ownerId: string; name: string; category: string;
-  description?: string; acquiredIn?: number; constraints?: string;
+  description?: string; acquiredInChapterId?: string; constraints?: string;
 }
 
 export async function listResources(novelId: string, ownerId?: string, category?: string) {
@@ -21,7 +21,7 @@ export async function createResource(data: ResourceData) {
   return getPrisma().characterResource.create({ data: { ...data, status: "active" } });
 }
 
-export async function updateResource(id: string, data: Partial<ResourceData & { status: string; depletedIn: number }>) {
+export async function updateResource(id: string, data: Partial<ResourceData & { status: string; depletedInChapterId: string }>) {
   return getPrisma().characterResource.update({ where: { id }, data });
 }
 
@@ -48,18 +48,23 @@ export function getResourceSummary(novelId: string): Promise<string> {
 
 export async function checkResourceConsistency(novelId: string): Promise<string[]> {
   const prisma = getPrisma();
-  const items = await prisma.characterResource.findMany({ where: { novelId } });
+  const items = await prisma.characterResource.findMany({
+    where: { novelId },
+    include: { acquiredInChapter: { select: { order: true } }, depletedInChapter: { select: { order: true } } },
+  });
   const warnings: string[] = [];
 
   for (const item of items) {
-    if (item.acquiredIn && item.depletedIn && item.depletedIn < item.acquiredIn) {
-      warnings.push(`${item.name}: 消耗于第${item.depletedIn}章，但获取于第${item.acquiredIn}章（顺序错误）`);
+    const acquiredOrder = item.acquiredInChapter?.order;
+    const depletedOrder = item.depletedInChapter?.order;
+    if (acquiredOrder != null && depletedOrder != null && depletedOrder < acquiredOrder) {
+      warnings.push(`${item.name}: 消耗于第${depletedOrder}章，但获取于第${acquiredOrder}章（顺序错误）`);
     }
-    // Resource acquired in chapter 5 but never used after 10+ chapters
-    if (item.acquiredIn && item.status === "active") {
+    // Resource acquired but never used after 10+ chapters
+    if (acquiredOrder != null && item.status === "active") {
       const chapters = await prisma.chapter.count({ where: { novelId } });
-      if (chapters > item.acquiredIn + 10) {
-        warnings.push(`${item.name}: 第${item.acquiredIn}章获取后超过10章未使用，可能被遗忘`);
+      if (chapters > acquiredOrder + 10) {
+        warnings.push(`${item.name}: 第${acquiredOrder}章获取后超过10章未使用，可能被遗忘`);
       }
     }
   }

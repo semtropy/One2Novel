@@ -33,13 +33,7 @@ function normalizeTitles(raw: unknown): Array<{ title: string; reason: string }>
 
 export async function generateTitles(input: { description?: string; genre?: string }) {
   const raw = await aiInvoke({
-    task: "planner",
-    systemPrompt: [
-      "你是专业的小说书名策划。根据故事信息生成5个候选书名。",
-      "书名要求：简洁有力(2-8字)、符合网文风格、有辨识度、易于记忆和搜索。",
-      "每个书名给出简短推荐理由(15-30字)。",
-      "考虑以下书名类型：悬念型(制造好奇)、设定型(点明核心设定)、人物型(突出主角特质)、意境型(营造氛围)。",
-    ].join("\n"),
+    assetId: "novel.title.generate",
     userPrompt: `故事描述：${input.description || "暂无"}\n题材：${input.genre || "未指定"}\n请生成5个候选书名。`,
     schema: TitleSchema,
     temperature: 0.9,

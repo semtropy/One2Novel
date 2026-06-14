@@ -172,7 +172,7 @@ export async function createChapterSnapshot(
   await prisma.chapter.update({
     where: { id: chapterId },
     data: {
-      sceneCards: JSON.stringify({
+      finalizationSnapshot: JSON.stringify({
         snapshotVersion: 1,
         timestamp: new Date().toISOString(),
         characterCount: characters.length,

@@ -1,9 +1,10 @@
 import { aiInvoke } from "../../platform/llm/aiService";
 import { z } from "zod";
 import { getPrisma } from "../../platform/db/client";
+import { serializeTags } from "../../platform/data/tagHelpers";
 import { generateBookFraming } from "../novel/setup/bookFraming";
 import { generateOutline } from "../novel/planning/storyMacro/outlineService";
-import { generateCharacters } from "../novel/planning/characterPrep/characterService";
+import { generateCharacters, persistDraftCharacters } from "../novel/planning/characterPrep/characterService";
 
 const IntentSchema = z.object({
   intent: z.string(),
@@ -53,21 +54,7 @@ export async function processChatMessage(
   }
 
   const result = await aiInvoke({
-    task: "planner",
-    systemPrompt: `你是小说创作助手。理解用户的自然语言意图，以友好口语化的方式回复。
-
-你可以帮用户做：
-- create_novel: 创建新小说（需要书名、题材、灵感描述）
-- generate_framing: 为当前小说生成书级定位
-- generate_outline: 生成故事大纲
-- generate_characters: 提取角色
-- write_chapter: 写章节
-- review: 审查章节
-- chat: 闲聊或解答创作问题
-- status: 查看当前状态
-
-回复JSON: { intent, novelId?, chapterNumber?, response, actions?: [{ type, label, args? }] }
-response要像朋友聊天一样自然，用中文。actions是可选的快捷操作按钮。只输出JSON。`,
+    assetId: "chat.assistant",
     userPrompt: `上下文：\n${context}\n\n用户说：${message}`,
     schema: IntentSchema,
     temperature: 0.7,
@@ -109,7 +96,7 @@ export async function executeAction(
         });
         await prisma.novel.update({ where: { id: nid }, data: {
           targetAudience: framing.targetAudience,
-          commercialTags: JSON.stringify(framing.commercialTags),
+          commercialTags: serializeTags(framing.commercialTags),
           competingFeel: framing.competingFeel,
           bookSellingPoint: framing.bookSellingPoint,
           first30ChapterPromise: framing.first30ChapterPromise,
@@ -124,6 +111,7 @@ export async function executeAction(
       case "generate_characters": {
         if (!nid) return { message: "请先选择一本小说" };
         const chars = await generateCharacters(nid);
+        await persistDraftCharacters(nid, chars);
         return { message: `已提取 ${chars.characters.length} 个角色：${chars.characters.map(c => c.name).join("、")}` };
       }
       case "status": {

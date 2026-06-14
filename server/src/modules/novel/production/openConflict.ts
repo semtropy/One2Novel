@@ -12,7 +12,9 @@ const ConflictSchema = z.object({
   })),
 });
 
-/** Scan chapter for open conflicts, update conflict state for context injection */
+/** Scan chapter for open conflicts, update conflict state for context injection.
+ *  Cumulative tracking: reads previous chapter's open conflicts, identifies
+ *  which were resolved/upgraded/new, then writes updated state. */
 export async function scanConflicts(novelId: string, chapterId: string): Promise<void> {
   const prisma = getPrisma();
   const chapter = await prisma.chapter.findUnique({ where: { id: chapterId } });
@@ -22,17 +24,37 @@ export async function scanConflicts(novelId: string, chapterId: string): Promise
     const chars = await prisma.novelCharacter.findMany({ where: { novelId }, select: { name: true } });
     const charList = chars.map(c => c.name).join(", ");
 
+    // Read previous chapter's conflicts for cumulative tracking
+    const prevChapter = await prisma.chapter.findFirst({
+      where: { novelId, order: { lt: chapter.order }, chapterStatus: { in: ["drafted", "completed"] } },
+      orderBy: { order: "desc" },
+      select: { openConflicts: true },
+    });
+    let prevConflictContext = "";
+    if (prevChapter?.openConflicts) {
+      try {
+        const prev = JSON.parse(prevChapter.openConflicts);
+        if (prev.conflicts?.length > 0) {
+          prevConflictContext = `\n\n上一章的开放冲突（需检查是否延续/升级/解决）：\n${prev.conflicts.map((c: { title: string; status: string; description: string }) => `- [${c.status}] ${c.title}：${c.description}`).join("\n")}`;
+        }
+      } catch {}
+    }
+
     const result = await aiInvoke({
-      task: "extractor",
-      systemPrompt: `从章节中识别所有开放冲突（未解决的矛盾/对抗/竞争）。`,
-      userPrompt: `出场角色：${charList}\n\n章节内容：\n${chapter.content.slice(0, 6000)}`,
+      assetId: "novel.conflict.scan",
+      userPrompt: `出场角色：${charList}\n\n章节内容：\n${chapter.content.slice(0, 6000)}${prevConflictContext}`,
       schema: ConflictSchema, temperature: 0.3,
     });
 
-    // Store conflicts in chapter metadata
-    const existing = chapter.sceneCards ? (() => { try { return JSON.parse(chapter.sceneCards); } catch { return {}; } })() : {};
-    existing.conflicts = result.conflicts;
-    await prisma.chapter.update({ where: { id: chapterId }, data: { sceneCards: JSON.stringify(existing) } });
+    // Store conflicts with cumulative tracking metadata
+    await prisma.chapter.update({
+      where: { id: chapterId },
+      data: { openConflicts: JSON.stringify({
+        conflicts: result.conflicts,
+        scannedAt: new Date().toISOString(),
+        hasPrevConflicts: !!prevConflictContext,
+      }) },
+    });
   } catch {}
 }
 
@@ -42,13 +64,13 @@ export async function getActiveConflicts(novelId: string): Promise<string> {
   const recentChapters = await prisma.chapter.findMany({
     where: { novelId, chapterStatus: { in: ["drafted", "completed"] } },
     orderBy: { order: "desc" }, take: 5,
-    select: { sceneCards: true },
+    select: { openConflicts: true },
   });
 
   const allConflicts: Array<{ title: string; description: string; parties: string[]; intensity: number; status: string }> = [];
   for (const ch of recentChapters) {
     try {
-      const data = ch.sceneCards ? JSON.parse(ch.sceneCards) : {};
+      const data = ch.openConflicts ? JSON.parse(ch.openConflicts) : {};
       if (data.conflicts) allConflicts.push(...data.conflicts.filter((c: { status: string }) => c.status !== "resolved"));
     } catch {}
   }

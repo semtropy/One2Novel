@@ -4,6 +4,8 @@ import { aiInvoke } from "../../platform/llm/aiService";
 
 const PayoffSchema = z.object({
   items: z.array(z.object({ title: z.string(), summary: z.string(), scopeType: z.string(), status: z.string() })),
+  touchedPayoffIds: z.array(z.string()).optional(),
+  paidOffPayoffIds: z.array(z.string()).optional(),
 });
 
 export async function scanChapterForPayoffs(novelId: string, chapterId: string): Promise<void> {
@@ -12,32 +14,40 @@ export async function scanChapterForPayoffs(novelId: string, chapterId: string):
   if (!chapter?.content) return;
 
   try {
-    const result = await aiInvoke({
-      task: "extractor",
-      systemPrompt: [
-        "你是小说伏笔分析师。从章节内容中识别所有伏笔/铺垫。伏笔包括：埋下的线索、未解之谜、角色的隐藏动机、暗示未来事件的细节。",
-        "对每个识别的伏笔，确定其作用域(scopeType)：book(整书级)、volume(卷级)、chapter(本章级)。",
-        "如果章节中触及了某个已有伏笔但未完全揭示，标记为hinted；如果是全新的伏笔标记为setup。",
-      ].join("\n"),
-      userPrompt: `分析以下章节的伏笔：\n\n${chapter.content.slice(0, 6000)}`,
-      schema: PayoffSchema, temperature: 0.3,
-    });
-
     const existing = await prisma.payoffLedgerItem.findMany({
       where: { novelId, currentStatus: { in: ["setup","hinted","pending_payoff"] } },
     });
+
+    const existingList = existing.length > 0
+      ? `\n\n已有伏笔清单（按ID引用）：\n${existing.map(p => `[${p.id}] ${p.title}（状态：${p.currentStatus}）：${p.summary ?? ""}`).join("\n")}`
+      : "";
+
+    const result = await aiInvoke({
+      assetId: "novel.payoff.scan",
+      userPrompt: `分析以下章节的伏笔：\n\n${chapter.content.slice(0, 6000)}${existingList}`,
+      schema: PayoffSchema, temperature: 0.3,
+    });
+
+    // Phase 2.2: semantic matching — use LLM-identified payoff touches instead of text matching
+    const touchedIds = new Set(result.touchedPayoffIds ?? []);
+    const paidOffIds = new Set(result.paidOffPayoffIds ?? []);
+
     for (const p of existing) {
-      if (chapter.content.includes(p.title)) {
+      if (paidOffIds.has(p.id)) {
         await prisma.payoffLedgerItem.update({
           where: { id: p.id },
-          data: { currentStatus: p.currentStatus === "pending_payoff" ? "paid_off" : "pending_payoff", payoffChapterId: chapterId, lastTouchedOrder: chapter.order },
+          data: { currentStatus: "paid_off", payoffChapterId: chapterId, lastTouchedOrder: chapter.order },
+        });
+      } else if (touchedIds.has(p.id)) {
+        await prisma.payoffLedgerItem.update({
+          where: { id: p.id },
+          data: { currentStatus: "pending_payoff", lastTouchedOrder: chapter.order },
         });
       }
     }
 
     for (const item of result.items) {
       const ledgerKey = `${novelId}-${item.title}`;
-      // H4: upsert instead of create to handle re-scans
       await prisma.payoffLedgerItem.upsert({
         where: { novelId_ledgerKey: { novelId, ledgerKey } },
         create: { novelId, ledgerKey, title: item.title, summary: item.summary, scopeType: item.scopeType, currentStatus: item.status, firstSeenOrder: chapter.order, lastTouchedOrder: chapter.order, setupChapterId: chapterId },

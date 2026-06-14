@@ -64,16 +64,7 @@ export async function updateCharacterDynamics(novelId: string, chapterId: string
 
   try {
     const result = await aiInvoke({
-      task: "extractor",
-      systemPrompt: [
-        "你是小说角色动态追踪分析师。根据最新章节内容，追踪角色状态变化和关系演变。",
-        "分析维度：",
-        "1. characterName：角色名（必须与出场角色列表中的名字完全一致）",
-        "2. newGoal（可选）：角色的当前目标是否因本章事件而改变？",
-        "3. newLocation（可选）：角色的物理位置是否移动？",
-        "4. relationshipChanges（可选）：角色之间的信任度、亲密感、冲突程度是否变化？",
-        "不编造正文中不存在的变化。",
-      ].join("\n"),
+      assetId: "novel.character.dynamics.post",
       userPrompt: `出场角色：${charList}\n\n章节内容：\n${chapter.content.slice(0, 6000)}`,
       schema: DynamicsSchema, temperature: 0.3,
     });

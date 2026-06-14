@@ -71,6 +71,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
         showNotTellScore: quality.showNotTellScore as number ?? 0,
         languageScore: quality.languageScore as number ?? 0,
         genreScore: quality.genreScore as number ?? 0,
+        coherenceScore: quality.coherenceScore as number ?? 0,
         overallComment: quality.overallComment as string ?? "",
         issues: (quality.issues as Array<{ type: string; severity: string; description: string; fixSuggestion: string }> | undefined) ?? [],
       };
@@ -94,6 +95,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
         showNotTellScore: (chapterFromNovel.showNotTellScore as number) ?? 0,
         languageScore: (chapterFromNovel.languageScore as number) ?? 0,
         genreScore: (chapterFromNovel.genreScore as number) ?? 0,
+        coherenceScore: (chapterFromNovel.coherenceScore as number) ?? 0,
         overallComment: comment,
         issues,
       };
@@ -103,7 +105,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
 
   const totalScore = scores
     ? scores.openingScore + scores.plotScore + scores.characterScore + scores.dialogueScore
-      + scores.suspenseScore + scores.pacingScore + scores.showNotTellScore + scores.languageScore + scores.genreScore
+      + scores.suspenseScore + scores.pacingScore + scores.showNotTellScore + scores.languageScore + scores.genreScore + scores.coherenceScore
     : 0;
 
   // diagnosis: prefer fresh prop, fallback to DB
@@ -243,7 +245,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
         ) : scores ? (
           <div>
             <div className="text-xs text-slate-600 mb-1.5">
-              总分 <span className="font-bold text-slate-800">{totalScore}</span>/90
+              总分 <span className="font-bold text-slate-800">{totalScore}</span>/100
               {scores.issues.length > 0 && <span className="text-slate-400 ml-1">· {scores.issues.length}个问题</span>}
             </div>
             <button
@@ -271,9 +273,9 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
             <div className="grid grid-cols-2 gap-5">
               {/* Left: Scores + Issues */}
               <div className="space-y-3">
-                <p className="text-xs text-slate-500">总分 <span className="font-bold text-slate-800">{totalScore}</span> / 90</p>
+                <p className="text-xs text-slate-500">总分 <span className="font-bold text-slate-800">{totalScore}</span> / 100</p>
                 <div className="space-y-0.5">
-                  {[["开头吸引力", scores.openingScore], ["情节推进", scores.plotScore], ["人物塑造", scores.characterScore], ["对话质量", scores.dialogueScore], ["悬念设置", scores.suspenseScore], ["节奏控制", scores.pacingScore], ["展示而非讲述", scores.showNotTellScore], ["语言质量", scores.languageScore], ["题材适应度", scores.genreScore]].map(([l, s]) => (
+                  {[["开头吸引力", scores.openingScore], ["情节推进", scores.plotScore], ["人物塑造", scores.characterScore], ["对话质量", scores.dialogueScore], ["悬念设置", scores.suspenseScore], ["节奏控制", scores.pacingScore], ["展示而非讲述", scores.showNotTellScore], ["语言质量", scores.languageScore], ["题材适应度", scores.genreScore], ["跨章连贯性", scores.coherenceScore]].map(([l, s]) => (
                     <div key={l as string} className="flex items-center gap-2">
                       <span className="text-xs text-slate-600 w-[4.5rem] shrink-0 text-right">{l as string}</span>
                       <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">

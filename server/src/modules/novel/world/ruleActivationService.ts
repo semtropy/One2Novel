@@ -6,6 +6,14 @@
 import { getPrisma } from "../../../platform/db/client";
 import { listRules, type WorldRuleData } from "./worldRuleService";
 
+// ─── Simple in-memory cache (TTL: 1 volume worth of chapters) ──
+const relevanceCache = new Map<string, { ruleIds: string[]; expiresAt: number }>();
+
+function cacheKey(novelId: string, chapterContext: string): string {
+  // Hash chapter context to a short key: use novelId + first 100 chars of context
+  return `${novelId}:${chapterContext.slice(0, 100)}`;
+}
+
 // ─── Relevance scoring ─────────────────────────────────
 
 /** Score how relevant a world rule is to a chapter based on keyword matching */
@@ -43,6 +51,14 @@ export async function selectRelevantRules(
   const active = rules.filter(r => r.status === "active");
   if (active.length === 0) return [];
 
+  // Check cache (1-hour TTL for same chapter context)
+  const key = cacheKey(novelId, chapterContext);
+  const cached = relevanceCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    const cachedRules = active.filter(r => cached.ruleIds.includes(r.id));
+    if (cachedRules.length > 0) return cachedRules.slice(0, maxRules);
+  }
+
   // Score and sort
   const scored = active
     .map(r => ({ rule: r, score: relevanceScore(r, chapterContext) }))
@@ -50,7 +66,15 @@ export async function selectRelevantRules(
     .sort((a, b) => b.score - a.score || b.rule.priority - a.rule.priority)
     .slice(0, maxRules);
 
-  return scored.map(s => s.rule);
+  const result = scored.map(s => s.rule);
+
+  // Cache
+  relevanceCache.set(key, {
+    ruleIds: result.map(r => r.id),
+    expiresAt: Date.now() + 3600_000, // 1 hour
+  });
+
+  return result;
 }
 
 export async function activateRulesForChapter(

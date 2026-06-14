@@ -12,6 +12,7 @@ const RawQualitySchema = z.object({
   showNotTellScore: z.number().optional(),  // Skill核心维度: 展示而非讲述
   languageScore: z.number().optional(),
   genreScore: z.number().optional(),
+  coherenceScore: z.number().optional(),   // 跨章连贯性
   overallComment: z.string().optional(),
   comment: z.string().optional(),
   summary: z.string().optional(),
@@ -31,6 +32,7 @@ export interface QualityResult {
   dialogueScore: number; suspenseScore: number; pacingScore: number;
   showNotTellScore: number;  // Skill三大黄金法则之一
   languageScore: number; genreScore: number;
+  coherenceScore: number;   // 跨章连贯性
   overallComment: string;
   verdict: Verdict;
   issues?: Array<{ type: string; severity: string; description: string; fixSuggestion: string }>;
@@ -43,6 +45,10 @@ export interface QualityGateOptions {
   characterProhibitions?: Array<{ name: string; prohibitions: string[] }>;
   /** Chapter expectation for obligation checking */
   chapterExpectation?: string | null;
+  /** Previous chapter summary for cross-chapter coherence checking */
+  previousChapterSummary?: string | null;
+  /** Previous chapter ending hook (last ~200 chars) for handoff check */
+  previousChapterEnding?: string | null;
 }
 
 // ─── Genre-specific check dimensions ──────────────────
@@ -161,11 +167,12 @@ function scanProhibitionViolations(
   return violations;
 }
 
-/** Convert a Chinese prohibition text to regex patterns for fuzzy matching */
+/** Convert a Chinese prohibition text to regex patterns for fuzzy matching.
+ *  Returns patterns array (may be empty if no hardcoded or character-based patterns match). */
 function prohibitionToPatterns(prohibition: string): RegExp[] {
   const patterns: RegExp[] = [];
 
-  // Pattern categories
+  // Pattern categories (8 hardcoded fast-paths)
   if (/善良|仁慈|心软|手下留情|不忍/.test(prohibition)) {
     patterns.push(/善良|仁慈|心软|手下留情|不忍|同情|怜悯/);
   }
@@ -191,7 +198,7 @@ function prohibitionToPatterns(prohibition: string): RegExp[] {
     patterns.push(/主动|率先|自愿/);
   }
 
-  // Generic fallback: search for key characters in the prohibition
+  // Character-based fallback for unknown prohibitions
   if (patterns.length === 0) {
     const chars = prohibition.replace(/[^一-鿿]/g, "");
     if (chars.length >= 2) {
@@ -221,44 +228,11 @@ export async function runQualityGate(
   const cat = classifyGenre(opts?.genre);
   const genreDimensions = genreCheckDimensions(cat);
 
-  // Build genre-specific review prompt
-  const systemPrompt = [
-    "你是资深中文小说编辑，正在评估投稿章节质量。",
-    "你需要在以下维度对本章评分，每项1-10分：",
-    "",
-    "【通用维度】",
-    "1. 开头吸引力：前三段是否立即抓住读者？是否避免了天气描写/日常流程/回顾上章等致命错误？",
-    "2. 情节推进：本章是否推进了主线剧情，是否有实质性的状态变化？",
-    "3. 人物塑造：人物行为是否符合其性格设定？是否有侧面展示而非直接标签？",
-    "4. 对话质量：对话是否自然简洁、有潜台词、服务情节推进？",
-    "5. 悬念设置：章尾是否设置了有效的悬念钩子？读者是否想继续看下一章？",
-    "6. 节奏控制：长短句是否交替？段落是否有呼吸感？信息密度是否有高低起伏？",
-    "7. 展示而非讲述（核心维度）：是否用动作和对话表现而非直接陈述？情绪是否通过身体反应间接表达？是否避免了「他很愤怒」「她很伤心」等直接陈述？抽象形容词是否被具体描写替代？",
-	    "8. 语言质量：是否存在AI痕迹（陈词滥调/四字成语堆砌/模板化表达/总结性语句替代剧情发展）？",
-    "",
-    "【题材特定维度】",
-    genreDimensions,
-    "",
-    "同时给出：",
-    "- overallComment：总体评语（含题材特定维度的评估）",
-    "- issues：具体问题列表，每条含 type(类型)、severity(低/中/高)、description(描述)、fixSuggestion(修复建议)",
-    "",
-    opts?.chapterExpectation
-      ? `本章要求完成：${opts.chapterExpectation}。检查正文是否完成了这一义务。`
-      : "",
-    "",
-    opts?.characterProhibitions && opts.characterProhibitions.length > 0
-      ? `【角色硬约束——不可违反】\n${opts.characterProhibitions.map(c =>
-        `${c.name}：禁止以下行为——${c.prohibitions.join("、")}`
-      ).join("\n")}\n请在审阅时检查正文是否违反上述约束。`
-      : "",
-    "",
-    "只输出JSON。",
-  ].filter(Boolean).join("\n");
+    const charProhibitionText = opts?.characterProhibitions && opts.characterProhibitions.length > 0 ? (opts.characterProhibitions.map(c => c.name + "：禁止以下行为——" + c.prohibitions.join("、")).join("\n")) : "";
 
   const raw = await aiInvoke({
-    task: "reviewer",
-    systemPrompt,
+    assetId: "novel.chapter.review",
+    templateVars: { genreCheckDimensions: genreDimensions, previousChapterSummary: opts?.previousChapterSummary ?? "", previousChapterEnding: opts?.previousChapterEnding ?? "", chapterExpectation: opts?.chapterExpectation ?? "", characterProhibitions: charProhibitionText },
     userPrompt: `请审阅以下章节：\n\n${content.slice(0, 8000)}`,
     schema: RawQualitySchema, temperature: 0.3,
   });
@@ -290,6 +264,7 @@ export async function runQualityGate(
     showNotTellScore: raw.showNotTellScore ?? 6,
     languageScore: raw.languageScore ?? 6,
     genreScore: raw.genreScore ?? 6,
+    coherenceScore: raw.coherenceScore ?? 6,
     overallComment: raw.overallComment ?? raw.summary ?? raw.comment ?? "评估完成",
     verdict: "NEEDS_FIX",
     issues: [...prohibitionIssues, ...llmIssues],
@@ -317,15 +292,16 @@ export function totalQualityScore(result: QualityResult): number {
   return (
     result.openingScore + result.plotScore + result.characterScore +
     result.dialogueScore + result.suspenseScore + result.pacingScore +
-    result.showNotTellScore + result.languageScore + result.genreScore
+    result.showNotTellScore + result.languageScore + result.genreScore +
+    result.coherenceScore
   );
 }
 
-/** Get the PASS threshold for a given genre — 9 dimensions, max 90 */
+/** Get the PASS threshold for a given genre — 10 dimensions, max 100 */
 export function passThreshold(genre?: string | null): number {
   const cat = classifyGenre(genre);
-  if (cat === "悬疑" || cat === "奇幻") return 59; // 9 dimensions × ~6.5
-  return 54; // 9 dimensions × 6
+  if (cat === "悬疑" || cat === "奇幻") return 65; // 10 dimensions × ~6.5
+  return 60; // 10 dimensions × 6
 }
 
 /** Get genre score dimension labels for UI display */

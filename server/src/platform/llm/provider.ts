@@ -69,7 +69,7 @@ export function createLLM(provider: LLMProvider, options?: { model?: string; tem
     // ── Anthropic ──
     case "anthropic":
       return new ChatAnthropic({
-        modelName: model ?? env.ANTHROPIC_MODEL ?? "claude-sonnet-4-20250514",
+        modelName: model ?? env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
         temperature, maxTokens,
         anthropicApiKey: env.ANTHROPIC_API_KEY,
       });

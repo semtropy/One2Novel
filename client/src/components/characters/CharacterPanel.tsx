@@ -36,16 +36,15 @@ export function CharacterPanel({ novelId }: Props) {
   const [genError, setGenError] = useState("");
 
 
-  type DraftChar = { id: string; name: string; role: string; personality?: string | null; background?: string | null; appearance?: string | null; quirks?: string | null; currentStatus?: string | null; currentGoal?: string | null; voiceTexture?: string | null; identityLabel?: string | null; prohibitions?: string | null; synced: boolean };
-  const draftChars: DraftChar[] = ((novel as unknown) as { draftCharacters?: DraftChar[] } | undefined)?.draftCharacters ?? [];
-  const chars: Array<NovelCharacter & { relations_source?: unknown[]; relations_target?: unknown[] }> = draftChars.map(dc => ({
+  const draftChars = novel?.draftCharacters ?? [];
+  const chars = draftChars.map(dc => ({
     id: dc.id, novelId, name: dc.name, role: dc.role,
-    personality: dc.personality ?? null, background: dc.background ?? null,
-    appearance: dc.appearance ?? null, quirks: dc.quirks ?? null,
-    currentGoal: dc.currentGoal ?? null, currentStatus: dc.currentStatus ?? null,
-    voiceTexture: dc.voiceTexture ?? null, identityLabel: dc.identityLabel ?? null,
-    prohibitions: dc.prohibitions ?? null,
-  }) as unknown as NovelCharacter & { relations_source?: unknown[]; relations_target?: unknown[] });
+    personality: dc.personality ?? undefined, background: dc.background ?? undefined,
+    appearance: dc.appearance ?? undefined, quirks: dc.quirks ?? undefined,
+    currentGoal: dc.currentGoal ?? undefined, currentStatus: dc.currentStatus ?? undefined,
+    voiceTexture: dc.voiceTexture ?? undefined, identityLabel: dc.identityLabel ?? undefined,
+    prohibitions: dc.prohibitions ?? undefined,
+  }));
 
   async function saveField(charId: string, key: string, value: string) {
     try {

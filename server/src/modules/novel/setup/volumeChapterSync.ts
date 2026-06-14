@@ -246,3 +246,99 @@ export async function syncDraftPlansToWriting(
   }
   await renumberGlobalChapterOrders(novelId);
 }
+
+// ─── Draft Character / Relation sync helpers ──────────────
+
+/**
+ * Sync DraftCharacters → NovelCharacters (upsert + delete orphans).
+ * Marks all surviving DraftCharacters as synced=true.
+ */
+export async function syncDraftCharactersToWriting(novelId: string): Promise<void> {
+  const prisma = getPrisma();
+  const draftChars = await prisma.draftCharacter.findMany({ where: { novelId } });
+  const draftCharNames = new Set(draftChars.map(dc => dc.name));
+
+  for (const dc of draftChars) {
+    const existing = await prisma.novelCharacter.findFirst({ where: { novelId, name: dc.name } });
+    if (existing) {
+      await prisma.novelCharacter.update({
+        where: { id: existing.id },
+        data: {
+          role: dc.role, personality: dc.personality, background: dc.background,
+          appearance: dc.appearance, quirks: dc.quirks, currentStatus: dc.currentStatus,
+          currentGoal: dc.currentGoal, voiceTexture: dc.voiceTexture,
+          identityLabel: dc.identityLabel, prohibitions: dc.prohibitions,
+        },
+      });
+    } else {
+      await prisma.novelCharacter.create({
+        data: {
+          novelId, name: dc.name, role: dc.role, personality: dc.personality,
+          background: dc.background, appearance: dc.appearance, quirks: dc.quirks,
+          currentStatus: dc.currentStatus, currentGoal: dc.currentGoal,
+          voiceTexture: dc.voiceTexture, identityLabel: dc.identityLabel,
+          prohibitions: dc.prohibitions,
+        },
+      });
+    }
+    await prisma.draftCharacter.update({ where: { id: dc.id }, data: { synced: true } });
+  }
+
+  // Delete NovelCharacters that no longer exist in DraftCharacter
+  const novelChars = await prisma.novelCharacter.findMany({ where: { novelId } });
+  for (const nc of novelChars) {
+    if (!draftCharNames.has(nc.name)) {
+      await prisma.novelCharacterRelation.deleteMany({
+        where: { OR: [{ sourceCharacterId: nc.id }, { targetCharacterId: nc.id }] },
+      });
+      await prisma.novelCharacter.delete({ where: { id: nc.id } });
+    }
+  }
+}
+
+/**
+ * Sync DraftCharacterRelations → NovelCharacterRelations (upsert + delete orphans).
+ * Requires DraftCharacters to be synced first (maps DraftChar IDs → NovelChar IDs by name).
+ * Marks all surviving DraftCharacterRelations as synced=true.
+ */
+export async function syncDraftRelationsToWriting(novelId: string): Promise<void> {
+  const prisma = getPrisma();
+  const draftChars = await prisma.draftCharacter.findMany({ where: { novelId } });
+  const draftRels = await prisma.draftCharacterRelation.findMany({ where: { novelId } });
+  const draftRelKeys = new Set(draftRels.map(r => `${r.sourceCharacterId}:${r.targetCharacterId}`));
+
+  // Map DraftCharacter IDs → NovelCharacter IDs (both reference the same name)
+  const dcIdToNcId: Record<string, string> = {};
+  for (const dc of draftChars) {
+    const nc = await prisma.novelCharacter.findFirst({ where: { novelId, name: dc.name } });
+    if (nc) dcIdToNcId[dc.id] = nc.id;
+  }
+
+  for (const dr of draftRels) {
+    const srcNcId = dcIdToNcId[dr.sourceCharacterId];
+    const tgtNcId = dcIdToNcId[dr.targetCharacterId];
+    if (!srcNcId || !tgtNcId) continue;
+    const existingRel = await prisma.novelCharacterRelation.findFirst({
+      where: { novelId, sourceCharacterId: srcNcId, targetCharacterId: tgtNcId },
+    });
+    if (existingRel) {
+      await prisma.novelCharacterRelation.update({
+        where: { id: existingRel.id },
+        data: { type: dr.type, summary: dr.summary },
+      });
+    } else {
+      await prisma.novelCharacterRelation.create({
+        data: { novelId, sourceCharacterId: srcNcId, targetCharacterId: tgtNcId, type: dr.type, summary: dr.summary },
+      });
+    }
+    await prisma.draftCharacterRelation.update({ where: { id: dr.id }, data: { synced: true } });
+  }
+
+  // Delete NovelCharacterRelations that no longer exist in DraftCharacterRelation
+  const novelRels = await prisma.novelCharacterRelation.findMany({ where: { novelId } });
+  for (const nr of novelRels) {
+    if (!draftRelKeys.has(`${nr.sourceCharacterId}:${nr.targetCharacterId}`)) {
+      await prisma.novelCharacterRelation.delete({ where: { id: nr.id } });
+    }
+  }
+}

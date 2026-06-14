@@ -68,26 +68,7 @@ export async function batchGenerateRules(novelId: string): Promise<WorldRuleData
   const novel = await prisma.novel.findUnique({ where: { id: novelId } });
   if (!novel) throw new Error("Novel not found");
 
-  const systemPrompt = [
-    "你是资深小说世界观设计师。根据小说信息，生成分类明确、可执行、可验证的世界规则。",
-    "",
-    `分类维度（共6类，尽量覆盖多类，不要求每类都有）：${WORLD_CATEGORIES.join("、")}`,
-    "",
-    "规则要求：",
-    "1. 每条10-50字，具体可操作，可验证（能判断'本章是否违反此规则'）",
-    "2. priority(1-10)：10=核心不可违背，5=重要但不绝对，1=锦上添花",
-    "3. 至少生成5条规则，覆盖主要分类维度",
-    "4. 势力格局：有哪些势力、谁控制什么、势力间基本关系",
-    "5. 力量体系：修炼/魔法/科技等级、获取方式、使用代价/限制",
-    "6. 资源规则：稀缺资源是什么、谁拥有、如何获取/消耗",
-    "7. 社会结构：阶层划分、流动规则、权力来源",
-    "8. 地理环境：关键地点、区位关系、环境约束",
-    "9. 历史背景：关键历史事件对当下的影响、遗留问题",
-    "10. 规则之间不得逻辑矛盾。优先基于已有信息归纳，合理补充但不做过度发散。",
-    "",
-    "只输出JSON。",
-  ].join("\n");
-
+  
   const context = [
     `书名：《${novel.title}》`,
     novel.genre ? `题材：${novel.genre}` : "",
@@ -96,8 +77,7 @@ export async function batchGenerateRules(novelId: string): Promise<WorldRuleData
   ].filter(Boolean).join("\n");
 
   const raw = await aiInvoke({
-    task: "extractor",
-    systemPrompt,
+    assetId: "world.rules.generate",
     userPrompt: context,
     schema: BatchGenerateSchema,
     temperature: 0.6,
@@ -151,15 +131,7 @@ export async function checkConflict(ruleId: string): Promise<{ hasConflict: bool
   if (allRules.length === 0) return { hasConflict: false, conflictingIds: [], explanation: "" };
 
   const raw = await aiInvoke({
-    task: "compiler",
-    systemPrompt: [
-      "你是小说世界观一致性审查员。检查两条规则之间是否存在逻辑矛盾。",
-      "矛盾类型：",
-      "- 直接对立：A说「只有贵族能修炼」B说「任何人都能修炼」→ 矛盾",
-      "- 隐含冲突：A说「魔法需要等价交换」B说「主角天生无限魔力」→ 矛盾",
-      "- 前提不一致：A基于'世界没有神'，B说'神赐予力量'→ 矛盾",
-      "如果没有矛盾，返回 hasConflict=false。只输出JSON。",
-    ].join("\n"),
+    assetId: "world.rules.conflict-check",
     userPrompt: `目标规则：[${rule.category}] ${rule.title}: ${rule.content}\n\n对比以下规则：\n${allRules.map(r => `[${r.id}] [${r.category}] ${r.title}: ${r.content}`).join("\n")}`,
     schema: ConflictCheckSchema,
     temperature: 0.2,
