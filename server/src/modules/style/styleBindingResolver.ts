@@ -114,11 +114,16 @@ export async function mergeStyleRules(
   const ruleMap = new Map<string, StyleRule>();
   const sourceCounts = new Map<string, { name: string; targetType: string; ruleCount: number }>();
 
+  // Batch-fetch all profiles to avoid N+1 queries
+  const profileIds = [...new Set(bindings.map(b => b.styleProfileId))];
+  const profiles = await prisma.styleProfile.findMany({
+    where: { id: { in: profileIds } },
+    select: { id: true, name: true, narrativeRules: true, languageRules: true, characterRules: true, rhythmRules: true, antiAiRules: true },
+  });
+  const profileMap = new Map(profiles.map(p => [p.id, p]));
+
   for (const binding of bindings) {
-    const profile = await prisma.styleProfile.findUnique({
-      where: { id: binding.styleProfileId },
-      select: { name: true, narrativeRules: true, languageRules: true, characterRules: true, rhythmRules: true, antiAiRules: true },
-    });
+    const profile = profileMap.get(binding.styleProfileId);
     if (!profile) continue;
 
     let profileRuleCount = 0;

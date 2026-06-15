@@ -16,7 +16,7 @@ interface DirectorProgress {
   results: Array<{ chapter: number; status: string; score?: number }>;
 }
 
-export default function AutoWriteModal({ novelId, onClose }: Props) {
+export function AutoWriteModal({ novelId, onClose }: Props) {
   const [chCount, setChCount] = useState(3);
   const [phase, setPhase] = useState<"config" | "running">("config");
   const [progress, setProgress] = useState<DirectorProgress | null>(null);

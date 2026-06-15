@@ -1,26 +1,70 @@
 {
   "version": 2,
-  "updatedAt": "2026-06-14T04:20:22.569Z",
+  "updatedAt": "2026-06-15T14:56:33.766Z",
   "preferences": {
-    "favoriteGenres": [],
+    "favoriteGenres": [
+      "都市",
+      "悬疑"
+    ],
     "preferredPerspective": "third_person",
     "preferredPace": "balanced",
     "preferredTone": "",
-    "typicalChapterCount": null,
+    "estimatedChapterCount": null,
     "defaultChapterLength": 3000,
     "creationHistory": [
       {
         "title": "未命名小说",
         "genre": "",
-        "createdAt": "2026-06-14T04:20:22.562Z"
+        "createdAt": "2026-06-15T14:56:33.758Z"
       },
       {
         "title": "未命名小说",
         "genre": "",
-        "createdAt": "2026-06-13T13:24:46.522Z"
+        "createdAt": "2026-06-15T13:54:06.611Z"
+      },
+      {
+        "title": "Framing测试",
+        "genre": "都市",
+        "createdAt": "2026-06-15T13:52:28.425Z"
+      },
+      {
+        "title": "验收测试",
+        "genre": "悬疑",
+        "createdAt": "2026-06-15T13:52:28.388Z"
+      },
+      {
+        "title": "未命名小说",
+        "genre": "",
+        "createdAt": "2026-06-15T11:55:39.697Z"
+      },
+      {
+        "title": "Framing测试",
+        "genre": "都市",
+        "createdAt": "2026-06-15T11:35:48.473Z"
+      },
+      {
+        "title": "验收测试",
+        "genre": "悬疑",
+        "createdAt": "2026-06-15T11:35:48.409Z"
+      },
+      {
+        "title": "Framing测试",
+        "genre": "都市",
+        "createdAt": "2026-06-15T11:16:50.761Z"
+      },
+      {
+        "title": "验收测试",
+        "genre": "悬疑",
+        "createdAt": "2026-06-15T11:16:50.692Z"
+      },
+      {
+        "title": "未命名小说",
+        "genre": "",
+        "createdAt": "2026-06-15T09:46:30.545Z"
       }
     ],
     "providerModels": {},
-    "apiKeys": {}
+    "apiKeys": {},
+    "typicalChapterCount": null
   }
 }

@@ -6,12 +6,27 @@
 import { getPrisma } from "../../../platform/db/client";
 import { listRules, type WorldRuleData } from "./worldRuleService";
 
-// ─── Simple in-memory cache (TTL: 1 volume worth of chapters) ──
+// ─── LRU in-memory cache (max 100 entries, TTL: 1 hour) ──
+const MAX_CACHE_ENTRIES = 100;
+const CACHE_TTL_MS = 60 * 60 * 1000;
 const relevanceCache = new Map<string, { ruleIds: string[]; expiresAt: number }>();
 
 function cacheKey(novelId: string, chapterContext: string): string {
-  // Hash chapter context to a short key: use novelId + first 100 chars of context
-  return `${novelId}:${chapterContext.slice(0, 100)}`;
+  // Hash chapter context: novelId + first 200 chars (wider to avoid collisions)
+  return `${novelId}:${chapterContext.slice(0, 200)}`;
+}
+
+function evictStaleOrLRU(): void {
+  const now = Date.now();
+  // Remove expired entries
+  for (const [k, v] of relevanceCache) {
+    if (v.expiresAt < now) relevanceCache.delete(k);
+  }
+  // If still over limit, evict oldest (first inserted = least recently used)
+  if (relevanceCache.size > MAX_CACHE_ENTRIES) {
+    const oldest = [...relevanceCache.keys()].slice(0, relevanceCache.size - MAX_CACHE_ENTRIES);
+    oldest.forEach(k => relevanceCache.delete(k));
+  }
 }
 
 // ─── Relevance scoring ─────────────────────────────────
@@ -68,10 +83,11 @@ export async function selectRelevantRules(
 
   const result = scored.map(s => s.rule);
 
-  // Cache
+  // Cache with LRU eviction
+  evictStaleOrLRU();
   relevanceCache.set(key, {
     ruleIds: result.map(r => r.id),
-    expiresAt: Date.now() + 3600_000, // 1 hour
+    expiresAt: Date.now() + CACHE_TTL_MS,
   });
 
   return result;

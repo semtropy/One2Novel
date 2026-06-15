@@ -26,13 +26,23 @@ export default function RelationshipGraphModal({ novelId, onClose }: Props) {
   const [newTarget, setNewTarget] = useState("");
   const [newType, setNewType] = useState("friend");
 
-  // Read from DraftCharacter (planning tab source of truth)
+  // Read characters from novel data
   const chars: Array<{ id: string; name: string }> =
-    ((novel as unknown) as { draftCharacters?: Array<{ id: string; name: string }> }).draftCharacters ?? [];
+    novel?.characters?.map(c => ({ id: c.id, name: c.name })) ?? [];
 
   async function handleSave(edgeId: string, _field: string) {
     if (!editVal.trim()) { setEditing(null); return; }
-    // For editing, we don't update inline — user can delete and re-add
+    const edge = relGraph?.edges.find(e => e.id === edgeId);
+    if (edge) {
+      try {
+        await upsertRel.mutateAsync({
+          novelId,
+          sourceCharacterId: edge.sourceId,
+          targetCharacterId: edge.targetId,
+          type: editVal,
+        });
+      } catch {}
+    }
     setEditing(null);
   }
 
@@ -45,7 +55,7 @@ export default function RelationshipGraphModal({ novelId, onClose }: Props) {
   }
 
   async function handleDelete(edgeId: string) {
-    try { await api.delete(`/novels/${novelId}/draft-relations/${edgeId}`); } catch {}
+    try { await api.delete(`/novels/${novelId}/relations/${edgeId}`); } catch {}
   }
 
   if (!relGraph) return null;

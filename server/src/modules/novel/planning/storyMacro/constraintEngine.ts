@@ -1,9 +1,8 @@
 /**
  * Story Macro Constraint Engine — validates outline structural integrity.
  *
- * ADAPTED from OP storyMacroConstraintEngine.ts (247 lines).
- * Streamlined for One2Novel's outline model:
- *   premise + mainArc + mysteryBox + endingDirection + volumes[].chapters[]
+ * Unified story core fields:
+ *   storySummary + centralQuestion + endingDirection + volumes[].chapters[]
  *
  * Validation dimensions:
  *   1. Conflict continuity — does the conflict engine sustain across volumes?
@@ -15,9 +14,8 @@
 // ─── Types ─────────────────────────────────────────────
 
 export interface StoryOutline {
-  premise: string;
-  mainArc: string;
-  mysteryBox: string;
+  storySummary: string;
+  centralQuestion: string;
   endingDirection: string;
   volumes: VolumeOutline[];
 }
@@ -233,32 +231,25 @@ function checkHookCoherence(outline: StoryOutline): ConstraintViolation[] {
 function checkStructuralCompleteness(outline: StoryOutline): ConstraintViolation[] {
   const violations: ConstraintViolation[] = [];
 
-  if (isEmpty(outline.premise)) {
+  if (isEmpty(outline.storySummary)) {
     violations.push({
       severity: "high", category: "结构缺失", location: "大纲",
-      description: "缺少前提(premise)——故事的根本驱动力未定义。",
-      suggestion: "前提应回答'这个故事为什么能开始'，80-150字。",
+      description: "缺少故事简介(storySummary)——故事的核心叙事线未定义。",
+      suggestion: "故事简介应回答'这个故事讲什么'，100-200字。",
     });
   }
-  if (isEmpty(outline.mainArc)) {
+  if (isEmpty(outline.centralQuestion)) {
     violations.push({
       severity: "high", category: "结构缺失", location: "大纲",
-      description: "缺少主线(mainArc)——全书的核心剧情线未定义。",
-      suggestion: "主线应回答'这个故事到底讲什么'，80-150字。",
-    });
-  }
-  if (isEmpty(outline.mysteryBox)) {
-    violations.push({
-      severity: "high", category: "结构缺失", location: "大纲",
-      description: "缺少核心悬念(mysteryBox)——无法持续牵引读者追读。",
-      suggestion: "核心悬念应是最关键但暂时无法揭晓的未知，50-100字。",
+      description: "缺少核心悬念(centralQuestion)——无法持续牵引读者追读。",
+      suggestion: "核心悬念应是最关键但暂时无法揭晓的未知，50-120字。",
     });
   }
   if (isEmpty(outline.endingDirection)) {
     violations.push({
       severity: "medium", category: "结构缺失", location: "大纲",
       description: "缺少结局方向(endingDirection)——结局气质与情感落点未定义。",
-      suggestion: "结局方向描述'这本书最终给人什么感觉'，50-100字。",
+      suggestion: "结局方向描述'这本书最终给人什么感觉'，50-150字。",
     });
   }
   if (outline.volumes.length === 0) {
@@ -282,6 +273,152 @@ function checkStructuralCompleteness(outline: StoryOutline): ConstraintViolation
   }
 
   return violations;
+}
+
+// ─── Phase 3: Volume-level rhythm checks ──────────────
+
+export interface VolumeRhythmInput {
+  sortOrder: number;
+  title: string;
+  chapters: Array<{
+    order: number;
+    chapterType?: string | null;    // advance | transition | cooldown | climax
+    coolPointType?: string | null;
+    hookType?: string | null;
+    conflictLevel?: number | null;
+  }>;
+}
+
+export interface VolumeRhythmReport {
+  volumeOrder: number;
+  passed: boolean;
+  violations: ConstraintViolation[];
+  summary: string;
+}
+
+/** Check cool-down chapter quota: at least 1 per volume, at most 3 */
+function checkCooldownQuota(volume: VolumeRhythmInput): ConstraintViolation[] {
+  const violations: ConstraintViolation[] = [];
+  const cooldowns = volume.chapters.filter(c => c.chapterType === "cooldown").length;
+
+  if (cooldowns === 0 && volume.chapters.length >= 5) {
+    violations.push({
+      severity: "medium",
+      category: "缺少冷却章",
+      location: `第${volume.sortOrder}卷《${volume.title}》`,
+      description: `整卷无冷却章，读者可能感到疲劳。`,
+      suggestion: "每卷至少安排1章冷却章，用于高潮后的情绪消化。",
+    });
+  }
+  if (cooldowns > volume.chapters.length * 0.3) {
+    violations.push({
+      severity: "low",
+      category: "冷却章过多",
+      location: `第${volume.sortOrder}卷《${volume.title}》`,
+      description: `${cooldowns}/${volume.chapters.length}章为冷却章，占比过高。`,
+      suggestion: "冷却章不宜超过全卷30%。",
+    });
+  }
+  return violations;
+}
+
+/** Check climax chapter quota: 1-2 per volume */
+function checkClimaxQuota(volume: VolumeRhythmInput): ConstraintViolation[] {
+  const violations: ConstraintViolation[] = [];
+  const climaxes = volume.chapters.filter(c => c.chapterType === "climax").length;
+
+  if (climaxes === 0 && volume.chapters.length >= 5) {
+    violations.push({
+      severity: "high",
+      category: "缺少高潮章",
+      location: `第${volume.sortOrder}卷《${volume.title}》`,
+      description: "整卷无高潮章，读者缺乏满足感。",
+      suggestion: "每卷至少安排1章高潮章（决战/揭示/晋升），给予读者情绪回报。",
+    });
+  }
+  if (climaxes > 3) {
+    violations.push({
+      severity: "medium",
+      category: "高潮章过多",
+      location: `第${volume.sortOrder}卷《${volume.title}》`,
+      description: `${climaxes}章高潮章，可能导致高潮疲劳。`,
+      suggestion: "高潮应集中而非分散，建议控制在1-3章。",
+    });
+  }
+  return violations;
+}
+
+/** Check conflict level forms a proper arc within the volume */
+function checkVolumeConflictArc(volume: VolumeRhythmInput): ConstraintViolation[] {
+  const violations: ConstraintViolation[] = [];
+  const levels = volume.chapters.map(c => c.conflictLevel ?? 5);
+  if (levels.length < 5) return violations;
+
+  // Check: first chapter shouldn't be max conflict
+  const maxLevel = Math.max(...levels);
+  if (levels[0] >= maxLevel - 1 && levels.length >= 5) {
+    violations.push({
+      severity: "low",
+      category: "冲突起点过高",
+      location: `第${volume.sortOrder}卷《${volume.title}》`,
+      description: "卷首冲突等级过高，缺乏逐步升级的空间。",
+      suggestion: "卷首冲突建议设在3-5之间，为后续升级留出空间。",
+    });
+  }
+
+  // Check: last 2 chapters should have high conflict
+  const lastTwo = levels.slice(-2);
+  const lastTwoAvg = lastTwo.reduce((s, l) => s + l, 0) / lastTwo.length;
+  if (lastTwoAvg < 6) {
+    violations.push({
+      severity: "medium",
+      category: "卷尾冲突不足",
+      location: `第${volume.sortOrder}卷《${volume.title}》`,
+      description: `卷尾两章平均冲突等级仅${lastTwoAvg.toFixed(1)}，卷末缺乏冲击力。`,
+      suggestion: "卷末应有高冲突场面（≥7），给读者留下深刻印象。",
+    });
+  }
+
+  return violations;
+}
+
+/** Check hook type distribution */
+function checkHookDistribution(volume: VolumeRhythmInput): ConstraintViolation[] {
+  const violations: ConstraintViolation[] = [];
+  const shortHooks = volume.chapters.filter(c => c.hookType === "short_term").length;
+  const mediumHooks = volume.chapters.filter(c => c.hookType === "medium_term").length;
+
+  if (volume.chapters.length >= 8 && mediumHooks < 2) {
+    violations.push({
+      severity: "low",
+      category: "中期钩子不足",
+      location: `第${volume.sortOrder}卷《${volume.title}》`,
+      description: `全卷仅${mediumHooks}个中期钩子，长期牵引力不足。`,
+      suggestion: "建议每卷设置2-3个中期钩子，形成卷级悬念线索。",
+    });
+  }
+  return violations;
+}
+
+export function validateVolumeRhythm(volume: VolumeRhythmInput): VolumeRhythmReport {
+  const allViolations = [
+    ...checkCooldownQuota(volume),
+    ...checkClimaxQuota(volume),
+    ...checkVolumeConflictArc(volume),
+    ...checkHookDistribution(volume),
+  ];
+
+  const highCount = allViolations.filter(v => v.severity === "high").length;
+  const mediumCount = allViolations.filter(v => v.severity === "medium").length;
+
+  return {
+    volumeOrder: volume.sortOrder,
+    passed: highCount === 0,
+    violations: allViolations,
+    summary: allViolations.length === 0
+      ? "卷级节奏检查通过。"
+      : `${highCount}项严重、${mediumCount}项中等问题。`,
+  };
 }
 
 // ─── Utility ───────────────────────────────────────────

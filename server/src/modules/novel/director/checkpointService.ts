@@ -11,7 +11,7 @@ export interface DirectorCheckpoint {
   totalChaptersToWrite: number;
   startedAt: string;
   lastCheckpointAt: string;
-  stage: "running" | "blocked" | "completed";
+  stage: "running" | "blocked" | "completed" | "paused";
 }
 
 // ─── Public API ────────────────────────────────────

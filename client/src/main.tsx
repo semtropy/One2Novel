@@ -2,13 +2,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { browserRouter, hashRouter } from "./app/router";
+import { createRouter } from "./app/router";
 import { queryClient } from "./app/queryClient";
-import { APP_RUNTIME } from "./lib/constants";
 import DesktopBootstrapBoundary from "./components/layout/DesktopBootstrapBoundary";
 import "./index.css";
 
-const router = APP_RUNTIME === "desktop" ? hashRouter : browserRouter;
+const router = createRouter();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

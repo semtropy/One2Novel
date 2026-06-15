@@ -56,7 +56,7 @@ export async function generateVolumeDynamics(
   });
   const volume = await prisma.volume.findUnique({
     where: { id: volumeId },
-    include: { draftPlans: { orderBy: { chapterOrder: "asc" } } },
+    include: { chapterPlans: { orderBy: { chapterOrder: "asc" } } },
   });
   const characters = await prisma.novelCharacter.findMany({ where: { novelId } });
 
@@ -66,8 +66,8 @@ export async function generateVolumeDynamics(
     `${c.name}(${c.role})：性格${c.personality ?? ""}，目标${c.currentGoal ?? ""}，身份${c.identityLabel ?? ""}`);
   const volLines = [
     `第${volume.sortOrder}卷《${volume.title}》：${volume.summary ?? ""}`,
-    `章节数：${volume.draftPlans.length}`,
-    ...volume.draftPlans.map(p => `  - 第${p.chapterOrder}章 ${p.title}：${p.summary ?? ""}`),
+    `章节数：${volume.chapterPlans.length}`,
+    ...volume.chapterPlans.map(p => `  - 第${p.chapterOrder}章 ${p.title}：${p.summary ?? ""}`),
   ];
 
   

@@ -55,19 +55,15 @@ export async function generateBeatSheet(
     // Direct volumeId lookup
     const volume = await prisma.volume.findUnique({
       where: { id: volumeIdOrSortOrder },
-      include: { draftPlans: { orderBy: { chapterOrder: "asc" } } },
+      include: { chapterPlans: { orderBy: { chapterOrder: "asc" } } },
     });
     if (!volume) throw new Error("Volume not found");
 
     volTitle = volume.title;
     volSummary = volume.summary ?? "";
-    chapters = volume.draftPlans.map(p =>
+    chapters = volume.chapterPlans.map(p =>
       `第${p.chapterOrder}章《${p.title}》：${p.summary ?? ""}`).join("\n");
-    chapterPlans = await prisma.volumeChapterPlan.findMany({
-      where: { volumeId: volume.id },
-      orderBy: { chapterOrder: "asc" },
-      select: { id: true, chapterOrder: true },
-    });
+    chapterPlans = volume.chapterPlans.map(p => ({ id: p.id, chapterOrder: p.chapterOrder }));
   } else {
     // SortOrder lookup
     const volumeSortOrder = volumeIdOrSortOrder;

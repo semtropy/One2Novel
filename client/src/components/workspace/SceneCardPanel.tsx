@@ -9,7 +9,7 @@ function newScene(): Scene {
   return { id: `new-${Date.now().toString(36)}`, order: 0, title: "", summary: "", estimatedWords: 500 };
 }
 
-export default function SceneCardPanel({ novelId, chapterId }: Props) {
+export function SceneCardPanel({ novelId, chapterId }: Props) {
   const { data: plan } = useScenePlan(novelId, chapterId);
   const generate = useGenerateScenePlan(novelId, chapterId);
   const update = useUpdateScenePlan(novelId, chapterId);

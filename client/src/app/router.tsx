@@ -1,11 +1,12 @@
-import { createBrowserRouter, createHashRouter } from "react-router-dom";
+import { createBrowserRouter, createHashRouter, Navigate } from "react-router-dom";
+import { APP_RUNTIME } from "../lib/constants";
 import { AppShell } from "../components/layout/AppShell";
 import { StartPage } from "../pages/StartPage";
 import { NovelsPage } from "../pages/NovelsPage";
 import { NovelWorkspacePage } from "../pages/NovelWorkspacePage";
 import { SettingsPage } from "../pages/SettingsPage";
-import { StylesPage } from "../pages/StylesPage";
-import { ChatPage } from "../pages/ChatPage";
+import { PlanningHubPage } from "../pages/PlanningHubPage";
+import { NovelRedirect } from "../pages/NovelRedirect";
 
 const routes = [
   {
@@ -13,13 +14,15 @@ const routes = [
     children: [
       { path: "/", element: <StartPage /> },
       { path: "/novels", element: <NovelsPage /> },
-      { path: "/novels/:novelId", element: <NovelWorkspacePage /> },
-      { path: "/chat", element: <ChatPage /> },
-      { path: "/styles", element: <StylesPage /> },
+      { path: "/novels/:novelId", element: <NovelRedirect /> },
+      { path: "/novels/:novelId/plan", element: <PlanningHubPage /> },
+      { path: "/novels/:novelId/write", element: <NovelWorkspacePage /> },
       { path: "/settings", element: <SettingsPage /> },
     ],
   },
 ];
 
-export const browserRouter = createBrowserRouter(routes);
-export const hashRouter = createHashRouter(routes);
+/** Create the appropriate router based on runtime environment */
+export function createRouter() {
+  return APP_RUNTIME === "desktop" ? createHashRouter(routes) : createBrowserRouter(routes);
+}

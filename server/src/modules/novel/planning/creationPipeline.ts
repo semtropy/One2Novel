@@ -1,0 +1,551 @@
+/**
+ * CreationPipeline — unified orchestration layer for the 7-step novel creation flow.
+ *
+ * Each step is an independent async method that can be called individually (advanced mode)
+ * or chained via runFullPipeline() (fast mode). All steps delegate to existing services.
+ *
+ * The pipeline does NOT own business logic — it coordinates existing services and
+ * provides a consistent progress-callback interface.
+ */
+import { getPrisma } from "../../../platform/db/client";
+import { serializeTags } from "../../../platform/data/tagHelpers";
+
+// ── Step dependencies ──
+import { generateStoryCore, getStoryCore, type StoryCoreResult } from "./storyCoreService";
+import { generateBookFraming } from "../setup/bookFraming";
+import {
+  generateCharacters,
+  persistCharacters,
+} from "./characterPrep/characterService";
+import {
+  getArchitectureTemplate,
+  buildExpectationProfile,
+  listArchitectureTemplates,
+} from "./architectureEngine/architectureRegistry";
+import {
+  generateLoopSkeleton,
+  expandLoopToVolume,
+  computeLoopCount,
+} from "./architectureEngine/loopTemplateService";
+import type {
+  ArchitectureType,
+  LoopSkeleton,
+  ExpandedVolume,
+} from "./architectureEngine/types";
+import { generateBlueprint, applyBlueprint } from "./blueprintService";
+import {
+  updateStepState,
+  getPipelineState,
+  createInitialPipelineState,
+  type PipelineState,
+  type StepName,
+} from "./pipelineState";
+
+// ─── Types ─────────────────────────────────────────────
+
+export interface PipelineProgress {
+  step: string;
+  detail: string;
+  percent: number; // 0-100
+}
+
+export type ProgressCallback = (progress: PipelineProgress) => void;
+
+export interface ReferenceAnalysisResult {
+  detectedArchitecture: { type: ArchitectureType; confidence: number } | null;
+  loopStats: { totalLoops: number; avgChaptersPerLoop: number | null } | null;
+  coolPointDensity: Array<{ chapterIndex: number; level: string }>;
+  hookPatterns: Record<string, number> | null; // 钩子类型 → 占比
+  goldenFingerBounds: { abilities: string[]; limits: string[] } | null;
+  settingTimeline: Array<{ chapterIndex: number; settingName: string }>;
+}
+
+export interface ArchConfirmationResult {
+  architectureType: ArchitectureType;
+  loopSkeleton: LoopSkeleton;
+  goldenFinger: { abilities: string[]; limits: string[] };
+  centralQuestion: string;
+  endingDirection: string;
+}
+
+export interface CharacterConfigResult {
+  characterCount: number;
+  characters: Array<{ name: string; role: string; loopFunctionTag: string | null }>;
+}
+
+// ─── Pipeline Class ────────────────────────────────────
+
+export class CreationPipeline {
+  private novelId: string;
+
+  constructor(novelId: string) {
+    this.novelId = novelId;
+  }
+
+  // ── Step 1: Story Core ───────────────────────────────
+
+  async step1_storyCore(onProgress?: ProgressCallback): Promise<StoryCoreResult> {
+    await updateStepState(this.novelId, "input", { status: "generating" });
+    onProgress?.({ step: "story_core", detail: "正在生成故事核心...", percent: 5 });
+
+    const novel = await getPrisma().novel.findUnique({
+      where: { id: this.novelId },
+      select: { storySummary: true },
+    });
+
+    let result: StoryCoreResult;
+    if (novel?.storySummary) {
+      const existing = await getStoryCore(this.novelId);
+      result = {
+        storySummary: existing?.storySummary ?? "",
+        centralQuestion: existing?.centralQuestion ?? "",
+        endingDirection: existing?.endingDirection ?? "",
+        genre: null,
+        narrativePov: null,
+        pacePreference: null,
+        styleTone: null,
+        emotionIntensity: null,
+      };
+    } else {
+      result = await generateStoryCore(this.novelId);
+    }
+
+    await updateStepState(this.novelId, "input", {
+      status: "completed",
+      result,
+    });
+    return result;
+  }
+
+  // ── Step 2: Reference Book Analysis ──────────────────
+
+  async step2_referenceAnalysis(
+    onProgress?: ProgressCallback,
+  ): Promise<ReferenceAnalysisResult | null> {
+    await updateStepState(this.novelId, "reference", { status: "generating" });
+    onProgress?.({ step: "reference", detail: "正在分析参考书...", percent: 15 });
+
+    const prisma = getPrisma();
+    const rb = await prisma.referenceBook.findUnique({
+      where: { novelId: this.novelId },
+    });
+
+    if (!rb?.content) {
+      // No reference book — skip this step
+      await updateStepState(this.novelId, "reference", {
+        status: "skipped",
+        result: null,
+      });
+      return null;
+    }
+
+    // Build analysis from existing annotations + run new inferences
+    const annotations = rb.annotations ? JSON.parse(rb.annotations) : {};
+    const analysisSummary = rb.analysisSummary ? JSON.parse(rb.analysisSummary) : null;
+
+    const result: ReferenceAnalysisResult = {
+      detectedArchitecture: analysisSummary?.detectedArchitecture ?? null,
+      loopStats: analysisSummary?.loopStats ?? null,
+      coolPointDensity: annotations?.coolPointDensity ?? [],
+      hookPatterns: annotations?.hookPatterns ?? null,
+      goldenFingerBounds: annotations?.goldenFingerBounds ?? null,
+      settingTimeline: annotations?.settingTimeline ?? [],
+    };
+
+    await updateStepState(this.novelId, "reference", {
+      status: "completed",
+      result,
+    });
+    return result;
+  }
+
+  // ── Step 3: Architecture & Engine Confirmation ───────
+
+  async step3_architectureConfirmation(
+    params: {
+      architectureType?: ArchitectureType;
+      goldenFinger?: { abilities: string[]; limits: string[] };
+      centralQuestion?: string;
+      endingDirection?: string;
+    },
+    onProgress?: ProgressCallback,
+  ): Promise<ArchConfirmationResult> {
+    await updateStepState(this.novelId, "architecture", { status: "generating" });
+    onProgress?.({ step: "architecture", detail: "正在确认架构...", percent: 25 });
+
+    const prisma = getPrisma();
+    const novel = await prisma.novel.findUnique({
+      where: { id: this.novelId },
+      select: { genre: true, description: true, estimatedChapterCount: true },
+    });
+
+    // Determine architecture type
+    let archType: ArchitectureType = params.architectureType ?? "case_driven";
+    if (!params.architectureType && novel?.genre) {
+      const g = novel.genre;
+      if (g.includes("仙侠") || g.includes("修真")) archType = "cultivation_planning";
+      else if (g.includes("历史")) archType = "historical_transmigration";
+      else if (g.includes("科幻") || g.includes("游戏") || g.includes("竞技"))
+        archType = "skill_slot";
+      else if (g.includes("奇幻") || g.includes("西幻")) archType = "hexagon_godhood";
+    }
+
+    // Save golden finger
+    const goldenFinger = params.goldenFinger ?? { abilities: [], limits: [] };
+    const expectationProfile = buildExpectationProfile(archType);
+
+    await prisma.novel.update({
+      where: { id: this.novelId },
+      data: {
+        architectureType: archType,
+        goldenFinger: JSON.stringify(goldenFinger),
+        expectationProfile,
+        centralQuestion: params.centralQuestion ?? novel?.description ?? undefined,
+        endingDirection: params.endingDirection ?? undefined,
+      },
+    });
+
+    // Generate loop skeleton
+    onProgress?.({ step: "architecture", detail: "正在生成回环骨架...", percent: 35 });
+    const estCh = novel?.estimatedChapterCount ?? 333;
+    const loopCount = computeLoopCount(estCh);
+    const skeleton = await generateLoopSkeleton({
+      novelId: this.novelId,
+      architectureType: archType,
+      totalLoops: loopCount,
+    });
+    await prisma.novel.update({
+      where: { id: this.novelId },
+      data: { loopSkeleton: JSON.stringify(skeleton) },
+    });
+
+    const result: ArchConfirmationResult = {
+      architectureType: archType,
+      loopSkeleton: skeleton,
+      goldenFinger,
+      centralQuestion: params.centralQuestion ?? "",
+      endingDirection: params.endingDirection ?? "",
+    };
+
+    await updateStepState(this.novelId, "architecture", {
+      status: "completed",
+      result,
+    });
+    return result;
+  }
+
+  // ── Step 4: Character Configuration ──────────────────
+
+  async step4_characterConfiguration(
+    onProgress?: ProgressCallback,
+  ): Promise<CharacterConfigResult> {
+    await updateStepState(this.novelId, "characters", { status: "generating" });
+    onProgress?.({ step: "characters", detail: "正在配置角色...", percent: 45 });
+
+    const prisma = getPrisma();
+    const charCount = await prisma.novelCharacter.count({
+      where: { novelId: this.novelId },
+    });
+
+    if (charCount === 0) {
+      const chars = await generateCharacters(this.novelId);
+      await persistCharacters(this.novelId, chars);
+    }
+
+    const characters = await prisma.novelCharacter.findMany({
+      where: { novelId: this.novelId },
+      select: { name: true, role: true, loopFunctionTag: true },
+    });
+
+    const result: CharacterConfigResult = {
+      characterCount: characters.length,
+      characters: characters.map((c) => ({
+        name: c.name,
+        role: c.role,
+        loopFunctionTag: c.loopFunctionTag,
+      })),
+    };
+
+    await updateStepState(this.novelId, "characters", {
+      status: "completed",
+      result,
+    });
+    return result;
+  }
+
+  // ── Step 5a: Generate Loop Skeleton ──────────────────
+
+  async step5a_generateLoopSkeleton(
+    onProgress?: ProgressCallback,
+  ): Promise<LoopSkeleton> {
+    onProgress?.({ step: "skeleton", detail: "正在生成回环骨架...", percent: 55 });
+
+    const prisma = getPrisma();
+    const novel = await prisma.novel.findUnique({
+      where: { id: this.novelId },
+      select: { architectureType: true, loopSkeleton: true, estimatedChapterCount: true },
+    });
+
+    // Return existing skeleton if present
+    if (novel?.loopSkeleton) {
+      try {
+        const existing = JSON.parse(novel.loopSkeleton) as LoopSkeleton;
+        if (existing.loops?.length > 0) return existing;
+      } catch { /* regenerate */ }
+    }
+
+    const archType = (novel?.architectureType as ArchitectureType) ?? "case_driven";
+    const estCh = novel?.estimatedChapterCount ?? 333;
+    const loopCount = computeLoopCount(estCh);
+
+    const skeleton = await generateLoopSkeleton({
+      novelId: this.novelId,
+      architectureType: archType,
+      totalLoops: loopCount,
+    });
+
+    await prisma.novel.update({
+      where: { id: this.novelId },
+      data: { loopSkeleton: JSON.stringify(skeleton) },
+    });
+
+    return skeleton;
+  }
+
+  // ── Step 5b: Expand a Single Volume ──────────────────
+
+  async step5b_expandVolume(
+    volumeOrder: number,
+    onProgress?: ProgressCallback,
+  ): Promise<ExpandedVolume> {
+    onProgress?.({
+      step: "expand_volume",
+      detail: `正在展开第${volumeOrder}卷...`,
+      percent: 55 + volumeOrder * 5,
+    });
+
+    const prisma = getPrisma();
+    const novel = await prisma.novel.findUnique({
+      where: { id: this.novelId },
+      select: { loopSkeleton: true },
+    });
+
+    if (!novel?.loopSkeleton) {
+      throw new Error("No loop skeleton found. Generate skeleton first.");
+    }
+
+    const skeleton: LoopSkeleton = JSON.parse(novel.loopSkeleton);
+
+    // Get previous volume summaries for context
+    const previousVolumes = await prisma.volume.findMany({
+      where: { novelId: this.novelId, sortOrder: { lt: volumeOrder } },
+      orderBy: { sortOrder: "asc" },
+      select: { summary: true },
+    });
+    const previousSummaries = previousVolumes
+      .map((v) => v.summary)
+      .filter(Boolean) as string[];
+
+    const expanded = await expandLoopToVolume(
+      this.novelId,
+      volumeOrder,
+      skeleton,
+      previousSummaries,
+    );
+
+    // Persist to DB
+    const existingVol = await prisma.volume.findFirst({
+      where: { novelId: this.novelId, sortOrder: volumeOrder },
+    });
+
+    const volumeId = existingVol
+      ? (
+          await prisma.volume.update({
+            where: { id: existingVol.id },
+            data: { title: expanded.title, summary: expanded.summary },
+          })
+        ).id
+      : (
+          await prisma.volume.create({
+            data: {
+              novelId: this.novelId,
+              sortOrder: volumeOrder,
+              title: expanded.title,
+              summary: expanded.summary,
+            },
+          })
+        ).id;
+
+    let globalOrder = await prisma.chapter.count({
+      where: { novelId: this.novelId },
+    });
+
+    for (const ch of expanded.phases.flatMap((p) => p.chapters)) {
+      globalOrder++;
+      const vcp = await prisma.volumeChapterPlan.findFirst({
+        where: { volumeId, chapterOrder: ch.chapterOrder },
+      });
+
+      const planData = {
+        title: ch.title,
+        summary: ch.summary,
+        purpose: ch.expectation,
+        exclusiveEvent: ch.coreEvent,
+        endingState: ch.endingHook,
+        loopPhase: ch.loopPhase,
+        loopIndex: volumeOrder,
+        coolPointType: ch.coolPointType,
+        hookType: ch.hookType,
+        chapterType: ch.chapterType,
+      };
+
+      if (vcp) {
+        await prisma.volumeChapterPlan.update({
+          where: { id: vcp.id },
+          data: planData,
+        });
+        if (vcp.chapterId) {
+          await prisma.chapter.update({
+            where: { id: vcp.chapterId },
+            data: {
+              title: ch.title,
+              order: globalOrder,
+              expectation: ch.expectation,
+            },
+          });
+        }
+      } else {
+        const chapter = await prisma.chapter.create({
+          data: {
+            novelId: this.novelId,
+            order: globalOrder,
+            title: ch.title,
+            expectation: ch.expectation,
+            chapterStatus: "planned",
+          },
+        });
+        await prisma.volumeChapterPlan.create({
+          data: { ...planData, volumeId, chapterOrder: ch.chapterOrder, chapterId: chapter.id },
+        });
+      }
+    }
+
+    return expanded;
+  }
+
+  // ── Step 5: Full Blueprint Generation (all volumes) ──
+
+  async step5_blueprintGeneration(
+    mode: "full" | "per_volume" = "full",
+    onProgress?: ProgressCallback,
+  ): Promise<{ skeleton: LoopSkeleton; expandedVolumes: number }> {
+    await updateStepState(this.novelId, "blueprint", { status: "generating" });
+
+    const skeleton = await this.step5a_generateLoopSkeleton(onProgress);
+    let expandedCount = 0;
+
+    if (mode === "full") {
+      for (let i = 0; i < skeleton.loops.length; i++) {
+        onProgress?.({
+          step: "blueprint",
+          detail: `正在展开第 ${i + 1}/${skeleton.totalLoops} 卷...`,
+          percent: 55 + Math.round(((i + 1) / skeleton.totalLoops) * 30),
+        });
+        await this.step5b_expandVolume(i + 1);
+        expandedCount++;
+      }
+    }
+
+    const result = { skeleton, expandedVolumes: expandedCount };
+    await updateStepState(this.novelId, "blueprint", {
+      status: "completed",
+      result,
+    });
+    return result;
+  }
+
+  // ── Step 6: Positioning & Expectation Calibration ─────
+
+  async step6_positioningCalibration(
+    onProgress?: ProgressCallback,
+  ): Promise<void> {
+    await updateStepState(this.novelId, "calibration", { status: "generating" });
+    onProgress?.({ step: "calibration", detail: "正在校准定位与期待...", percent: 85 });
+
+    const prisma = getPrisma();
+    const novel = await prisma.novel.findUnique({
+      where: { id: this.novelId },
+      select: {
+        title: true,
+        description: true,
+        genre: true,
+        targetAudience: true,
+        architectureType: true,
+      },
+    });
+
+    // Generate framing if not present
+    if (!novel?.targetAudience) {
+      const framing = await generateBookFraming({
+        title: novel?.title ?? "未命名",
+        description: novel?.description ?? undefined,
+        genre: novel?.genre ?? undefined,
+      });
+      await prisma.novel.update({
+        where: { id: this.novelId },
+        data: {
+          targetAudience: framing.targetAudience,
+          commercialTags: serializeTags(framing.commercialTags),
+          competingFeel: framing.competingFeel,
+          bookSellingPoint: framing.bookSellingPoint,
+          first30ChapterPromise: framing.first30ChapterPromise,
+        },
+      });
+    }
+
+    // Ensure expectation profile exists
+    if (novel?.architectureType) {
+      const profile =
+        (await prisma.novel.findUnique({
+          where: { id: this.novelId },
+          select: { expectationProfile: true },
+        }))?.expectationProfile ?? buildExpectationProfile(novel.architectureType as ArchitectureType);
+
+      if (profile) {
+        await prisma.novel.update({
+          where: { id: this.novelId },
+          data: { expectationProfile: profile },
+        });
+      }
+    }
+
+    await updateStepState(this.novelId, "calibration", {
+      status: "completed",
+    });
+  }
+
+  // ── Step 7: Enter Writing ────────────────────────────
+
+  async step7_enterWriting(onProgress?: ProgressCallback): Promise<void> {
+    await updateStepState(this.novelId, "writing", { status: "generating" });
+    onProgress?.({ step: "writing", detail: "正在启动写作模式...", percent: 95 });
+
+    const prisma = getPrisma();
+    const novel = await prisma.novel.findUnique({
+      where: { id: this.novelId },
+      select: { projectStatus: true },
+    });
+
+    if (novel?.projectStatus !== "in_progress") {
+      await prisma.novel.update({
+        where: { id: this.novelId },
+        data: { projectStatus: "in_progress" },
+      });
+    }
+
+    await updateStepState(this.novelId, "writing", {
+      status: "completed",
+    });
+  }
+
+}

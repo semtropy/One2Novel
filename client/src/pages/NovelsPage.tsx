@@ -1,25 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, BookOpen, Trash2, AlertTriangle, Loader2 } from "lucide-react";
-import { useNovels, useCreateNovel } from "../api/novel";
+import { Plus, BookOpen, Trash2, AlertTriangle } from "lucide-react";
+import { useNovels } from "../api/novel";
 import { api } from "../app/api";
 import { useQueryClient } from "@tanstack/react-query";
 
 export function NovelsPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { data: novels, isLoading, error } = useNovels();
-  const createNovel = useCreateNovel();
 
   async function handleCreate() {
-    setCreating(true);
-    try {
-      const novel = await createNovel.mutateAsync({ title: "未命名小说" });
-      qc.invalidateQueries({ queryKey: ["novels"] });
-      navigate(`/novels/${novel.id}`);
-    } catch {} finally { setCreating(false); }
+    // Navigate to StartPage for unified creation (with mode selection)
+    navigate("/");
   }
 
   async function handleDelete() {
@@ -32,10 +26,9 @@ export function NovelsPage() {
     <div className="h-full overflow-y-auto">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">我的小说</h2>
-        <button onClick={handleCreate} disabled={creating}
-          className="flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50">
-          {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-          {creating ? "创建中..." : "新建小说"}
+        <button onClick={handleCreate}
+          className="flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">
+          <Plus size={16} /> 开始创作
         </button>
       </div>
 
@@ -53,16 +46,15 @@ export function NovelsPage() {
           <BookOpen size={40} className="mb-4 text-slate-300" />
           <h3 className="mb-2 text-sm font-medium text-slate-600">还没有小说</h3>
           <p className="mb-4 text-xs text-slate-400">从一句灵感开始你的创作之旅</p>
-          <button onClick={handleCreate} disabled={creating}
-            className="flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50">
-            {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-            {creating ? "创建中..." : "创建第一本小说"}
+          <button onClick={handleCreate}
+            className="flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">
+            <Plus size={16} /> 开始创作
           </button>
         </div>
       ) : (
         <div className="space-y-3">
           {novels.map((novel) => {
-            const tags = (() => { try { const t = JSON.parse(novel.commercialTags ?? "[]"); return Array.isArray(t) ? t.slice(0, 4) : []; } catch { return []; } })();
+            const tags: string[] = (() => { try { const raw = novel.commercialTags; if (Array.isArray(raw)) return raw.slice(0, 4); const t = JSON.parse(raw ?? "[]"); return Array.isArray(t) ? t.slice(0, 4) : []; } catch { return []; } })();
             return (
               <div key={novel.id}
                 className="group flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer"
@@ -84,7 +76,7 @@ export function NovelsPage() {
                   )}
                 </div>
                 <button onClick={(e) => { e.stopPropagation(); setDeleteId(novel.id); }}
-                  className="shrink-0 rounded-lg p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all">
+                  className="shrink-0 rounded-lg p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-60 hover:opacity-100 transition-all">
                   <Trash2 size={16} />
                 </button>
               </div>

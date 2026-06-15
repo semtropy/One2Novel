@@ -5,7 +5,7 @@ interface Props {
   onClose: () => void;
 }
 
-export default function StatisticsDashboard({ novelId, onClose }: Props) {
+export function StatisticsDashboard({ novelId, onClose }: Props) {
   const stats = useNovelStatistics(novelId);
   const daily = useDailyOutput(novelId, 30);
   const quality = useQualityTrend(novelId);
@@ -46,7 +46,7 @@ export default function StatisticsDashboard({ novelId, onClose }: Props) {
                       className="flex-1 bg-amber-400 hover:bg-amber-500 rounded-t transition-colors relative group"
                       style={{ height: `${Math.max(4, (d.chars / maxDaily) * 100)}%` }}
                     >
-                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-400 opacity-60 hover:opacity-100 whitespace-nowrap">
                         {d.date.slice(5)}: {(d.chars / 1000).toFixed(1)}k
                       </div>
                     </div>
@@ -69,7 +69,7 @@ export default function StatisticsDashboard({ novelId, onClose }: Props) {
                         className={`flex-1 ${color} hover:opacity-80 rounded-t transition-opacity relative group`}
                         style={{ height: `${pct}%` }}
                       >
-                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-400 opacity-60 hover:opacity-100 whitespace-nowrap">
                           Ch{q.chapterOrder}: {q.totalScore}
                         </div>
                       </div>

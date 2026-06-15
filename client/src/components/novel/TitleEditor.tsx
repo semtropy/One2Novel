@@ -88,11 +88,11 @@ export function TitleEditor({ novelId, currentTitle }: Props) {
         <h1 className="text-lg font-bold text-slate-900 group flex items-center gap-2">
           <span className="cursor-pointer" onClick={() => { setTitle(currentTitle); setEditing(true); }}>{currentTitle}</span>
           <button onClick={() => { setTitle(currentTitle); setEditing(true); }}
-            className="text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
+            className="text-slate-300 hover:text-slate-500 opacity-60 hover:opacity-100 transition-opacity">
             <Pencil size={12} />
           </button>
           <button onMouseDown={(e) => { e.preventDefault(); handleGenerate(); }} disabled={genning}
-            className="rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs text-purple-600 hover:bg-purple-100 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            className="rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs text-purple-600 hover:bg-purple-100 flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
             <Sparkles size={12} />{genning ? "..." : "AI 起名"}
           </button>
         </h1>

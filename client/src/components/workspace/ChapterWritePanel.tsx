@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { RefreshCw, XCircle, Play, Save, X, ChevronDown } from "lucide-react";
+import { RefreshCw, XCircle, Play, Save, X, ChevronDown, Lightbulb } from "lucide-react";
 import { api } from "../../app/api";
 import { useNovel } from "../../api/novel";
 import { type RevisionOperation } from "../../api/revision";
 import { ChapterEditor } from "./ChapterEditor";
 import { RevisionToolbar } from "./RevisionToolbar";
 import { RevisionWorkbench } from "./RevisionWorkbench";
-import AutoWriteModal from "./AutoWriteModal";
+import { AutoWriteModal } from "./AutoWriteModal";
 import { cn } from "../../lib/cn";
 
 interface Props { novelId: string; chapterId: string; reviewing: boolean; onReview: () => void }
@@ -38,6 +38,19 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
   const [toolbarPos, setToolbarPos] = useState<{ top: number; left: number } | null>(null);
   const [showToolbar, setShowToolbar] = useState(false);
   const [revisionOp, setRevisionOp] = useState<RevisionOperation | null>(null);
+  const [inlineSuggestion, setInlineSuggestion] = useState<{ suggestion: string; severity: string; focus: string } | null>(null);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestPos, setSuggestPos] = useState<{ top: number; left: number } | null>(null);
+
+  async function handleInlineSuggest(paragraphs: string[], pos: { top: number; left: number }) {
+    if (!paragraphs.length) return;
+    setSuggestLoading(true);
+    setSuggestPos({ top: Math.max(60, pos.top + 20), left: Math.max(10, pos.left) });
+    try {
+      const { data } = await api.post(`/novels/${novelId}/chapters/${chapterId}/inline-suggest`, { selectedText: paragraphs.join("\n") });
+      setInlineSuggestion(data.data);
+    } catch {} finally { setSuggestLoading(false); }
+  }
 
   const handleParagraphSelect = useCallback((paras: string[], pos?: { top: number; left: number }) => {
     setSelectedParagraphs(paras);
@@ -82,6 +95,53 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
   const displayTitle = title || chapter?.title || "";
   const wordCount = displayContent.replace(/<[^>]*>/g, "").length;
   const isDirty = displayContent !== savedContent;
+
+  // Phase 6: Auto-save draft to localStorage
+  const draftKey = `chapter-draft-${chapterId}`;
+
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (saved && !chapter?.content) {
+        const draft = JSON.parse(saved);
+        if (draft.content && draft.content.length > 50) {
+          setContent(draft.content);
+          if (draft.title) setTitle(draft.title);
+          setSaved(true);
+        }
+      }
+    } catch {}
+  }, [chapterId]);
+
+  // Auto-save every 30s when dirty
+  useEffect(() => {
+    if (!isDirty || !displayContent) return;
+    const interval = setInterval(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ content: displayContent, title: displayTitle, ts: Date.now() }));
+      } catch {}
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [isDirty, displayContent, displayTitle, draftKey]);
+
+  // Save on page unload
+  useEffect(() => {
+    const handler = () => {
+      if (isDirty && displayContent) {
+        try { localStorage.setItem(draftKey, JSON.stringify({ content: displayContent, title: displayTitle, ts: Date.now() })); } catch {}
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty, displayContent, displayTitle, draftKey]);
+
+  // Clear draft when content matches savedContent (i.e., saved to server)
+  useEffect(() => {
+    if (!isDirty && savedContent) {
+      try { localStorage.removeItem(draftKey); } catch {}
+    }
+  }, [isDirty, savedContent, draftKey]);
 
   useEffect(() => {
     if (!generating && displayContent) {
@@ -154,8 +214,20 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
   }
 
   const handleSave = useCallback(async () => {
-    try { await api.patch(`/novels/${novelId}/chapters/${chapterId}`, { content: displayContent, title: displayTitle }); setSavedContent(displayContent); setSaved(true); setTimeout(() => setSaved(false), 1500); refetch(); } catch {}
-  }, [novelId, chapterId, displayContent, displayTitle, refetch]);
+    try {
+      const { data } = await api.put(`/novels/${novelId}/chapters/${chapterId}/content`, { content: displayContent });
+      setSavedContent(displayContent);
+      if (data?.data?.score != null) {
+        const qs = Math.round(data.data.score);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      } else {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      }
+      refetch();
+    } catch {}
+  }, [novelId, chapterId, displayContent, refetch]);
 
   const handleSaveTitle = useCallback(async () => {
     try { await api.patch(`/novels/${novelId}/chapters/${chapterId}`, { title: displayTitle }); refetch(); } catch {}
@@ -203,6 +275,35 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
 
       {generating && <div className="mt-2 shrink-0 rounded-lg bg-blue-50 p-2 flex items-center gap-2 text-xs text-blue-600"><RefreshCw size={12} className="animate-spin" />{stage}</div>}
       {error && <div className="mt-2 shrink-0 rounded-lg bg-red-50 p-2 flex items-center gap-2 text-xs text-red-600"><XCircle size={12} />{error}</div>}
+
+      {/* Inline Suggestion Floating Card */}
+      {(inlineSuggestion || suggestLoading) && suggestPos && (
+        <div className="fixed z-50 rounded-xl border border-indigo-200 bg-white shadow-lg p-3" style={{ top: suggestPos.top, left: suggestPos.left, maxWidth: 280 }}>
+          {suggestLoading ? (
+            <div className="flex items-center gap-2 text-xs text-slate-400"><RefreshCw size={11} className="animate-spin" />分析中...</div>
+          ) : inlineSuggestion ? (
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <span className={`text-[10px] rounded px-1 py-0 ${inlineSuggestion.severity === "medium" ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-500"}`}>
+                  {inlineSuggestion.focus === "pass" ? "✓" : inlineSuggestion.focus}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mb-2">{inlineSuggestion.suggestion}</p>
+              <button onClick={() => { setInlineSuggestion(null); setSuggestPos(null); }} className="text-[10px] text-slate-400 hover:text-slate-600">关闭</button>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* Add inline suggest to paragraph selection handler */}
+      {showToolbar && !generating && (
+        <div className="fixed z-40" style={{ top: (toolbarPos?.top ?? 100) - 20, left: toolbarPos?.left ?? 100 }}>
+          <button onClick={() => { handleInlineSuggest(selectedParagraphs, toolbarPos!); setShowToolbar(false); }}
+            className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs text-indigo-600 hover:bg-indigo-100 shadow-sm">
+            <Lightbulb size={11} className="inline mr-0.5" />AI建议
+          </button>
+        </div>
+      )}
 
       {showAutoWrite && <AutoWriteModal novelId={novelId} onClose={() => setShowAutoWrite(false)} />}
 

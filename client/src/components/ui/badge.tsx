@@ -2,10 +2,10 @@ import type * as React from "react";
 import { cn } from "@/lib/cn";
 
 const variants: Record<string, string> = {
-  default: "border-transparent bg-primary text-primary-foreground",
-  secondary: "border-transparent bg-secondary text-secondary-foreground",
-  destructive: "border-transparent bg-destructive text-destructive-foreground",
-  outline: "text-foreground",
+  default: "border-transparent bg-slate-800 text-slate-100",
+  secondary: "border-transparent bg-slate-100 text-slate-600",
+  destructive: "border-transparent bg-red-500 text-white",
+  outline: "border-slate-300 text-slate-700",
 };
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -16,7 +16,7 @@ function Badge({ className, variant = "default", ...props }: BadgeProps) {
   return (
     <div
       className={cn(
-        "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring",
+        "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none",
         variants[variant] ?? variants.default,
         className,
       )}

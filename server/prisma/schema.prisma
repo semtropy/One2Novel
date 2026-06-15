@@ -34,106 +34,119 @@ enum NarrativePov {
 // ─── Core: Novel ──────────────────────────────────────
 
 model Novel {
-  id               String   @id @default(cuid())
-  title            String
-  description      String?
-  status           String   @default("draft")   // draft | active | completed
-  writingMode      String   @default("original") // original | continuation
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  status      String  @default("draft") // draft | active | completed
+  writingMode String  @default("original") // original | continuation
 
-  // Book framing
-  genre            String?
-  targetAudience   String?
-  bookSellingPoint String?
-  competingFeel    String?
+  // Book framing (editorial / market info)
+  genre                 String?
+  targetAudience        String?
+  bookSellingPoint      String?
+  competingFeel         String?
   first30ChapterPromise String?
-  commercialTags   String?
-  titleSuggestions String?
+  commercialTags        String?
+  titleSuggestions      String?
+
+  // ── Unified story core (replaces DraftStorySeed + fragmented columns) ──
+  storySummary    String? // 故事简介：合并 premise + mainArc（80-300字）
+  centralQuestion String? // 核心悬念：合并 mysteryBox + finalSecret（50-150字）
+  endingDirection String? // 结局方向：含 finalEnemy + ultimateForm 描述（50-150字）
 
   // Creative parameters
-  narrativePov      NarrativePov?
-  pacePreference    String?                     // slow | balanced | fast
-  styleTone         String?
-  emotionIntensity  String?                     // low | medium | high
-  defaultChapterLength Int?
+  narrativePov          NarrativePov?
+  pacePreference        String? // slow | balanced | fast
+  styleTone             String?
+  emotionIntensity      String? // low | medium | high
+  defaultChapterLength  Int?
   estimatedChapterCount Int?
 
-  // Outline (Phase 18: removed deprecated `outline` column; use structuredOutline only)
-  structuredOutline  String?                   // JSON structured outline
-  directorCheckpoint String?                   // JSON DirectorCheckpoint for batch-write resume
+  // Long-form web novel (the only mode)
+  writingScale       String  @default("long")
+  architectureType   String? // skill_slot | sequence_promotion | case_driven | cultivation_planning | historical_transmigration | custom
+  loopSkeleton       String? // JSON: LoopSkeleton
+  loopDefinition     String? // JSON: user-customized loop phase definitions
+  goldenFinger       String? // JSON: {abilities:string[], limits:string[]}
+  expectationProfile String? // JSON: ExpectationProfile
 
-  // Progress (managed via Confirmation table)
-  projectStatus    ProjectProgressStatus @default(not_started)
+  // Blueprint — volume→chapter structure
+  structuredOutline  String? // JSON blueprint
+  directorCheckpoint String? // JSON DirectorCheckpoint for batch-write resume
+  pipelineState      String? // JSON PipelineState — 7-step creation pipeline progress
+
+  // Progress
+  projectStatus ProjectProgressStatus @default(not_started)
+
+  // Budget
+  budgetLimit Float? // USD cost ceiling — null = no limit
 
   // Style
   postGenerationStyleReviewEnabled Boolean @default(true)
 
-  // Draft
-  draftCharacters DraftCharacter[]
-  draftStorySeed  DraftStorySeed?
-
   // Relations
-  chapters         Chapter[]
-  characters       NovelCharacter[]
-  draftRelations   DraftCharacterRelation[]
-  confirmations    Confirmation[]
-  volumes          Volume[]
-  chapterSummaries ChapterSummary[]
-  auditReports     AuditReport[]
-  timelineItems    TimelineItem[]
-  payoffItems      PayoffLedgerItem[]
-  worldRules       WorldRule[]
+  chapters           Chapter[]
+  characters         NovelCharacter[]
+  volumes            Volume[]
+  chapterSummaries   ChapterSummary[]
+  auditReports       AuditReport[]
+  timelineItems      TimelineItem[]
+  payoffItems        PayoffLedgerItem[]
+  worldRules         WorldRule[]
   characterResources CharacterResource[]
-  infoProfiles     CharacterInfoProfile[]
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  infoProfiles       CharacterInfoProfile[]
+  volumePresences    CharacterVolumePresence[]
+  referenceBook      ReferenceBook?
+  costRecords        CostRecord[]
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
 }
 
 // ─── Chapter ──────────────────────────────────────────
 
 model Chapter {
-  id               String   @id @default(cuid())
+  id               String        @id @default(cuid())
   novelId          String
   title            String
-  content          String?                    // Full chapter text (markdown)
+  content          String? // Full chapter text (markdown)
   order            Int
-  chapterStatus    ChapterStatus   @default(unplanned)
-  targetWordCount  Int             @default(3000)
+  chapterStatus    ChapterStatus @default(unplanned)
+  targetWordCount  Int           @default(3000)
   actualWordCount  Int?
-  qualityScore     Float?                     // 0-80 scale
+  qualityScore     Float? // 0-80 scale
   openingScore     Int?
   plotScore        Int?
   characterScore   Int?
   dialogueScore    Int?
   suspenseScore    Int?
   pacingScore      Int?
-  showNotTellScore Int?                     // Skill维度7: 展示而非讲述
+  showNotTellScore Int?
   languageScore    Int?
   genreScore       Int?
-  coherenceScore   Int?                     // Phase 3: 跨章连贯性评分
-  activeWorldRules String?                    // JSON array: rule IDs active for this chapter
-  hook             String?                    // Chapter end hook text
-  expectation      String?                    // What this chapter should achieve
-  repairHistory    String?                    // JSON repair log
-  diagnosis        String?                    // JSON WorkspaceDiagnosis
-  riskFlags        String?                    // JSON string array
+  coherenceScore   Int?
+  activeWorldRules String? // JSON array: rule IDs active for this chapter
+  hook             String? // Chapter end hook text
+  expectation      String? // What this chapter should achieve
+  repairHistory    String? // JSON repair log
+  diagnosis        String? // JSON WorkspaceDiagnosis
+  riskFlags        String? // JSON string array
 
-  // Phase 0.2: 拆分为独立列（原 sceneCards 一列被 5 子系统串用）
-  scenePlan            String?                // JSON {scenes:[...], enabled:bool} — 归 scenePlanService
-  openConflicts        String?                // JSON {conflicts:[...]}              — 归 openConflict
-  finalizationSnapshot String?                // JSON {snapshotVersion,timestamp,...} — 归 finalization
+  scenePlan            String? // JSON {scenes:[...], enabled:bool}
+  openConflicts        String? // JSON {conflicts:[...]}
+  finalizationSnapshot String? // JSON {snapshotVersion,timestamp,...}
 
   // Relations
-  novel          Novel             @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  chapterSummary ChapterSummary?
-  auditReports   AuditReport[]
-  volumeChapterPlans VolumeChapterPlan[]  // H8
-  timelineItems  TimelineItem[]
-  editHistory    ChapterEditHistory[]
-  acquiredResources  CharacterResource[]     @relation("ResourceAcquiredIn")
-  depletedResources  CharacterResource[]     @relation("ResourceDepletedIn")
+  novel                Novel                  @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  chapterSummary       ChapterSummary?
+  auditReports         AuditReport[]
+  volumeChapterPlans   VolumeChapterPlan[]
+  timelineItems        TimelineItem[]
+  editHistory          ChapterEditHistory[]
+  acquiredResources    CharacterResource[]    @relation("ResourceAcquiredIn")
+  depletedResources    CharacterResource[]    @relation("ResourceDepletedIn")
   revealedInfoProfiles CharacterInfoProfile[] @relation("InfoProfileRevealedIn")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@unique([novelId, order])
   @@index([novelId, chapterStatus])
@@ -143,8 +156,8 @@ model ChapterEditHistory {
   id         String   @id @default(cuid())
   chapterId  String
   chapter    Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  content    String                     // 编辑前正文快照
-  sceneState String?                    // 当时的 scenePlan 快照（用于 undo 一并恢复）
+  content    String // 编辑前正文快照
+  sceneState String? // 当时的 scenePlan 快照
   createdAt  DateTime @default(now())
 
   @@index([chapterId, createdAt])
@@ -155,8 +168,8 @@ model ChapterSummary {
   novelId         String
   chapterId       String   @unique
   summary         String
-  keyEvents       String?                  // JSON array
-  characterStates String?                  // JSON map
+  keyEvents       String? // JSON array
+  characterStates String? // JSON map
   hook            String?
   chapter         Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   novel           Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
@@ -169,7 +182,7 @@ model ChapterSummary {
 // ─── Volume Planning ──────────────────────────────────
 
 model Volume {
-  id             String   @id @default(cuid())
+  id             String              @id @default(cuid())
   novelId        String
   sortOrder      Int
   title          String
@@ -178,11 +191,10 @@ model Volume {
   mainPromise    String?
   climax         String?
   nextVolumeHook String?
-  novel          Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  novel          Novel               @relation(fields: [novelId], references: [id], onDelete: Cascade)
   chapterPlans   VolumeChapterPlan[]
-  draftPlans     DraftPlan[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   @@unique([novelId, sortOrder])
 }
@@ -201,9 +213,14 @@ model VolumeChapterPlan {
   revealLevel     Int?
   targetWordCount Int?
   mustAvoid       String?
-  taskSheet       String?
-  sceneCards      String?                  // JSON scene card array
-  chapter         Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)  // H8
+  taskSheet       String? // JSON scene card array
+  // Phase 0: Long-form loop + rhythm tracking
+  loopPhase       String? // "trigger"|"enter"|"explore"|"setback"|"turn"|"climax"|"settlement"
+  loopIndex       Int? // 属于第几轮回环
+  coolPointType   String? // "collect"|"strategy"|"verify"|"face_slap"|"reveal"|"upgrade"
+  hookType        String? // "short_term"|"medium_term"
+  chapterType     String? // "advance"|"transition"|"cooldown"|"climax"
+  chapter         Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   volume          Volume   @relation(fields: [volumeId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -211,185 +228,166 @@ model VolumeChapterPlan {
   @@index([volumeId, chapterOrder])
 }
 
-model DraftPlan {
-  id           String   @id @default(cuid())
-  volumeId     String
-  chapterOrder Int
-  title        String
-  summary      String?
-  synced       Boolean  @default(false)
-  volume       Volume   @relation(fields: [volumeId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}
-
-model DraftStorySeed {
-  id        String   @id @default(cuid())
-  novelId   String
-  synced    Boolean  @default(false)
-  content   String                     // JSON: { premise, mainArc, mysteryBox, endingDirection, ... }
-  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([novelId])
-}
-
-model DraftCharacter {
-  id              String   @id @default(cuid())
-  novelId         String
-  name            String
-  role            String
-  personality     String?
-  background      String?
-  appearance      String?
-  quirks          String?
-  currentStatus   String?
-  currentGoal     String?
-  voiceTexture    String?
-  identityLabel   String?
-  prohibitions    String?
-  synced          Boolean  @default(false)
-  novel           Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-
 // ─── Characters ───────────────────────────────────────
 
 model NovelCharacter {
-  id              String   @id @default(cuid())
-  novelId         String
-  name            String
-  role            String                      // protagonist | antagonist | supporting | minor
-  personality     String?
-  background      String?
+  id                 String                    @id @default(cuid())
+  novelId            String
+  name               String
+  role               String // protagonist | antagonist | supporting | minor
+  personality        String?
+  background         String?
   // Hard facts
-  identityLabel   String?
-  factionLabel    String?
-  stanceLabel     String?
-  powerLevel      String?
-  realm           String?
-  currentLocation String?
-  availability    String?
-  prohibitions    String?                     // Natural language: "禁止背叛师父、禁止在战斗中逃跑"
+  identityLabel      String?
+  factionLabel       String?
+  stanceLabel        String?
+  powerLevel         String?
+  realm              String?
+  currentLocation    String?
+  availability       String?
+  prohibitions       String? // Natural language: "禁止背叛师父、禁止在战斗中逃跑"
+  loopFunctionTag    String? // 副本触发器 | 奖励来源 | 伏笔载体 | 长期威胁 | 情感锚点
   // Appearance
-  appearance      String?                     // 外貌体态着装一句话 (30-80字)
-  quirks          String?                     // 1-2个标志性习惯动作 (10-30字)
+  appearance         String? // 外貌体态着装一句话 (30-80字)
+  quirks             String? // 1-2个标志性习惯动作 (10-30字)
   // Profile
-  currentState    String?
-  currentStatus   String?                     // 角色当前状态快照 (10-40字)
-  currentGoal     String?
-  voiceTexture    String?
+  currentState       String?
+  currentStatus      String? // 角色当前状态快照 (10-40字)
+  currentGoal        String?
+  voiceTexture       String?
   presenceImpression String?
   // Meta
-  novel           Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  relations_source NovelCharacterRelation[] @relation("SourceCharacter")
-  relations_target NovelCharacterRelation[] @relation("TargetCharacter")
-  ownedResources   CharacterResource[]
-  knownInfo        CharacterInfoProfile[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  novel              Novel                     @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  relations_source   NovelCharacterRelation[]  @relation("SourceCharacter")
+  relations_target   NovelCharacterRelation[]  @relation("TargetCharacter")
+  ownedResources     CharacterResource[]
+  knownInfo          CharacterInfoProfile[]
+  volumePresences    CharacterVolumePresence[]
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
 
   @@index([novelId, role])
 }
 
 model NovelCharacterRelation {
-  id                  String   @id @default(cuid())
-  novelId             String
-  sourceCharacterId   String
-  targetCharacterId   String
-  type                String                     // friend | enemy | lover | rival | mentor | family
-  summary             String?
-  trustScore          Float?
-  intimacyScore       Float?
-  conflictScore       Float?
-  dependencyScore     Float?
-  attitudeSource     String?                    // How source feels about target
-  attitudeTarget     String?                    // How target feels about source
-  historySummary     String?                    // How they met, key shared events
-  currentTension     String?                    // Current state of tension
-  stage              String?                    // strangers|acquainted|allied|conflicted|estranged|reconciled
-  volumePresence     String?                    // JSON: which volumes they matter in
-  sourceCharacter     NovelCharacter @relation("SourceCharacter", fields: [sourceCharacterId], references: [id], onDelete: Cascade)
-  targetCharacter     NovelCharacter @relation("TargetCharacter", fields: [targetCharacterId], references: [id], onDelete: Cascade)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                String         @id @default(cuid())
+  novelId           String
+  sourceCharacterId String
+  targetCharacterId String
+  type              String // friend | enemy | lover | rival | mentor | family
+  summary           String?
+  trustScore        Float?
+  intimacyScore     Float?
+  conflictScore     Float?
+  dependencyScore   Float?
+  attitudeSource    String? // How source feels about target
+  attitudeTarget    String? // How target feels about source
+  historySummary    String? // How they met, key shared events
+  currentTension    String? // Current state of tension
+  stage             String? // strangers|acquainted|allied|conflicted|estranged|reconciled
+  volumePresence    String? // JSON: which volumes they matter in
+  sourceCharacter   NovelCharacter @relation("SourceCharacter", fields: [sourceCharacterId], references: [id], onDelete: Cascade)
+  targetCharacter   NovelCharacter @relation("TargetCharacter", fields: [targetCharacterId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  @@unique([novelId, sourceCharacterId, targetCharacterId])  // H3
+  @@unique([novelId, sourceCharacterId, targetCharacterId])
   @@index([novelId])
   @@index([sourceCharacterId])
   @@index([targetCharacterId])
 }
 
-// ─── Draft Character Relation (planning tab) ──────────
+// ─── Phase 0: Character Volume Presence (long-form role lifecycle) ─
 
-model DraftCharacterRelation {
-  id                String   @id @default(cuid())
-  novelId           String
-  sourceCharacterId String
-  targetCharacterId String
-  type              String                     // friend | enemy | lover | rival | mentor | family
-  summary           String?
-  synced            Boolean  @default(false)
-  novel             Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+model CharacterVolumePresence {
+  id             String         @id @default(cuid())
+  novelId        String
+  characterId    String
+  volumeOrder    Int // 第几卷
+  presence       String         @default("active") // "active" | "inactive" | "returning" | "departing"
+  trajectoryNote String? // 本卷的角色弧线描述
+  novel          Novel          @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  character      NovelCharacter @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  @@unique([novelId, sourceCharacterId, targetCharacterId])
-  @@index([novelId])
+  @@unique([novelId, characterId, volumeOrder])
+  @@index([novelId, volumeOrder])
 }
 
-// ─── Confirmation (Phase 17: planning→writing linkage) ─
+// ─── Phase 0: Reference Book (competitor analysis) ─
 
-model Confirmation {
-  id        String   @id @default(cuid())
-  novelId   String
-  scope     String                     // 'story_seed' | 'characters' | 'blueprint'
-  snapshot  String                     // JSON snapshot frozen at confirm time
-  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+model ReferenceBook {
+  id              String   @id @default(cuid())
+  novelId         String
+  fileName        String
+  totalChapters   Int?
+  content         String? // 文本内容（可能很大）
+  annotations     String? // JSON: 用户标注
+  analysisSummary String? // JSON: 分析摘要
+  writingAssets   String? // JSON: WritingAssetCollection — LLM 提取的写作技法
+  novel           Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  @@unique([novelId, scope])
+  @@unique([novelId])
+}
+
+// ─── Phase 0: Cost Tracking ────────────────────────
+
+model CostRecord {
+  id            String   @id @default(cuid())
+  novelId       String
+  chapterId     String?
+  assetId       String // 哪个 Prompt Asset 产生的调用
+  inputTokens   Int
+  outputTokens  Int
+  estimatedCost Float?
+  provider      String?
+  model         String?
+  novel         Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
   @@index([novelId])
+  @@index([novelId, createdAt])
 }
 
 // ─── Phase 12: Character Depth ─────────────────────────
 
 model CharacterResource {
-  id          String   @id @default(cuid())
-  novelId     String
-  ownerId     String
-  name        String
-  category    String
-  description String?
+  id                  String         @id @default(cuid())
+  novelId             String
+  ownerId             String
+  name                String
+  category            String
+  description         String?
   acquiredInChapterId String?
   depletedInChapterId String?
-  status      String   @default("active")
-  constraints String?
-  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  owner       NovelCharacter @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  acquiredInChapter Chapter?  @relation("ResourceAcquiredIn", fields: [acquiredInChapterId], references: [id], onDelete: SetNull)
-  depletedInChapter Chapter?  @relation("ResourceDepletedIn", fields: [depletedInChapterId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status              String         @default("active")
+  constraints         String?
+  novel               Novel          @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  owner               NovelCharacter @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  acquiredInChapter   Chapter?       @relation("ResourceAcquiredIn", fields: [acquiredInChapterId], references: [id], onDelete: SetNull)
+  depletedInChapter   Chapter?       @relation("ResourceDepletedIn", fields: [depletedInChapterId], references: [id], onDelete: SetNull)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
   @@index([novelId, ownerId])
 }
 
 model CharacterInfoProfile {
-  id          String   @id @default(cuid())
-  novelId     String
-  knowerId    String
-  subject     String
-  content     String
-  certainty   String   @default("certain")
+  id                  String         @id @default(cuid())
+  novelId             String
+  knowerId            String
+  subject             String
+  content             String
+  certainty           String         @default("certain")
   revealedInChapterId String?
-  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  knower      NovelCharacter @relation(fields: [knowerId], references: [id], onDelete: Cascade)
-  revealedInChapter Chapter? @relation("InfoProfileRevealedIn", fields: [revealedInChapterId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  novel               Novel          @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  knower              NovelCharacter @relation(fields: [knowerId], references: [id], onDelete: Cascade)
+  revealedInChapter   Chapter?       @relation("InfoProfileRevealedIn", fields: [revealedInChapterId], references: [id], onDelete: SetNull)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
   @@index([novelId, knowerId])
 }
@@ -397,69 +395,69 @@ model CharacterInfoProfile {
 // ─── Quality Audit ────────────────────────────────────
 
 model AuditReport {
-  id          String   @id @default(cuid())
-  novelId     String
-  chapterId   String
-  auditType   String                     // acceptance | timeline | style
+  id           String       @id @default(cuid())
+  novelId      String
+  chapterId    String
+  auditType    String // acceptance | timeline | style
   overallScore Float?
-  summary     String?                    // Human-facing summary
-  details     String?                    // JSON structured details
-  status      String   @default("pending")  // pending | passed | warning | failed
-  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  issues      AuditIssue[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  summary      String? // Human-facing summary
+  details      String? // JSON structured details
+  status       String       @default("pending") // pending | passed | warning | failed
+  novel        Novel        @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  chapter      Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  issues       AuditIssue[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   @@index([chapterId, auditType])
-  @@index([novelId])  // H9
+  @@index([novelId])
 }
 
 model AuditIssue {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   reportId      String
-  type          String                     // continuity | character | plot | style | pacing | dialogue
-  severity      String                     // low | medium | high | critical
+  type          String // continuity | character | plot | style | pacing | dialogue
+  severity      String // low | medium | high | critical
   description   String
   evidence      String?
   fixSuggestion String?
-  status        String   @default("open")  // open | resolved | ignored
+  status        String      @default("open") // open | resolved | ignored
   report        AuditReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 // ─── Style Engine ─────────────────────────────────────
 
 model StyleProfile {
-  id              String   @id @default(cuid())
-  name            String
-  description     String?
-  category        String?                    // uploaded | extracted | manual
-  sourceText      String?
-  extractedFeatures String?                  // JSON: LLM-extracted features
-  narrativeRules  String?                    // JSON
-  languageRules   String?                    // JSON
-  characterRules  String?                    // JSON
-  rhythmRules     String?                    // JSON
-  antiAiRules     String?                    // JSON
-  selfCheckRules  String?                    // JSON
-  bindings        StyleBinding[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String         @id @default(cuid())
+  name              String
+  description       String?
+  category          String? // uploaded | extracted | manual
+  sourceText        String?
+  extractedFeatures String? // JSON: LLM-extracted features
+  narrativeRules    String? // JSON
+  languageRules     String? // JSON
+  characterRules    String? // JSON
+  rhythmRules       String? // JSON
+  antiAiRules       String? // JSON
+  selfCheckRules    String? // JSON
+  bindings          StyleBinding[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 }
 
 model StyleBinding {
-  id              String   @id @default(cuid())
-  styleProfileId  String
-  targetType      String                     // novel | chapter
-  targetId        String
-  priority        Int      @default(0)
-  weight          Float    @default(1.0)
-  enabled         Boolean  @default(true)
-  styleProfile    StyleProfile @relation(fields: [styleProfileId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String       @id @default(cuid())
+  styleProfileId String
+  targetType     String // novel | chapter
+  targetId       String
+  priority       Int          @default(0)
+  weight         Float        @default(1.0)
+  enabled        Boolean      @default(true)
+  styleProfile   StyleProfile @relation(fields: [styleProfileId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([targetType, targetId])
 }
@@ -467,23 +465,23 @@ model StyleBinding {
 // ─── Payoff / Foreshadowing ───────────────────────────
 
 model PayoffLedgerItem {
-  id              String   @id @default(cuid())
-  novelId         String
-  ledgerKey       String
-  title           String
-  summary         String?
-  scopeType       String                     // book | volume | chapter
-  currentStatus   String                     // setup | hinted | pending_payoff | paid_off | failed | overdue
+  id               String   @id @default(cuid())
+  novelId          String
+  ledgerKey        String
+  title            String
+  summary          String?
+  scopeType        String // book | volume | chapter
+  currentStatus    String // setup | hinted | pending_payoff | paid_off | failed | overdue
   targetStartOrder Int?
-  targetEndOrder  Int?
-  firstSeenOrder  Int?
+  targetEndOrder   Int?
+  firstSeenOrder   Int?
   lastTouchedOrder Int?
-  setupChapterId  String?
-  payoffChapterId String?
-  statusReason    String?
-  novel           Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  setupChapterId   String?
+  payoffChapterId  String?
+  statusReason     String?
+  novel            Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([novelId, ledgerKey])
   @@index([novelId, currentStatus])
@@ -498,8 +496,8 @@ model TimelineItem {
   title       String
   description String?
   sortOrder   Int
-  category    String   @default("event")    // event | deadline | milestone | constraint
-  status      String   @default("pending")  // pending | active | resolved | violated
+  category    String   @default("event") // event | deadline | milestone | constraint
+  status      String   @default("pending") // pending | active | resolved | violated
   novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
   chapter     Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
@@ -511,18 +509,18 @@ model TimelineItem {
 // ─── World Rules ──────────────────────────────────────
 
 model WorldRule {
-  id          String   @id @default(cuid())
-  novelId     String
-  category    String                     // 势力格局|力量体系|资源规则|社会结构|地理环境|历史背景
-  title       String
-  content     String                     // 10-50 chars, executable rule
-  priority    Int      @default(0)       // Higher = more important for conflict detection
-  status      String   @default("active") // active|deprecated|conflicted
-  conflictsWith String?                  // JSON array of conflicting rule IDs
-  activatedAt  String?                   // JSON array of chapter IDs
-  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  novelId       String
+  category      String // 势力格局|力量体系|资源规则|社会结构|地理环境|历史背景
+  title         String
+  content       String // 10-50 chars, executable rule
+  priority      Int      @default(0) // Higher = more important for conflict detection
+  status        String   @default("active") // active|deprecated|conflicted
+  conflictsWith String? // JSON array of conflicting rule IDs
+  activatedAt   String? // JSON array of chapter IDs
+  novel         Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([novelId, category])
   @@index([novelId, status])

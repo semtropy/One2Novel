@@ -1,18 +1,37 @@
 import { Router } from "express";
+import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
 import { generateStoryCore } from "../../planning/storyCoreService";
-import { serializeTags } from "../../../../platform/data/tagHelpers";
-import { generateBookFraming } from "../bookFraming";
-import { generateCharacters, persistDraftCharacters } from "../../planning/characterPrep/characterService";
+import { generateCharacters, persistCharacters } from "../../planning/characterPrep/characterService";
 import { generateBlueprint } from "../../planning/blueprintService";
 import { rebuildBlueprintFromOutline, restoreBlueprintFromWriting } from "../blueprintRebuild";
-import { syncDraftPlansToWriting } from "../volumeChapterSync";
-import { confirmScope, confirmAllScopes, unconfirmScope, getConfirmationStatus } from "../../planning/ConfirmationService";
 import { generateChapterDynamics, compileDynamicsContext } from "../../planning/characterPrep/characterDynamicsService";
 import { generateChapterExecutionContract } from "../../planning/storyMacro/chapterDetailService";
 import { generateWorldRulesFromReference } from "../../world/worldReferenceService";
+import { CreationPipeline } from "../../planning/creationPipeline";
+import {
+  getPipelineState,
+  savePipelineState,
+  updateStepState,
+  advanceToNextStep,
+  createInitialPipelineState,
+  type StepName,
+} from "../../planning/pipelineState";
+// Phase 1-6 sub-routers
+import architectureRoutes from "./planning/architecture.routes";
+import rhythmRoutes from "./planning/rhythm.routes";
+import referenceRoutes from "./planning/reference.routes";
+import beatSheetRoutes from "./planning/beat-sheet.routes";
+import auditCostRoutes from "./planning/audit-cost.routes";
 
 const router = Router();
+
+// Mount Phase 1-6 sub-routers
+router.use("/", architectureRoutes);
+router.use("/", beatSheetRoutes);
+router.use("/", rhythmRoutes);
+router.use("/", referenceRoutes);
+router.use("/", auditCostRoutes);
 
 // ─── Story Core ──────────────────────────────────────
 
@@ -20,85 +39,110 @@ router.post("/:novelId/story-core", async (req, res, next) => {
   try { res.json({ data: await generateStoryCore(req.params.novelId) }); } catch (e) { next(e); }
 });
 
-// ─── Quick Start ─────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// 7-Step Advanced Creation Pipeline Routes
+// ═══════════════════════════════════════════════════════════
 
-router.post("/:novelId/quick-start", async (req, res, next) => {
+// Initialize pipeline for advanced mode
+router.post("/:novelId/pipeline/init", async (req, res, next) => {
   try {
     const novelId = req.params.novelId;
-    const results: Record<string, unknown> = {};
-    const errors: string[] = [];
+    const state = createInitialPipelineState(novelId, "advanced");
+    await savePipelineState(state);
+    res.json({ data: state });
+  } catch (e) { next(e); }
+});
 
-    results.storyCore = await generateStoryCore(novelId);
-    // Auto-confirm story seed immediately
-    await confirmScope(novelId, "story_seed").catch(() => {});
+// Get pipeline state
+router.get("/:novelId/pipeline/state", async (req, res, next) => {
+  try {
+    const state = await getPipelineState(req.params.novelId);
+    res.json({ data: state });
+  } catch (e) { next(e); }
+});
 
-    const tasks = [
-      generateCharacters(novelId).then(async (result) => {
-        await persistDraftCharacters(novelId, result);
-        // Auto-confirm characters immediately
-        await confirmScope(novelId, "characters").catch(() => {});
-        results.characters = result;
-      }).catch(e => { errors.push("characters: " + (e instanceof Error ? e.message : String(e))); }),
-      generateBlueprint(novelId).then(async (r) => {
-        results.blueprint = r;
-        const prisma = getPrisma();
-        const novel = await prisma.novel.findUnique({ where: { id: novelId }, select: { structuredOutline: true } });
-        if (novel?.structuredOutline) {
-          await rebuildBlueprintFromOutline(novelId, novel.structuredOutline);
-          // Auto-confirm blueprint to writing tables
-          await syncDraftPlansToWriting(novelId);
-          await confirmScope(novelId, "blueprint");
+// Execute a single pipeline step
+router.post("/:novelId/pipeline/step/:stepName", async (req, res, next) => {
+  try {
+    const novelId = req.params.novelId;
+    const stepName = req.params.stepName as StepName;
+    const pipeline = new CreationPipeline(novelId);
+
+    let result: unknown = null;
+
+    switch (stepName) {
+      case "input":
+        result = await pipeline.step1_storyCore();
+        break;
+      case "reference":
+        result = await pipeline.step2_referenceAnalysis();
+        break;
+      case "architecture":
+        result = await pipeline.step3_architectureConfirmation({
+          architectureType: req.body?.architectureType,
+          goldenFinger: req.body?.goldenFinger,
+          centralQuestion: req.body?.centralQuestion,
+          endingDirection: req.body?.endingDirection,
+        });
+        break;
+      case "characters":
+        result = await pipeline.step4_characterConfiguration();
+        break;
+      case "blueprint": {
+        const mode = req.body?.mode ?? "per_volume";
+        if (req.body?.skeletonOnly) {
+          result = await pipeline.step5a_generateLoopSkeleton();
+        } else if (req.body?.volumeOrder) {
+          result = await pipeline.step5b_expandVolume(req.body.volumeOrder);
+        } else {
+          result = await pipeline.step5_blueprintGeneration(mode);
         }
-      }).catch(e => { errors.push("blueprint: " + (e instanceof Error ? e.message : String(e))); }),
-      (async () => {
-          const prisma = getPrisma();
-          const novel = await prisma.novel.findUnique({ where: { id: novelId }, select: { title: true, description: true, genre: true } });
-          if (novel) {
-            const framing = await generateBookFraming({ title: novel.title, description: novel.description ?? undefined, genre: novel.genre ?? undefined });
-            results.framing = framing;
-            await prisma.novel.update({ where: { id: novelId }, data: {
-              targetAudience: framing.targetAudience,
-              commercialTags: serializeTags(framing.commercialTags),
-              competingFeel: framing.competingFeel,
-              bookSellingPoint: framing.bookSellingPoint,
-              first30ChapterPromise: framing.first30ChapterPromise,
-            }});
-          }
-        })().catch(e => { errors.push("framing: " + (e instanceof Error ? e.message : String(e))); }),
-    ];
-
-    await Promise.allSettled(tasks);
-    res.json({ data: { ...results, errors: errors.length > 0 ? errors : undefined } });
-  } catch (e) { next(e); }
-});
-
-// ─── Draft Story Seed ────────────────────────────────
-
-router.put("/:novelId/draft-story-seed", async (req, res, next) => {
-  try {
-    const prisma = getPrisma();
-    const novelId = req.params.novelId;
-    const { content } = req.body;
-    if (!content || typeof content !== "string") {
-      res.status(400).json({ error: { code: "INVALID_INPUT", message: "content is required" } });
-      return;
+        break;
+      }
+      case "calibration":
+        await pipeline.step6_positioningCalibration();
+        break;
+      case "writing":
+        await pipeline.step7_enterWriting();
+        break;
+      default:
+        res.status(400).json({ error: { code: "INVALID_STEP", message: `Unknown step: ${stepName}` } });
+        return;
     }
-    await prisma.draftStorySeed.upsert({
-      where: { novelId },
-      create: { novelId, content },
-      update: { content, synced: false },
-    });
-    res.json({ data: { ok: true } });
+
+    await advanceToNextStep(novelId);
+    const state = await getPipelineState(novelId);
+    res.json({ data: { step: stepName, result, pipelineState: state } });
   } catch (e) { next(e); }
 });
 
-// ─── Confirm / Unconfirm ─────────────────────────────
-
-router.post("/:novelId/story-seed/confirm", async (req, res, next) => {
-  try { await confirmScope(req.params.novelId, "story_seed"); res.json({ data: { ok: true } }); } catch (e) { next(e); }
+// Generate only the loop skeleton (step 5a, used by per-volume mode)
+router.post("/:novelId/pipeline/generate-skeleton", async (req, res, next) => {
+  try {
+    const pipeline = new CreationPipeline(req.params.novelId);
+    const skeleton = await pipeline.step5a_generateLoopSkeleton();
+    res.json({ data: skeleton });
+  } catch (e) { next(e); }
 });
-router.delete("/:novelId/story-seed/confirm", async (req, res, next) => {
-  try { await unconfirmScope(req.params.novelId, "story_seed"); res.json({ data: { ok: true } }); } catch (e) { next(e); }
+
+// Expand a single volume (step 5b)
+router.post("/:novelId/pipeline/expand-volume/:volumeOrder", async (req, res, next) => {
+  try {
+    const pipeline = new CreationPipeline(req.params.novelId);
+    const expanded = await pipeline.step5b_expandVolume(
+      parseInt(req.params.volumeOrder),
+    );
+    res.json({ data: expanded });
+  } catch (e) { next(e); }
+});
+
+// Generate all volumes at once (step 5 full mode)
+router.post("/:novelId/pipeline/generate-all-volumes", async (req, res, next) => {
+  try {
+    const pipeline = new CreationPipeline(req.params.novelId);
+    const result = await pipeline.step5_blueprintGeneration("full");
+    res.json({ data: result });
+  } catch (e) { next(e); }
 });
 
 // ─── Characters ──────────────────────────────────────
@@ -107,16 +151,9 @@ router.post("/:novelId/characters/generate", async (req, res, next) => {
   try {
     const novelId = req.params.novelId;
     const result = await generateCharacters(novelId);
-    await persistDraftCharacters(novelId, result);
+    await persistCharacters(novelId, result);
     res.json({ data: result });
   } catch (e) { next(e); }
-});
-
-router.post("/:novelId/characters/confirm", async (req, res, next) => {
-  try { await confirmScope(req.params.novelId, "characters"); res.json({ data: { ok: true } }); } catch (e) { next(e); }
-});
-router.delete("/:novelId/characters/confirm", async (req, res, next) => {
-  try { await unconfirmScope(req.params.novelId, "characters"); res.json({ data: { ok: true } }); } catch (e) { next(e); }
 });
 
 // ─── Blueprint ───────────────────────────────────────
@@ -130,33 +167,13 @@ router.post("/:novelId/blueprint/restore", async (req, res, next) => {
 
 router.post("/:novelId/blueprint", async (req, res, next) => {
   try {
-    const result = await generateBlueprint(req.params.novelId, req.body?.volumes);
+    const { result, validation, needsRegeneration } = await generateBlueprint(req.params.novelId, req.body?.volumes);
     const prisma = getPrisma();
     const novel = await prisma.novel.findUnique({ where: { id: req.params.novelId }, select: { structuredOutline: true } });
     if (novel?.structuredOutline) {
       await rebuildBlueprintFromOutline(req.params.novelId, novel.structuredOutline);
-      // Auto-confirm: sync draft plans to writing tables immediately
-      await syncDraftPlansToWriting(req.params.novelId);
-      await confirmScope(req.params.novelId, "blueprint");
     }
-    res.json({ data: result });
-  } catch (e) { next(e); }
-});
-router.delete("/:novelId/blueprint/confirm", async (req, res, next) => {
-  try { await unconfirmScope(req.params.novelId, "blueprint"); res.json({ data: { ok: true } }); } catch (e) { next(e); }
-});
-
-// ─── Confirm All ─────────────────────────────────────
-
-router.post("/:novelId/confirm-all", async (req, res, next) => {
-  try {
-    await confirmAllScopes(req.params.novelId);
-    res.json({ data: { ok: true } });
-  } catch (e) { next(e); }
-});
-router.get("/:novelId/confirmation-status", async (req, res, next) => {
-  try {
-    res.json({ data: await getConfirmationStatus(req.params.novelId) });
+    res.json({ data: { blueprint: result, validation, needsRegeneration } });
   } catch (e) { next(e); }
 });
 

@@ -3,9 +3,8 @@ import { aiInvoke } from "../../../platform/llm/aiService";
 import { getPrisma } from "../../../platform/db/client";
 
 const StoryCoreSchema = z.object({
-  premise: z.string(),
-  mainArc: z.string(),
-  mysteryBox: z.string(),
+  storySummary: z.string(),
+  centralQuestion: z.string(),
   endingDirection: z.string(),
   genre: z.string().optional(),
   narrativePov: z.string().optional(),
@@ -15,9 +14,8 @@ const StoryCoreSchema = z.object({
 });
 
 export interface StoryCoreResult {
-  premise: string;
-  mainArc: string;
-  mysteryBox: string;
+  storySummary: string;
+  centralQuestion: string;
   endingDirection: string;
   genre: string | null;
   narrativePov: string | null;
@@ -27,8 +25,8 @@ export interface StoryCoreResult {
 }
 
 /**
- * Generate story core (premise/mainArc/mysteryBox/endingDirection + creative params).
- * Writes to Novel.draftSeed (not structuredOutline) — consistent with DraftPlan/DraftCharacter pattern.
+ * Generate story core (storySummary / centralQuestion / endingDirection + creative params).
+ * Writes directly to Novel columns — no more DraftStorySeed indirection.
  */
 export async function generateStoryCore(novelId: string): Promise<StoryCoreResult> {
   const prisma = getPrisma();
@@ -46,12 +44,12 @@ export async function generateStoryCore(novelId: string): Promise<StoryCoreResul
     userPrompt: `为以下小说生成故事核心：\n\n${context}`,
     schema: StoryCoreSchema,
     temperature: 0.8,
+    novelId,
   });
 
   const result: StoryCoreResult = {
-    premise: raw.premise,
-    mainArc: raw.mainArc,
-    mysteryBox: raw.mysteryBox,
+    storySummary: raw.storySummary,
+    centralQuestion: raw.centralQuestion,
     endingDirection: raw.endingDirection,
     genre: raw.genre ?? novel.genre ?? null,
     narrativePov: raw.narrativePov ?? novel.narrativePov ?? null,
@@ -60,23 +58,13 @@ export async function generateStoryCore(novelId: string): Promise<StoryCoreResul
     emotionIntensity: raw.emotionIntensity ?? novel.emotionIntensity ?? null,
   };
 
-  // Write story core to DraftStorySeed (single source of truth for planning)
-  const draftSeedContent = JSON.stringify({
-    premise: result.premise,
-    mainArc: result.mainArc,
-    mysteryBox: result.mysteryBox,
-    endingDirection: result.endingDirection,
-  });
-
-  await prisma.draftStorySeed.upsert({
-    where: { novelId },
-    create: { novelId, content: draftSeedContent },
-    update: { content: draftSeedContent, synced: false },
-  });
-
+  // Write directly to Novel columns
   await prisma.novel.update({
     where: { id: novelId },
     data: {
+      storySummary: result.storySummary,
+      centralQuestion: result.centralQuestion,
+      endingDirection: result.endingDirection,
       genre: result.genre,
       narrativePov: result.narrativePov as "first_person" | "third_person" | "mixed" | null,
       pacePreference: result.pacePreference,
@@ -89,24 +77,21 @@ export async function generateStoryCore(novelId: string): Promise<StoryCoreResul
 }
 
 /**
- * Read story core from DraftStorySeed (single source of truth for planning).
- * Falls back to structuredOutline for legacy novels. Returns null if neither exists.
+ * Read story core directly from Novel columns.
+ * Returns null if storySummary is empty (not yet generated).
  */
 export async function getStoryCore(novelId: string): Promise<{
-  premise: string; mainArc: string; mysteryBox: string; endingDirection: string;
+  storySummary: string; centralQuestion: string; endingDirection: string;
 } | null> {
   const prisma = getPrisma();
-  const draftSeed = await prisma.draftStorySeed.findUnique({ where: { novelId } });
-  if (draftSeed?.content) {
-    try {
-      const parsed = JSON.parse(draftSeed.content);
-      if (parsed.premise || parsed.mainArc) return {
-        premise: parsed.premise ?? "",
-        mainArc: parsed.mainArc ?? "",
-        mysteryBox: parsed.mysteryBox ?? "",
-        endingDirection: parsed.endingDirection ?? "",
-      };
-    } catch { /* fall through */ }
-  }
-  return null;
+  const novel = await prisma.novel.findUnique({
+    where: { id: novelId },
+    select: { storySummary: true, centralQuestion: true, endingDirection: true },
+  });
+  if (!novel?.storySummary) return null;
+  return {
+    storySummary: novel.storySummary,
+    centralQuestion: novel.centralQuestion ?? "",
+    endingDirection: novel.endingDirection ?? "",
+  };
 }

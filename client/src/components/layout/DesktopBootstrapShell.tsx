@@ -259,7 +259,7 @@ function DesktopBootstrapUpdatePanel({ snapshot }: { snapshot: DesktopBootstrapS
             onClick={() => void runUpdaterAction("check")}
           >
             <Download className="h-4 w-4" aria-hidden="true" />
-            下载更新
+            检查更新
           </Button>
         ) : null}
         {showInstallButton ? (

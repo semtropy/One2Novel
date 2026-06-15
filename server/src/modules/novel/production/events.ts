@@ -1,7 +1,7 @@
 import { novelEventBus } from "../../../platform/events/bus";
 import { getPrisma } from "../../../platform/db/client";
 import { scanChapterForPayoffs } from "../../payoff/payoffService";
-import { updateCharacterDynamics } from "./characterDynamics";
+import { updateCharacterDynamics } from "./post/characterDynamics";
 import { scanConflicts } from "./openConflict";
 import { logEventError } from "../../../platform/logging/eventErrorLog";
 

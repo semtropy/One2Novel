@@ -2,6 +2,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../app/api";
 import type { NovelDetail, NovelCreate, NovelUpdate } from "@one2novel/shared/types/novel";
 
+// Phase 1-4 hooks are defined in domain-specific files, re-exported here for backward compatibility
+export { useArchitectureTemplates, useGenerateLoopSkeleton, useLoopSkeleton, useExpandLoopToVolume, useGenerateNextVolume, useSaveArchitecture } from "./architecture";
+export type { ArchitectureTemplateSummary, LoopSkeletonItem, LoopSkeleton, ExpandedChapter, ExpandedVolume } from "./architecture";
+
 // Re-export shared types so consumers don't need direct shared imports
 export type Novel = NovelDetail;
 export type { NovelCreate, NovelUpdate };
@@ -57,34 +61,10 @@ export function useUpdateNovel() {
     },
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: ["novel", id] });
-      qc.invalidateQueries({ queryKey: ["confirmation-status", id] });
     },
   });
 }
 
-export interface StoryOutline {
-  premise: string;
-  mainArc: string;
-  mysteryBox?: string;
-  endingDirection: string;
-  volumes: VolumeOutline[];
-}
-export interface VolumeOutline {
-  sortOrder: number;
-  title: string;
-  summary: string;
-  chapters: ChapterOutline[];
-}
-export interface ChapterOutline {
-  order: number;
-  title: string;
-  summary: string;
-  coreEvent: string;
-  hook: string;
-  characters: string[];
-  conflictLevel: number;
-  revealLevel: number;
-}
 export interface NovelCharacter {
   id: string;
   name: string;
@@ -100,19 +80,6 @@ export interface NovelCharacter {
   prohibitions?: string;
 }
 
-export function useGenerateOutline() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (novelId: string) => {
-      const { data } = await api.post(`/novels/${novelId}/outline`);
-      return data.data as StoryOutline;
-    },
-    onSuccess: (_, novelId) => {
-      qc.invalidateQueries({ queryKey: ["novel", novelId] });
-    },
-  });
-}
-
 export function useGenerateCharacters() {
   const qc = useQueryClient();
   return useMutation({
@@ -122,7 +89,6 @@ export function useGenerateCharacters() {
     },
     onSuccess: (_, novelId) => {
       qc.invalidateQueries({ queryKey: ["novel", novelId] });
-      qc.invalidateQueries({ queryKey: ["confirmation-status", novelId] });
     },
   });
 }
@@ -143,7 +109,7 @@ export function useGenerateFraming() {
 // ─── Story Core ─────────────────────────────────────────
 
 export interface StoryCoreResult {
-  premise: string; mainArc: string; mysteryBox: string; endingDirection: string;
+  storySummary: string; centralQuestion: string; endingDirection: string;
   genre: string | null; narrativePov: string | null; pacePreference: string | null;
   styleTone: string | null; emotionIntensity: string | null;
 }
@@ -157,36 +123,21 @@ export function useGenerateStoryCore() {
     },
     onSuccess: (_, novelId) => {
       qc.invalidateQueries({ queryKey: ["novel", novelId] });
-      qc.invalidateQueries({ queryKey: ["confirmation-status", novelId] });
     },
   });
 }
-
-// ─── Quick Start (batch: story core → characters + blueprint + framing) ──
-
-export interface QuickStartResult {
-  storyCore: StoryCoreResult;
-  characters: { characters: unknown[]; relationships: unknown[] };
-  blueprint: { volumes: unknown[] };
-  framing: BookFramingResult;
-}
-
-export function useQuickStart() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (novelId: string) => {
-      const { data } = await api.post(`/novels/${novelId}/quick-start`);
-      return data.data as QuickStartResult;
-    },
-    onSuccess: (_, novelId) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
-  });
-}
-
 
 // ─── Blueprint ──────────────────────────────────────────
 
 export interface BlueprintResult {
-  volumes: VolumeOutline[];
+  volumes: Array<{
+    sortOrder: number; title: string; summary: string;
+    chapters: Array<{
+      order: number; title: string; summary: string;
+      coreEvent: string; hook: string; characters: string[];
+      conflictLevel: number; revealLevel: number;
+    }>;
+  }>;
 }
 
 export function useGenerateBlueprint() {
@@ -198,72 +149,11 @@ export function useGenerateBlueprint() {
     },
     onSuccess: (_, novelId) => {
       qc.invalidateQueries({ queryKey: ["novel", novelId] });
-      qc.invalidateQueries({ queryKey: ["confirmation-status", novelId] });
     },
   });
 }
 
-// ─── Confirmation (Phase 17: replaces lock/unlock) ─────
-
-export interface ScopeStatus {
-  confirmed: boolean;
-  dirty: boolean;
-  dirtyCount: number;
-  lastConfirmedAt: string | null;
-}
-export interface ConfirmationStatus {
-  story_seed: ScopeStatus;
-  characters: ScopeStatus;
-  blueprint: ScopeStatus;
-}
-
-export function useConfirmationStatus(novelId: string | undefined) {
-  return useQuery({
-    queryKey: ["confirmation-status", novelId],
-    queryFn: async () => {
-      const { data } = await api.get(`/novels/${novelId}/confirmation-status`);
-      return data.data as ConfirmationStatus;
-    },
-    enabled: !!novelId,
-    staleTime: 0,
-  });
-}
-
-const confirmInvalidate = (qc: ReturnType<typeof useQueryClient>, novelId: string) => {
-  qc.invalidateQueries({ queryKey: ["confirmation-status", novelId] });
-  qc.invalidateQueries({ queryKey: ["novel", novelId] });
-};
-
-export function useConfirmAllScopes() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ novelId, mode }: { novelId: string; mode: "replace" | "merge" }) => {
-      const { data } = await api.post(`/novels/${novelId}/confirm-all`, { mode });
-      return data.data as { confirmed: string[] };
-    },
-    onSuccess: (_, { novelId }) => confirmInvalidate(qc, novelId),
-  });
-}
-
-export function useConfirmScope() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ novelId, scope }: { novelId: string; scope: string }) => {
-      await api.post(`/novels/${novelId}/${scope}/confirm`);
-    },
-    onSuccess: (_, { novelId }) => confirmInvalidate(qc, novelId),
-  });
-}
-
-export function useUnconfirmScope() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ novelId, scope }: { novelId: string; scope: string }) => {
-      await api.delete(`/novels/${novelId}/${scope}/confirm`);
-    },
-    onSuccess: (_, { novelId }) => confirmInvalidate(qc, novelId),
-  });
-}
+// ─── Confirmation removed — planning writes directly to production tables ───
 
 // ─── Phase 13: Export / Statistics / Cleanup ───────────
 
@@ -476,8 +366,8 @@ export function useRelationshipGraph(novelId?: string) {
 // Draft character relations (planning tab)
 export function useDraftRelationshipGraph(novelId?: string) {
   return useQuery({
-    queryKey: ["draft-rel-graph", novelId],
-    queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/draft-relations/graph`); return data.data as RelationshipGraph; },
+    queryKey: ["rel-graph", novelId],
+    queryFn: async () => { const { data } = await api.get(`/novels/${novelId}/relations/graph`); return data.data as RelationshipGraph; },
     enabled: !!novelId,
   });
 }
@@ -486,16 +376,221 @@ export function useUpsertDraftRelation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { novelId: string; sourceCharacterId: string; targetCharacterId: string; type: string }) => {
-      const { data } = await api.post(`/novels/${input.novelId}/draft-relations`, input);
+      const { data } = await api.post(`/novels/${input.novelId}/relations`, input);
       return data.data;
     },
-    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["draft-rel-graph", v.novelId] }); },
+    onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["rel-graph", v.novelId] }); },
   });
 }
 
 export function useUpsertRelation() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: async (input: { novelId: string; sourceCharacterId: string; targetCharacterId: string; type: string; attitudeSource?: string; attitudeTarget?: string; stage?: string }) => { const { data } = await api.post(`/novels/${input.novelId}/relations`, input); return data.data; }, onSuccess: (_, v) => { qc.invalidateQueries({ queryKey: ["rel-graph", v.novelId] }); } });
+}
+
+// Phase 0-1 architecture hooks → ./architecture.ts (re-exported at top)
+
+export interface CharacterPresenceRecord {
+  characterId: string;
+  characterName: string;
+  role: string;
+  volumeOrder: number;
+  presence: "active" | "inactive" | "returning" | "departing";
+  trajectoryNote: string | null;
+}
+
+export interface VolumeCastRecommendation {
+  volumeOrder: number;
+  activeCharacters: Array<{ characterId: string; characterName: string; role: string; reason: string }>;
+  returningCharacters: Array<{ characterId: string; characterName: string; role: string; returnReason: string }>;
+  departingCharacters: Array<{ characterId: string; characterName: string; role: string; departReason: string }>;
+  restingCharacters: Array<{ characterId: string; characterName: string; role: string }>;
+}
+
+export interface VolumeCompressionResult {
+  volumeOrder: number;
+  volumeTitle: string;
+  summary: string;
+  keyEvents: string[];
+  characterChanges: string[];
+  unresolvedPayoffs: string[];
+  archiveDigest: string;
+}
+
+export function useCharacterPresence(novelId?: string, volumeOrder?: number) {
+  return useQuery({
+    queryKey: ["character-presence", novelId, volumeOrder],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/characters/volume-presence/${volumeOrder}`);
+      return data.data as CharacterPresenceRecord[];
+    },
+    enabled: !!novelId && volumeOrder !== undefined,
+  });
+}
+
+export function useVolumeCastRecommendation() {
+  return useMutation({
+    mutationFn: async ({ novelId, sortOrder }: { novelId: string; sortOrder: number }) => {
+      const { data } = await api.post(`/novels/${novelId}/volumes/${sortOrder}/character-schedule`);
+      return data.data as VolumeCastRecommendation;
+    },
+  });
+}
+
+export function useCompressVolume() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ novelId, sortOrder }: { novelId: string; sortOrder: number }) => {
+      const { data } = await api.post(`/novels/${novelId}/volumes/${sortOrder}/compress`);
+      return data.data as VolumeCompressionResult;
+    },
+    onSuccess: (_, { novelId }) => {
+      qc.invalidateQueries({ queryKey: ["novel", novelId] });
+    },
+  });
+}
+
+export function useLongAbsentCharacters(novelId?: string, threshold = 10) {
+  return useQuery({
+    queryKey: ["long-absent", novelId, threshold],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/characters/long-absent?threshold=${threshold}`);
+      return data.data as Array<{ characterId: string; characterName: string; chaptersSinceLastAppearance: number }>;
+    },
+    enabled: !!novelId,
+    staleTime: 60_000,
+  });
+}
+
+// ─── Phase 3: Cool Points & Rhythm ────────────────────
+
+export interface CoolPointStatus {
+  volumeOrder: number;
+  chaptersWritten: number;
+  breakdown: Array<{ type: string; target: number; actual: number; percentage: number; gap: string }>;
+  alerts: Array<{ type: string; severity: string; message: string; chaptersSince: number }>;
+}
+
+export interface HookCheckResult {
+  chapterId: string; chapterOrder: number;
+  hasHook: boolean; hookQuality: "strong" | "adequate" | "weak" | "missing";
+  issue?: string;
+}
+
+export interface HookDensityReport {
+  volumeOrder: number; totalChapters: number;
+  chaptersWithHooks: number; chaptersWithoutHooks: number;
+  weakHookChapters: number[]; density: number;
+  verdict: "good" | "acceptable" | "needs_improvement";
+  suggestion: string;
+}
+
+export interface VolumeRhythmReport {
+  volumeOrder: number; passed: boolean;
+  violations: Array<{ severity: string; category: string; location: string; description: string; suggestion: string }>;
+  summary: string;
+}
+
+export function useCoolPointStatus(novelId?: string, volumeOrder?: number) {
+  return useQuery({
+    queryKey: ["coolpoint-status", novelId, volumeOrder],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/volumes/${volumeOrder}/coolpoint-status`);
+      return data.data as CoolPointStatus;
+    },
+    enabled: !!novelId && volumeOrder !== undefined,
+    staleTime: 30_000,
+  });
+}
+
+export function useHookCheck(novelId?: string, chapterId?: string) {
+  return useQuery({
+    queryKey: ["hook-check", novelId, chapterId],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/chapters/${chapterId}/hook-check`);
+      return data.data as HookCheckResult;
+    },
+    enabled: !!novelId && !!chapterId,
+    staleTime: 60_000,
+  });
+}
+
+export function useHookDensity(novelId?: string, volumeOrder?: number) {
+  return useQuery({
+    queryKey: ["hook-density", novelId, volumeOrder],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/volumes/${volumeOrder}/hook-density`);
+      return data.data as HookDensityReport;
+    },
+    enabled: !!novelId && volumeOrder !== undefined,
+    staleTime: 60_000,
+  });
+}
+
+export function useVolumeRhythmReport(novelId?: string, volumeOrder?: number) {
+  return useQuery({
+    queryKey: ["rhythm-report", novelId, volumeOrder],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/volumes/${volumeOrder}/rhythm-report`);
+      return data.data as VolumeRhythmReport;
+    },
+    enabled: !!novelId && volumeOrder !== undefined,
+  });
+}
+
+// ─── Phase 5: Cross-Volume Audit & Cost ───────────────
+
+export interface AuditFinding {
+  severity: "high" | "medium" | "low";
+  category: string; location: string; description: string; suggestion: string;
+}
+
+export interface CrossVolumeAuditReport {
+  novelId: string; auditedVolumeOrder: number;
+  totalChaptersAudited: number; findings: AuditFinding[];
+  summary: string; overallScore: number;
+}
+
+export interface CostSummaryData {
+  novelId: string;
+  totalInputTokens: number; totalOutputTokens: number;
+  totalEstimatedCost: number; estimatedRemainingCost: number | null;
+  averageCostPerChapter: number; chapterCount: number;
+  budgetLimit: number | null; budgetPercent: number | null;
+  warning: string | null;
+}
+
+export function useCrossVolumeAudit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ novelId, sortOrder }: { novelId: string; sortOrder: number }) => {
+      const { data } = await api.post(`/novels/${novelId}/volumes/${sortOrder}/cross-audit`);
+      return data.data as CrossVolumeAuditReport;
+    },
+    onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
+  });
+}
+
+export function useCostSummary(novelId?: string) {
+  return useQuery({
+    queryKey: ["cost-summary", novelId],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/cost-summary`);
+      return data.data as CostSummaryData;
+    },
+    enabled: !!novelId,
+    staleTime: 30_000,
+  });
+}
+
+export function useSetBudgetLimit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ novelId, limit }: { novelId: string; limit: number | null }) => {
+      await api.put(`/novels/${novelId}/budget-limit`, { limit });
+    },
+    onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["cost-summary", novelId] }); },
+  });
 }
 
 // ─── Phase 2.5: Volume Rebalance ──────────────────────
@@ -577,5 +672,59 @@ export function useTimelineReminders(novelId?: string, chapterOrder?: number) {
     },
     enabled: !!novelId && chapterOrder !== undefined && chapterOrder > 0,
     staleTime: 30_000,
+  });
+}
+
+// ─── Completion Readiness ───────────────────────────────
+
+export interface CompletionReadiness {
+  totalChapters: number;
+  completedChapters: number;
+  completionPercent: number;
+  unrecycledPayoffs: number;
+  characterArcsComplete: number;
+  totalCharacterArcs: number;
+  estimatedRemainingChapters: number | null;
+  readinessVerdict: "ready" | "close" | "early";
+}
+
+export function useCompletionReadiness(novelId?: string) {
+  return useQuery({
+    queryKey: ["completion-readiness", novelId],
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/completion-readiness`);
+      return data.data as CompletionReadiness;
+    },
+    enabled: !!novelId,
+    staleTime: 30_000,
+  });
+}
+
+// ─── Reference Book: Writing Assets ────────────────────
+
+export function useExtractWritingAssets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/reference-book/extract-writing-assets`);
+      return data.data;
+    },
+    onSuccess: (_data, novelId) => {
+      qc.invalidateQueries({ queryKey: ["novel", novelId] });
+    },
+  });
+}
+
+export function useCreateStyleProfileFromAssets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (novelId: string) => {
+      const { data } = await api.post(`/novels/${novelId}/reference-book/create-style-profile`);
+      return data.data as { profileId: string; bindingId: string };
+    },
+    onSuccess: (_data, novelId) => {
+      qc.invalidateQueries({ queryKey: ["novel", novelId] });
+      qc.invalidateQueries({ queryKey: ["style-profiles"] });
+    },
   });
 }

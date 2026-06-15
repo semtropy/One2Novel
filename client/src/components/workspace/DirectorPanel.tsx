@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Play, RefreshCw, CheckCircle, AlertTriangle, XCircle, RotateCcw } from "lucide-react";
 import { api } from "../../app/api";
 import { cn } from "../../lib/cn";
-import AutoWriteModal from "./AutoWriteModal";
+import { AutoWriteModal } from "./AutoWriteModal";
 
 interface Props { novelId: string; compact?: boolean }
 
@@ -41,11 +41,16 @@ export function DirectorPanel({ novelId, compact }: Props) {
           <Play size={18} />一键自动写作
         </button>
         {isBlocked && (
-          <button onClick={handleResume} disabled={resuming}
-            className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 font-medium">
-            <RotateCcw size={14} className={resuming ? "animate-spin" : ""} />
-            {resuming ? "恢复中..." : `⚠ 在第${progress.currentChapter}章中断，点击恢复`}
-          </button>
+          <div className="space-y-1">
+            <button onClick={handleResume} disabled={resuming}
+              className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 font-medium">
+              <RotateCcw size={14} className={resuming ? "animate-spin" : ""} />
+              {resuming ? "恢复中..." : `⚠ 在第${progress.currentChapter}章中断，点击恢复`}
+            </button>
+            {progress.message && (
+              <p className="text-xs text-amber-500">{progress.message}</p>
+            )}
+          </div>
         )}
         {showAutoWrite && <AutoWriteModal novelId={novelId} onClose={() => setShowAutoWrite(false)} />}
       </>

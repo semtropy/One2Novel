@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "../../app/api";
 import { Lightbulb, Clock, Plus, X, Sparkles } from "lucide-react";
 import { cn } from "../../lib/cn";
-import SceneCardPanel from "./SceneCardPanel";
+import { SceneCardPanel } from "./SceneCardPanel";
 
 interface Props { novelId: string; chapterId: string | null }
 
@@ -74,7 +74,8 @@ export function BottomPanel({ novelId, chapterId }: Props) {
       const r = await api.get(`/styles/bindings/chapter/${chapterId}`);
       const chapterBindings = (r.data.data ?? []) as Array<{ id: string; styleProfile?: { name: string } }>;
       const target = chapterBindings.find(b => b.styleProfile?.name === bindingName);
-      if (target) { await api.delete(`/styles/${bindingName}/bind/${target.id}`); loadStyles(); }
+      const profileId = styleCtx.bindings.find(b => b.name === bindingName && b.targetType === "chapter")?.id;
+      if (profileId && target) { await api.delete(`/styles/${profileId}/bind/${target.id}`); loadStyles(); }
     } catch {}
   }
 
@@ -84,7 +85,8 @@ export function BottomPanel({ novelId, chapterId }: Props) {
       const r = await api.get(`/styles/bindings/novel/${novelId}`);
       const bindings = (r.data.data ?? []) as Array<{ id: string; styleProfile?: { name: string } }>;
       const target = bindings.find(b => b.styleProfile?.name === name);
-      if (target) { await api.delete(`/styles/${name}/bind/${target.id}`); loadStyles(); }
+      const profileId = styleCtx.bindings.find(b => b.name === name && b.targetType === "novel")?.id;
+      if (profileId && target) { await api.delete(`/styles/${profileId}/bind/${target.id}`); loadStyles(); }
     } catch {}
   }
 

@@ -19,9 +19,7 @@ export interface UserPreferences {
     preferredPerspective: string;
     preferredPace: string;
     preferredTone: string;
-    typicalChapterCount: number | null;
-    preferredVolumes?: number | null;
-    preferredChaptersPerVolume?: number | null;
+    estimatedChapterCount: number | null;
     defaultChapterLength: number | null;
     creationHistory: Array<{ title: string; genre: string; createdAt: string }>;
     defaultProvider?: "deepseek" | "openai" | "anthropic";
@@ -38,8 +36,8 @@ const defaults: UserPreferences = {
     favoriteGenres: [],
     preferredPerspective: "third_person",
     preferredPace: "balanced",
-    preferredTone: "",
-    typicalChapterCount: null,
+    preferredTone: "dramatic",
+    estimatedChapterCount: null,
     defaultChapterLength: 3000,
     creationHistory: [],
     providerModels: {},

@@ -299,7 +299,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
                     <div className="space-y-1">
                       {scores.issues.map((iss, i) => (
                         <div key={i} className="rounded border border-amber-100 bg-amber-50/50 p-1.5 text-xs">
-                          <span className={cn("px-1 py-0.5 rounded mr-1", iss.severity === "high" ? "bg-red-100 text-red-700" : iss.severity === "medium" ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-600")}>{SEVERITY_LABEL[iss.severity] ?? iss.severity}</span>
+                          <span className={cn("px-1 py-0.5 rounded mr-1", iss.severity === "high" ? "bg-red-100 text-red-700" : iss.severity === "medium" ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-600")}>{SEVERITY_LABEL[iss.severity as keyof typeof SEVERITY_LABEL] ?? iss.severity}</span>
                           <span className="text-amber-800">{iss.description}</span>
                           <div className="text-amber-600 mt-0.5 text-[10px] italic">{iss.fixSuggestion}</div>
                         </div>

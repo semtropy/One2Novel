@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { api } from "../app/api";
 import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import type { ProviderInfo } from "../components/settings/ProviderConfigDialog";
+import { StyleDomain } from "../components/planning/StyleDomain";
 
 const SELECT_STYLE = "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:ring-1 focus:ring-indigo-200 focus:outline-none bg-white";
 
 export const MODEL_OPTIONS = [
   { provider: "deepseek", label: "DeepSeek", models: ["deepseek-chat", "deepseek-reasoner"] },
-  { provider: "openai", label: "OpenAI", models: ["gpt-5-mini", "gpt-5", "gpt-4o"] },
+  { provider: "openai", label: "OpenAI", models: ["gpt-4.1-mini", "gpt-4.1", "gpt-4o"] },
   { provider: "anthropic", label: "Anthropic Claude", models: ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"] },
   { provider: "gemini", label: "Google Gemini", models: ["gemini-2.5-flash", "gemini-2.5-pro"] },
   { provider: "qwen", label: "通义千问", models: ["qwen-plus", "qwen-max"] },
@@ -225,42 +226,24 @@ export function SettingsPage() {
                 />
               </div>
             </div>
-            <div className="flex gap-4">
-              <div className="w-1/3">
-                <div className="text-xs text-slate-500 font-medium mb-1.5">默认目标章数</div>
-                <input type="number" min={1} max={1000}
-                  value={(prefs.typicalChapterCount as number | null) ?? ""}
-                  onChange={e => { const v = e.target.value ? parseInt(e.target.value) || null : null; setPrefs(p => ({ ...p, typicalChapterCount: v })); }}
-                  onBlur={() => savePref("typicalChapterCount", prefs.typicalChapterCount)}
-                  placeholder="不预设"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
-                />
-                <p className="text-xs text-slate-400 mt-1">留空则不预设总章数</p>
-              </div>
-              <div className="w-1/3">
-                <div className="text-xs text-slate-500 font-medium mb-1.5">默认卷数</div>
-                <input type="number" min={2} max={8}
-                  value={(prefs.preferredVolumes as number | null) ?? ""}
-                  onChange={e => { const v = e.target.value ? parseInt(e.target.value) || null : null; setPrefs(p => ({ ...p, preferredVolumes: v })); }}
-                  onBlur={() => savePref("preferredVolumes", prefs.preferredVolumes)}
-                  placeholder="2-8"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
-                />
-                <p className="text-xs text-slate-400 mt-1">留空则根据章数自动计算</p>
-              </div>
-              <div className="w-1/3">
-                <div className="text-xs text-slate-500 font-medium mb-1.5">每卷章数</div>
-                <input type="number" min={2} max={100}
-                  value={(prefs.preferredChaptersPerVolume as number | null) ?? ""}
-                  onChange={e => { const v = e.target.value ? parseInt(e.target.value) || null : null; setPrefs(p => ({ ...p, preferredChaptersPerVolume: v })); }}
-                  onBlur={() => savePref("preferredChaptersPerVolume", prefs.preferredChaptersPerVolume)}
-                  placeholder="12"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
-                />
-                <p className="text-xs text-slate-400 mt-1">默认12，留空自动计算</p>
-              </div>
+            <div>
+              <div className="text-xs text-slate-500 font-medium mb-1.5">目标总章数</div>
+              <input type="number" min={50} max={1000}
+                value={(prefs.estimatedChapterCount as number) ?? 333}
+                onChange={e => { const v = parseInt(e.target.value) || 333; setPrefs(p => ({ ...p, estimatedChapterCount: v })); }}
+                onBlur={() => savePref("estimatedChapterCount", prefs.estimatedChapterCount)}
+                className="w-1/3 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
+              />
+              <p className="text-xs text-slate-400 mt-1">长篇网文建议 100-500 章，回环骨架根据此数值自动计算回环数量</p>
             </div>
           </div>
+        </section>
+
+        {/* ════════════════ 文风配置 ════════════════ */}
+        <section className="rounded-xl border border-slate-200 bg-white p-6">
+          <h3 className="text-sm font-semibold text-slate-800 mb-1">文风配置</h3>
+          <p className="text-xs text-slate-400 mb-5">创建和管理写作风格配置文件，上传范文让 AI 学习你的写作风格，然后在小说中绑定使用。</p>
+          <StyleDomain novelId="" />
         </section>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BookOpen, FileText, FileJson } from "lucide-react";
 import { useExportPreview, useExportNovel } from "../../api/novel";
 
 interface Props {
@@ -6,11 +7,18 @@ interface Props {
   onClose: () => void;
 }
 
+const FORMAT_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
+  epub: BookOpen,
+  md: FileText,
+  txt: FileText,
+  json: FileJson,
+};
+
 const FORMATS = [
-  { key: "epub", label: "EPUB 电子书", desc: "分章节、带目录、可导入 Kindle / Apple Books / 微信读书", icon: "📖" },
-  { key: "md", label: "Markdown", desc: "带 YAML 元数据 + 目录，可导入 Obsidian / Notion", icon: "📝" },
-  { key: "txt", label: "纯文本 TXT", desc: "章节分隔，通用格式，适合在任何设备阅读", icon: "📄" },
-  { key: "json", label: "JSON 完整备份", desc: "含全部元数据/角色/大纲，可重新导入系统", icon: "💾" },
+  { key: "epub", label: "EPUB 电子书", desc: "分章节、带目录、可导入 Kindle / Apple Books / 微信读书" },
+  { key: "md", label: "Markdown", desc: "带 YAML 元数据 + 目录，可导入 Obsidian / Notion" },
+  { key: "txt", label: "纯文本 TXT", desc: "章节分隔，通用格式，适合在任何设备阅读" },
+  { key: "json", label: "JSON 完整备份", desc: "含全部元数据/角色/大纲，可重新导入系统" },
 ];
 
 export default function ExportDialog({ novelId, onClose }: Props) {
@@ -74,7 +82,7 @@ export default function ExportDialog({ novelId, onClose }: Props) {
               />
               <div className="flex-1">
                 <div className="font-medium text-sm flex items-center gap-1.5">
-                  <span>{f.icon}</span> {f.label}
+                  {(() => { const Icon = FORMAT_ICONS[f.key]; return <Icon size={15} />; })()} {f.label}
                 </div>
                 <div className="text-xs text-gray-500 mt-0.5">{f.desc}</div>
               </div>

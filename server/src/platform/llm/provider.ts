@@ -47,21 +47,23 @@ export function createLLM(provider: LLMProvider, options?: { model?: string; tem
       });
 
     case "qwen": {
-      const apiKey = env.QWEN_API_KEY ?? env.DEEPSEEK_API_KEY;
+      if (!env.QWEN_API_KEY) throw new Error("Qwen API key not configured. Please set QWEN_API_KEY in Settings.");
       return new ChatOpenAI({
-        model: model ?? "qwen-plus",
+        model: model ?? env.QWEN_MODEL ?? "qwen-plus",
         temperature, maxTokens, timeout: 120000,
-        apiKey, configuration: { baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" },
+        apiKey: env.QWEN_API_KEY,
+        configuration: { baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" },
         ...(options?.responseFormat === "json_object" ? { modelKwargs: { response_format: { type: "json_object" as const } } } : {}),
       });
     }
 
     case "moonshot": {
-      const apiKey = env.MOONSHOT_API_KEY ?? env.OPENAI_API_KEY;
+      if (!env.MOONSHOT_API_KEY) throw new Error("Moonshot API key not configured. Please set MOONSHOT_API_KEY in Settings.");
       return new ChatOpenAI({
-        model: model ?? "moonshot-v1-8k",
+        model: model ?? env.MOONSHOT_MODEL ?? "moonshot-v1-8k",
         temperature, maxTokens, timeout: 120000,
-        apiKey, configuration: { baseURL: "https://api.moonshot.cn/v1" },
+        apiKey: env.MOONSHOT_API_KEY,
+        configuration: { baseURL: "https://api.moonshot.cn/v1" },
         ...(options?.responseFormat === "json_object" ? { modelKwargs: { response_format: { type: "json_object" as const } } } : {}),
       });
     }

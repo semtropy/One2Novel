@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import { createLLM, type LLMProvider } from "./provider";
 import { relaxGeneratedContentSchema } from "./generatedContentSchema";
 import {
@@ -9,6 +9,40 @@ import {
   getArrayElement,
   type ZodDefInner,
 } from "./zodIntrospect";
+
+// ─── Usage Extraction ──────────────────────────────────────
+
+/**
+ * Extract actual token usage from a LangChain AIMessage response.
+ * Different providers store usage in different metadata locations.
+ */
+function extractUsage(response: AIMessage): { inputTokens: number; outputTokens: number } {
+  const meta = response.response_metadata as Record<string, unknown>;
+  // DeepSeek / OpenAI style
+  if (meta?.tokenUsage) {
+    const tu = meta.tokenUsage as Record<string, number>;
+    return {
+      inputTokens: tu.inputTokens ?? tu.prompt_tokens ?? 0,
+      outputTokens: tu.outputTokens ?? tu.completion_tokens ?? 0,
+    };
+  }
+  // Anthropic style
+  if (meta?.usage) {
+    const u = meta.usage as Record<string, number>;
+    return {
+      inputTokens: (u.input_tokens ?? u.inputTokens ?? 0),
+      outputTokens: (u.output_tokens ?? u.outputTokens ?? 0),
+    };
+  }
+  // Fallback: estimate from content length (rough, but better than nothing)
+  const contentLen = typeof response.content === "string" ? response.content.length : 0;
+  return { inputTokens: 0, outputTokens: Math.ceil(contentLen / 2) };
+}
+
+export interface StructuredInvokeResult<T extends z.ZodType> {
+  result: z.output<T>;
+  usage: { inputTokens: number; outputTokens: number };
+}
 
 export interface StructuredInvokeOptions<T extends z.ZodType> {
   provider?: LLMProvider;
@@ -246,7 +280,7 @@ function buildRepairPrompt(lastError: string): string {
 
 export async function invokeStructuredLlm<T extends z.ZodType>(
   opts: StructuredInvokeOptions<T>,
-): Promise<z.infer<T>> {
+): Promise<StructuredInvokeResult<T>> {
   const provider = opts.provider ?? "deepseek";
   const maxRetries = opts.maxRetries ?? 3;
   const useJsonMode = provider === "deepseek" || provider === "openai";
@@ -273,6 +307,9 @@ export async function invokeStructuredLlm<T extends z.ZodType>(
         ? [...messages, new HumanMessage(buildRepairPrompt(lastError?.message ?? "Unknown format error"))]
         : messages;
       const response = await llm.invoke(repairMessages);
+
+      // Extract actual token usage from provider response metadata
+      const usage = extractUsage(response);
 
       const text = typeof response.content === "string"
         ? response.content
@@ -311,15 +348,15 @@ export async function invokeStructuredLlm<T extends z.ZodType>(
 
       // Phase 2: OP programmatic fixes
       const wrapped = tryWrapRawArray(parsed, opts.schema);
-      if (wrapped !== null) return wrapped as z.infer<T>;
+      if (wrapped !== null) return { result: wrapped as z.output<T>, usage };
 
       // Try relaxed parse
       const first = runtimeSchema.safeParse(parsed);
-      if (first.success) return first.data;
+      if (first.success) return { result: first.data, usage };
 
       // Try oversized array trim
       const trimmed = normalizeOversizedArrays(parsed, first.error, runtimeSchema);
-      if (trimmed) return trimmed.data as z.infer<T>;
+      if (trimmed) return { result: trimmed.data as z.output<T>, usage };
 
       // If still failing, fall through to retry
       lastError = first.error;

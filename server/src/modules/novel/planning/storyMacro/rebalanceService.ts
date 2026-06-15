@@ -28,7 +28,7 @@ export async function rebalanceVolume(novelId: string, volumeId: string): Promis
   const prisma = getPrisma();
   const volume = await prisma.volume.findUnique({
     where: { id: volumeId },
-    include: { draftPlans: { orderBy: { chapterOrder: "asc" } }, chapterPlans: { orderBy: { chapterOrder: "asc" } } },
+    include: { chapterPlans: { orderBy: { chapterOrder: "asc" } } },
   });
   const characters = await prisma.novelCharacter.findMany({ where: { novelId } });
   const payoffs = await prisma.payoffLedgerItem.findMany({ where: { novelId } });
@@ -39,7 +39,7 @@ export async function rebalanceVolume(novelId: string, volumeId: string): Promis
     return `第${p.chapterOrder}章《${p.title}》：${p.summary ?? ""}`;
   }).join("\n");
 
-  const planned = volume.draftPlans.map(p =>
+  const planned = volume.chapterPlans.map(p =>
     `第${p.chapterOrder}章《${p.title}》：${p.summary ?? ""}`).join("\n");
 
   return aiInvoke({

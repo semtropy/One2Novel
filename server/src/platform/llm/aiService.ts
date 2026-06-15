@@ -5,6 +5,8 @@ import { generateFormatHint } from "./schemaFormatHint";
 import { selectContextBlocks } from "./contextSelection";
 import { renderSelectedContextBlocks } from "./renderContextBlocks";
 import { injectSkillRules } from "./skillRules";
+import { estimateTokens } from "./tokenCounter";
+import { logEventError } from "../logging/eventErrorLog";
 import type { PromptContextBlock } from "./promptTypes";
 
 export type TaskType = "writer" | "reviewer" | "planner" | "extractor" | "compiler" | "repairer";
@@ -13,20 +15,26 @@ export type TaskType = "writer" | "reviewer" | "planner" | "extractor" | "compil
 // Preferred Provider
 // ═══════════════════════════════════════════════════════════
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+function loadPreferencesModule() {
+  // tsc compiles to CommonJS where require() is natively available
+  return require("../../modules/settings/preferences") as {
+    getPreferences: () => { defaultProvider?: string; [key: string]: unknown };
+  };
+}
+
 export function getPreferredProvider(): LLMProvider {
   try {
-    const { getPreferences } = require("../../modules/settings/preferences");
-    const prefs = getPreferences();
-    const raw = (prefs?.defaultProvider as string) ?? "deepseek";
+    const { getPreferences } = loadPreferencesModule();
+    const raw = getPreferences().defaultProvider ?? "deepseek";
     return (raw.includes(":") ? raw.split(":")[0] : raw) as LLMProvider;
   } catch { return "deepseek"; }
 }
 
 export function getPreferredModel(): string | undefined {
   try {
-    const { getPreferences } = require("../../modules/settings/preferences");
-    const prefs = getPreferences();
-    const raw = (prefs?.defaultProvider as string) ?? "";
+    const { getPreferences } = loadPreferencesModule();
+    const raw = getPreferences().defaultProvider ?? "";
     const parts = raw.split(":");
     return parts.length > 1 ? parts.slice(1).join(":") : undefined;
   } catch { return undefined; }
@@ -103,16 +111,14 @@ const TASK_MODEL: Record<TaskType, { temperature: number; maxTokens: number }> =
 
 promptRegistry.register({
   id: "novel.story-core.generate",
-  taskType: "planner", version: "v1",
+  taskType: "planner", version: "v2",
   systemPrompt: [
     "你是资深小说策划编辑。根据用户提供的一句话灵感（+可选书名/题材），补全故事核心定位。",
     "",
     "字段说明：",
-    "- premise（前提）：主角被困的处境 + 故事根本驱动力。回答「这个故事为什么能开始」。（80-150字）",
-    "- mainArc（主线）：贯穿全书的核心剧情线，从起点到终点的变化弧线。回答「这个故事到底讲什么」。（80-150字）",
-    "  premise 和 mainArc 必须有本质区别：premise 是初始困局，mainArc 是全程路径与演变。",
-    "- mysteryBox（核心悬念）：最关键但暂时无法揭晓的未知，持续牵引读者。回答「读者为什么想知道后面」。（50-100字）",
-    "- endingDirection（结局方向）：结局气质与情感落点。回答「最终走向什么结局」。（50-100字）",
+    "- storySummary（故事简介）：主角的初始处境、核心冲突与贯穿全书的故事走向。回答「这个故事讲什么、为什么能一直写下去」。（100-200字）",
+    "- centralQuestion（核心悬念）：全书最核心的未解之谜，持续牵引读者追读。回答「读者为什么想知道后面」。应包含谜面与暗示性的谜底方向。（50-120字）",
+    "- endingDirection（结局方向）：故事终局的气质与情感落点。可以包含最终敌人、主角终极形态、世界最终状态等元素。（50-150字）",
     "- genre：题材（悬疑/言情/奇幻/科幻/历史/都市/武侠/恐怖/其他）",
     "- narrativePov：视角（first_person=第一人称/third_person=第三人称/mixed=混合）",
     "- pacePreference：节奏（slow=舒缓/balanced=均衡/fast=快节奏）",
@@ -127,34 +133,7 @@ promptRegistry.register({
   ].join("\n"),
 });
 
-// ── Planning: Outline ────────────────────────────────────
-
-promptRegistry.register({
-  id: "novel.outline.generate",
-  taskType: "planner", version: "v4",
-  systemPrompt: [
-    "你是资深小说作者+剧情策划编辑。根据已确定的故事核心（前提/主线/悬念/结局方向），生成卷→章结构蓝图。",
-    "已提供故事核心作为硬约束——你只需生成卷和章节结构，不得修改或重新生成前提/主线/悬念/结局。",
-    "",
-    "核心原则：",
-    "1. 优先做冲突重构和叙事驱动构建，不要把重点放在设定说明。",
-    "2. 所有字段都服务于「这本书为什么能一直写下去」。",
-    "3. 冲突引擎必须回答：剧情为何能不断升级、变形、反转、继续推进。",
-    "4. 进度循环必须体现：发现→介入→升级→反噬/反转→再发现。",
-    "5. 设置一个持续牵引读者的核心悬念，最关键但暂时无法完全知道的事。",
-    "6. 设计2-3个具有画面感、冲突性和后续可扩展性的高张力场面种子。",
-    "",
-    "题材适配：",
-    "悬疑/推理→信息揭示节奏、认知误导、真相分层推进。",
-    "成长→阶段性认知变化、代价、认知纠偏与自我重构。",
-    "奇幻/科幻→世界观规则必须一致，设定不能随意添加。",
-    "",
-    "缺失处理：信息不足时不要假装完整，给出最稳妥克制的结果。",
-    "2-4卷，每卷5-8章，章节标题<=8字。",
-  ].join("\n"),
-});
-
-// ── Planning: Blueprint ──────────────────────────────────
+// ── Planning: Blueprint (unified — replaces deprecated outline.generate) ──
 
 promptRegistry.register({
   id: "novel.blueprint.generate",
@@ -187,7 +166,6 @@ promptRegistry.register({
     "- bookSellingPoint：核心卖点",
     "- first30ChapterPromise：前30章承诺",
     "- genre：题材（悬疑/言情/奇幻/科幻/历史/都市/武侠/恐怖/其他）",
-    "- writingMode：original（原创）或 continuation（续写）",
     "- narrativePov：first_person（第一人称）/ third_person（第三人称）/ mixed（混合）",
     "- pacePreference：slow（舒缓）/ balanced（均衡）/ fast（快节奏）",
     "- styleTone：风格基调，一段话",
@@ -302,6 +280,143 @@ promptRegistry.register({
     "最后给出structureDiagnosis(50-100字)，诊断本卷节奏是否合理。",
     "",
     "beats数组必须包含每一章，不能跳过或遗漏。",
+  ].join("\n"),
+});
+
+// ── Planning: Loop Skeleton Generation (Phase 1) ──────────
+
+promptRegistry.register({
+  id: "novel.loop-skeleton.generate",
+  taskType: "planner", version: "v1",
+  systemPrompt: [
+    "你是资深网文架构师。根据架构类型和故事设定，为长篇网文生成完整的回环骨架。",
+    "",
+    "每一轮回环必须包含：",
+    "- triggerEvent：本轮触发事件（是什么开启了这轮回环）",
+    "- dungeonName：副本/事件的具体名称（要有辨识度）",
+    "- estimatedChapters：本章数（6-25章，随回环推进可递增）",
+    "- settlementContent：结算内容（具体可感知的收获，不能泛泛）",
+    "- scaleUpDirection：舞台升级方向（下一轮比这轮「大」在哪）",
+    "",
+    "生成原则：",
+    "1. 回环递进——每轮回环都比上一轮舞台更大、敌人更强、代价更高",
+    "2. 触发升级——前半轮回环以外部事件为主，后半轮回环以主角主动探索为主",
+    "3. 结算具体——每轮结算内容必须具体且与后续回环有关联",
+    "4. 指向终局——最终轮回环应指向全书最大秘密和最终敌人",
+    "5. 数量达标——必须生成指定数量的回环，不能少也不能多",
+  ].join("\n"),
+});
+
+// ── Planning: Volume Expansion (Phase 1) ──────────────────
+
+promptRegistry.register({
+  id: "novel.volume.expand",
+  taskType: "planner", version: "v1",
+  systemPrompt: [
+    "你是资深网文分章策划师。将一回环展开为详细的卷章结构，包含阶段分解和每章的具体规划。",
+    "",
+    "必须按架构的阶段顺序分配章节，不得跳过任何阶段。",
+    "每章输出：",
+    "- title：≤8字",
+    "- summary：本章概要（20-40字）",
+    "- loopPhase：所属回环阶段",
+    "- chapterType：advance | transition | cooldown | climax",
+    "- expectation：本章目标（15-30字）",
+    "- coreEvent：核心事件一句话（15-30字）",
+    "- endingHook：章尾钩子（15-30字），推动读者读下一章",
+    "- coolPointType（可选）：collect | strategy | verify | reveal | upgrade | face_slap",
+    "- hookType（可选）：short_term | medium_term",
+    "",
+    "章节分配原则：",
+    "1. advance（推进章）≈60%——有实质剧情推进",
+    "2. transition（过渡章）≈20%——日常/修炼/旅行",
+    "3. cooldown（冷却章）≥1章——高潮后的情绪缓冲",
+    "4. climax（高潮章）1-2章——决战/揭示/仪式",
+    "5. 章与章之间必须有因果推进关系",
+    "6. 每章结尾必须有钩子",
+  ].join("\n"),
+});
+
+// ── Reference: Loop Inference (Phase 4) ──────────────────
+
+promptRegistry.register({
+  id: "reference.loop.infer",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是网文结构分析师。根据参考书的章节列表和用户已标注的回环边界，推断其余章节可能的回环起止点。",
+    "",
+    "回环（Loop）特征：",
+    "- 起点：新副本/新任务/新危机的引入章节",
+    "- 终点：该阶段冲突解决、收获结算的章节",
+    "- 相邻回环之间通常有因果递进关系",
+    "",
+    "输出：loopBoundaries 数组，每条包含 chapterIndex（章节序号）和 type（\"start\" 或 \"end\"）。",
+    "如果用户已有标注，优先保持用户标注不变，只补充推断新的边界。",
+    "不要标注用户已有的边界。",
+  ].join("\n"),
+});
+
+promptRegistry.register({
+  id: "reference.coolpoint.infer",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是网文节奏分析师。根据参考书的章节片段，识别高爽点和低爽点章节。",
+    "",
+    "高爽点特征：",
+    "- 主角获得重要能力/物品/信息",
+    "- 打脸/碾压对手",
+    "- 关键真相揭示",
+    "- 战斗胜利/实力突破",
+    "- 读者会产生强烈满足感的章节",
+    "",
+    "低爽点特征：",
+    "- 纯过渡/日常/旅行章节",
+    "- 大段说明性文字/设定堆砌",
+    "- 节奏拖沓、读者可能跳过的章节",
+    "",
+    "输出两个数组：highCoolChapters 和 lowCoolChapters，每个元素是章节序号（整数）。",
+    "如果用户已有标注，不要重复标注，只补充新的。",
+  ].join("\n"),
+});
+
+// ── Reference: Writing Assets Extraction (Phase: new) ──────
+promptRegistry.register({
+  id: "reference.writing_assets.extract",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是网文写作技法分析师。分析对标小说的写作技法，从五个维度提取可模仿的写法规则。",
+    "",
+    "## 提取维度",
+    "1. 叙事技法（narrativeAssets）：视角切换、伏笔铺垫、信息揭示节奏、场景转换方式、倒叙/插叙使用",
+    "2. 语言风格（languageAssets）：句式长短偏好、修辞手法、描写密度、语体风格（口语/书面）、开篇/收尾模式",
+    "3. 角色塑造（characterAssets）：角色反应模式、内心独白风格、角色出场方式、情感表达技法",
+    "4. 节奏控制（rhythmAssets）：章节节奏模型、高潮铺垫方式、动作场景节奏、悬念钩子密度、冷却章节安排",
+    "5. 反AI特征（antiAiAssets）：独特语感、反套路写法、对话自然度、节奏变化技巧",
+    "",
+    "## 输出要求",
+    "- 每个维度最多5条技法",
+    "- 每条技法给出 category（子类别标签）、observation（对标书做法，50-150字）、rule（可操作模仿规则，50-150字）、confidence（置信度0-1）",
+    "- overallStyleDescription 给出整体风格一句话描述（50-150字）",
+    "- 规则必须具体可操作，禁止空洞评价如「写得很好」、「节奏合适」",
+  ].join("\n"),
+});
+
+// ── Production: Volume Compression (Phase 2) ─────────────
+
+promptRegistry.register({
+  id: "novel.volume.compress",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是小说编辑，负责对已完成的卷进行结构化压缩。",
+    "",
+    "输出要求：",
+    "- summary：200-300字该卷概括，包含核心事件、角色弧线和主题推进",
+    "- keyEvents：3-5个关键事件（每句15-30字）",
+    "- characterChanges：角色在本卷中的变化（如「张三从怀疑到信任」「李四获得新能力」）",
+    "- unresolvedPayoffs：本卷埋下但尚未回收的伏笔",
+    "- archiveDigest：1-2句话（50字内），作为历史骨架存储。应回答「这卷发生了什么，为什么重要」",
+    "",
+    "只输出JSON。",
   ].join("\n"),
 });
 
@@ -479,7 +594,7 @@ promptRegistry.register({
   id: "novel.scene-plan.generate",
   taskType: "planner", version: "v1",
   systemPrompt: [
-    "你是专业小说分镜师。将章节拆分为3-6个场景，每个场景是章节内的一个独立叙事单元。",
+    "你是专业小说分镜师。将章节拆分为2-4个场景，每个场景是章节内的一个独立叙事单元。",
     "",
     "【分镜原则】",
     "1. 场景之间必须有因果推进关系（前一场景的结果触发后一场景）",
@@ -637,6 +752,55 @@ promptRegistry.register({
     "5. 句式模板化：连续多句同主语→变换句式。",
     "",
     "只输出JSON，不要解释。",
+  ].join("\n"),
+});
+
+// ── Chapter-by-Chapter: Next Chapter Preview ───────────
+
+promptRegistry.register({
+  id: "novel.chapter.next-preview",
+  taskType: "planner", version: "v1",
+  systemPrompt: [
+    "你是资深网文策划编辑。根据前面已完成的章节摘要和当前卷的结构，生成下一章的写作概要。",
+    "",
+    "输出字段：",
+    "- chapterTitle：章节标题（≤8字）",
+    "- expectation：本章目标（1句话，15-30字）",
+    "- coreEvent：核心事件（1句话，15-30字）",
+    "- endingHook：章尾钩子（1句话，15-30字）",
+    "- coolPointType：建议爽点类型（collect/strategy/verify/reveal/upgrade/face_slap）",
+    "- sceneCount：建议场景数（2-4）",
+    "",
+    "原则：",
+    "1. 必须承接上一章的结尾（如果提供了上一章内容）",
+    "2. 必须推进卷概要中的阶段性目标",
+    "3. 钩子必须具体——不是泛泛的'接下来会发生什么'",
+    "4. 考虑已有爽点分配，避免连续同一类型",
+    "",
+    "只输出JSON。",
+  ].join("\n"),
+});
+
+// ── Inline Writing Suggestions ─────────────────────────
+
+promptRegistry.register({
+  id: "novel.chapter.inline-suggest",
+  taskType: "compiler", version: "v1",
+  systemPrompt: [
+    "你是资深中文小说编辑。针对用户选中的一段文字，给出简短的写作建议。",
+    "",
+    "只分析以下维度中最重要的1-2个问题：",
+    "- 节奏：段落是否过长/过短，句式是否单调",
+    "- 对话：是否有信息量，是否推动剧情",
+    "- 描写：是否有感官细节，空间感是否清晰",
+    "- AI痕迹：是否有套话/成语堆砌/总结句",
+    "- 情感表达：是否用动作间接表现而非直接陈述",
+    "",
+    "输出格式：{ suggestion: string, severity: 'low'|'medium', focus: string }",
+    "suggestion长度不超过50字。severity表示问题的严重程度。focus是关注维度（节奏/对话/描写/AI痕迹/情感）。",
+    "如果没有明显问题，输出 { suggestion: '这段文字没有明显问题', severity: 'low', focus: 'pass' }。",
+    "",
+    "只输出JSON。",
   ].join("\n"),
 });
 
@@ -810,29 +974,6 @@ promptRegistry.register({
   ].join("\n"),
 });
 
-// ── Chat: Assistant ─────────────────────────────────────
-
-promptRegistry.register({
-  id: "chat.assistant",
-  taskType: "planner", version: "v1",
-  systemPrompt: [
-    "你是小说创作助手。理解用户的自然语言意图，以友好口语化的方式回复。",
-    "",
-    "你可以帮用户做：",
-    "- create_novel: 创建新小说（需要书名、题材、灵感描述）",
-    "- generate_framing: 为当前小说生成书级定位",
-    "- generate_outline: 生成故事大纲",
-    "- generate_characters: 提取角色",
-    "- write_chapter: 写章节",
-    "- review: 审查章节",
-    "- chat: 闲聊或解答创作问题",
-    "- status: 查看当前状态",
-    "",
-    "回复JSON: { intent, novelId?, chapterNumber?, response, actions?: [{ type, label, args? }] }",
-    "response要像朋友聊天一样自然，用中文。actions是可选的快捷操作按钮。只输出JSON。",
-  ].join("\n"),
-});
-
 // ── Post-Write: Chapter Summary ──────────────────────────
 
 promptRegistry.register({
@@ -879,6 +1020,10 @@ export async function aiInvoke<T extends z.ZodType>(opts: {
   maxTokens?: number;
   /** Max retries on validation failure */
   maxRetries?: number;
+  /** Phase 5: Novel ID for cost tracking */
+  novelId?: string;
+  /** Phase 5: Chapter ID for cost tracking */
+  chapterId?: string;
 }) {
   const asset = promptRegistry.get(opts.assetId);
   if (!asset) throw new Error(`Prompt asset not found: ${opts.assetId}`);
@@ -897,7 +1042,7 @@ export async function aiInvoke<T extends z.ZodType>(opts: {
     ? formatHint + "\n\n---\n\n" + rawSystemPrompt
     : rawSystemPrompt;
 
-  return invokeStructuredLlm({
+  const { result, usage } = await invokeStructuredLlm({
     provider: getPreferredProvider(),
     model: getPreferredModel(),
     temperature: opts.temperature ?? route.temperature,
@@ -907,6 +1052,25 @@ export async function aiInvoke<T extends z.ZodType>(opts: {
     userPrompt: opts.userPrompt,
     schema: opts.schema,
   });
+
+  // Phase 5: Record cost if novel context is available (uses actual API usage)
+  if (opts.novelId) {
+    import("../../modules/novel/production/costTracker").then(m =>
+      m.recordCost({
+        novelId: opts.novelId!,
+        chapterId: opts.chapterId,
+        assetId: opts.assetId,
+        inputTokens: usage.inputTokens || estimateTokens(systemPrompt + opts.userPrompt),
+        outputTokens: usage.outputTokens || estimateTokens(JSON.stringify(result)),
+        provider: getPreferredProvider(),
+        model: getPreferredModel(),
+      })
+    ).catch(e => {
+      logEventError("cost-tracker", { novelId: opts.novelId, assetId: opts.assetId }, e);
+    });
+  }
+
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -949,7 +1113,7 @@ export async function invokeAsset<T extends z.ZodType>(opts: {
     ? formatHint + "\n\n---\n\n" + rawSystemPrompt
     : rawSystemPrompt;
 
-  const output = await invokeStructuredLlm({
+  const { result: output, usage } = await invokeStructuredLlm({
     provider: getPreferredProvider(),
     model: getPreferredModel(),
     temperature: opts.temperature ?? route.temperature,
@@ -970,9 +1134,12 @@ export async function invokeAsset<T extends z.ZodType>(opts: {
   };
 }
 
+// Token estimation is imported from ./tokenCounter — single source of truth
+
 /**
  * Compile a prompt asset into { systemPrompt, userPrompt } for streaming.
- * Does NOT call the LLM — the caller handles the stream via llm.stream().
+ * Streaming-only: does NOT call the LLM. For structured (non-streaming) calls,
+ * use aiInvoke() or invokeAsset() which go through invokeStructuredLlm().
  */
 export function compileAsset(opts: {
   assetId: string;

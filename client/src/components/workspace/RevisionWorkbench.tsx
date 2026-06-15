@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { X, RefreshCw, AlertTriangle, Play, ChevronDown, ChevronRight } from "lucide-react";
 import { api } from "../../app/api";
 import { OPERATION_LABELS, type RevisionOperation, type RewriteCandidate } from "../../api/revision";
+import { escapeHtml } from "../../lib/html";
 import { cn } from "../../lib/cn";
 
 interface Props {
@@ -155,9 +156,10 @@ export function RevisionWorkbench({ novelId, chapterId, initialOperation, select
                   <div className="p-4">
                     <div className="text-sm leading-relaxed whitespace-pre-wrap font-serif">
                       {candidate.diffChunks.map((chunk, i) => {
-                        if (chunk.type === "equal") return <span key={i} className="text-slate-500">{chunk.text}</span>;
-                        if (chunk.type === "insert") return <span key={i} className="bg-green-50 text-green-800 underline decoration-green-400 decoration-dotted">{chunk.text}</span>;
-                        return <span key={i} className="bg-red-50 text-red-400 line-through decoration-red-300">{chunk.text}</span>;
+                        const safe = escapeHtml(chunk.text);
+                        if (chunk.type === "equal") return <span key={i} className="text-slate-500">{safe}</span>;
+                        if (chunk.type === "insert") return <span key={i} className="bg-green-50 text-green-800 underline decoration-green-400 decoration-dotted">{safe}</span>;
+                        return <span key={i} className="bg-red-50 text-red-400 line-through decoration-red-300">{safe}</span>;
                       })}
                     </div>
                     {/* Candidate meta */}

@@ -1,39 +1,38 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { useNovel, useUpdateNovel } from "../api/novel";
+import { useParams, useNavigate } from "react-router-dom";
+import { useNovel } from "../api/novel";
 import { api } from "../app/api";
 import { useQueryClient } from "@tanstack/react-query";
-import { StorySeedPanel } from "../components/planning/StorySeedPanel";
-import { BlueprintPanel } from "../components/planning/BlueprintPanel";
-import { CharacterPanel } from "../components/characters/CharacterPanel";
+import { WritingDashboard } from "../components/workspace/WritingDashboard";
+import { NextChapterPreview } from "../components/workspace/NextChapterPreview";
+import { ContextDebugPanel } from "../components/workspace/ContextDebugPanel";
+import { PlanningQuickDrawer } from "../components/workspace/PlanningQuickDrawer";
+import { ChapterDiffModal } from "../components/workspace/ChapterDiffModal";
 import { ChapterWritePanel } from "../components/workspace/ChapterWritePanel";
 import { ContextPanel } from "../components/workspace/ContextPanel";
 import { BottomPanel } from "../components/workspace/BottomPanel";
 import { type WorkspaceDiagnosis } from "../api/revision";
-import { AdvancedSettings } from "../components/planning/AdvancedSettings";
-import { BottomLockBanner } from "../components/planning/BottomLockBanner";
 import { ProgressBar } from "../components/novel/ProgressBar";
 import { DirectorPanel } from "../components/workspace/DirectorPanel";
 import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
-import { AlertTriangle, List, PenLine, Download, BarChart3, Trash2, Plus } from "lucide-react";
+import { AlertTriangle, PenLine, Download, BarChart3, Trash2, Plus, ShieldCheck, Coins, Clock, X } from "lucide-react";
+import { useCostSummary, useCompletionReadiness } from "../api/novel";
 import ExportDialog from "../components/workspace/ExportDialog";
-import StatisticsDashboard from "../components/workspace/StatisticsDashboard";
+import { StatisticsDashboard } from "../components/workspace/StatisticsDashboard";
 import { cn } from "../lib/cn";
-
-type Tab = "planning" | "writing";
 
 export function NovelWorkspacePage() {
   const { novelId } = useParams<{ novelId: string }>();
+  const navigate = useNavigate();
   const { data: novel, isLoading, error } = useNovel(novelId);
   const qc = useQueryClient();
-  const updateNovel = useUpdateNovel();
-  const [inspiration, setInspiration] = useState("");
-  const [tab, setTab] = useState<Tab>("planning");
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [deleteChapterId, setDeleteChapterId] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   // ─── Review + Diagnosis state (lifted from ChapterWritePanel) ───
   const [quality, setQuality] = useState<Record<string, unknown> | null>(null);
@@ -69,6 +68,8 @@ export function NovelWorkspacePage() {
   }
 
   // ALL hooks MUST be before any conditional returns (React rule)
+  const { data: costSummary } = useCostSummary(novelId);
+  const { data: completionReadiness } = useCompletionReadiness(novelId);
   const allChapters = novel?.chapters ?? [];
 
   type ChapterWithVol = { id: string; order: number; title: string; content?: string | null; chapterStatus: string; chapterOrder: number };
@@ -121,6 +122,18 @@ export function NovelWorkspacePage() {
       {/* Dialogs */}
       {showExport && <ExportDialog novelId={novel.id} onClose={() => setShowExport(false)} />}
       {showStats && <StatisticsDashboard novelId={novel.id} onClose={() => setShowStats(false)} />}
+      {showDiff && selectedChapterId && <ChapterDiffModal novelId={novel.id} chapterId={selectedChapterId} onClose={() => setShowDiff(false)} />}
+      {showDashboard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowDashboard(false)}>
+          <div className="w-[42rem] max-h-[85vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-800">写作仪表盘</h3>
+              <button onClick={() => setShowDashboard(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+            <WritingDashboard novelId={novel.id} chapterId={selectedChapterId ?? null} />
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between mb-3">
@@ -130,64 +143,63 @@ export function NovelWorkspacePage() {
           </div>
           <div className="flex items-center gap-2 mt-1">
             {novel.genre && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{novel.genre}</span>}
+            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-600 font-medium">长篇</span>
             <span className="text-xs text-slate-400">全书 {totalWords.toLocaleString()} 字</span>
             <span className="text-xs text-slate-300">|</span>
             <span className="text-xs text-slate-400">{allChapters.filter(c => c.chapterStatus === "completed").length}/{allChapters.length} 章</span>
+            {completionReadiness && (
+              <>
+                <span className="text-xs text-slate-300">|</span>
+                <span className={cn(
+                  "text-xs font-medium",
+                  completionReadiness.readinessVerdict === "ready" ? "text-green-500" :
+                  completionReadiness.readinessVerdict === "close" ? "text-amber-500" :
+                  "text-slate-400",
+                )} title={`待回收伏笔: ${completionReadiness.unrecycledPayoffs} · 角色弧线: ${completionReadiness.characterArcsComplete}/${completionReadiness.totalCharacterArcs} · 预计剩余: ${completionReadiness.estimatedRemainingChapters ?? "?"}章`}>
+                  {completionReadiness.readinessVerdict === "ready" ? "可完本" :
+                   completionReadiness.readinessVerdict === "close" ? "接近完本" :
+                   `完本度 ${completionReadiness.completionPercent.toFixed(0)}%`}
+                </span>
+              </>
+            )}
           </div>
         </div>
         <div className="shrink-0">
           <ProgressBar steps={(() => {
-            const n = novel ?? {};
-            const hasFraming = !!(n.targetAudience || n.bookSellingPoint);
-            const hasOutline = !!n.structuredOutline;
-            const hasChars = Array.isArray(n.characters) && n.characters.length > 0;
+            const hasCore = !!(novel.storySummary || novel.centralQuestion);
+            const hasChars = (novel.characters?.length ?? 0) > 0;
+            const hasOutline = !!novel.structuredOutline;
             const hasWritten = allChapters.some(c => c.chapterStatus === "completed");
             const allDone = allChapters.length > 0 && allChapters.every(c => c.chapterStatus === "completed");
             return [
-              { key: "framing", label: "定位", done: hasFraming, current: !hasFraming },
-              { key: "characters", label: "角色", done: hasChars, current: hasFraming && !hasChars },
+              { key: "core", label: "核心", done: hasCore, current: !hasCore },
+              { key: "chars", label: "角色", done: hasChars, current: hasCore && !hasChars },
               { key: "outline", label: "大纲", done: hasOutline, current: hasChars && !hasOutline },
               { key: "writing", label: "写作", done: hasWritten, current: hasOutline && !hasWritten },
-              { key: "complete", label: "完本", done: allDone, current: false },
+              { key: "done", label: "完本", done: allDone, current: false },
             ];
           })()} />
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
-            <button onClick={() => setTab("planning")} className={cn("flex items-center gap-1 rounded-md px-3 py-1 text-sm font-medium transition-colors", tab === "planning" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}><List size={13} />规划</button>
-            <button onClick={() => setTab("writing")} className={cn("flex items-center gap-1 rounded-md px-3 py-1 text-sm font-medium transition-colors", tab === "writing" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700")}><PenLine size={13} />写作</button>
-          </div>
           <button onClick={() => setShowStats(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"><BarChart3 size={13} />统计</button>
-          <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"><Download size={13} />导出全书</button>
+          <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"><Download size={13} />导出</button>
+          {selectedChapterId && <button onClick={() => setShowDashboard(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50"><BarChart3 size={11} />仪表盘</button>}
+          {selectedChapterId && <button onClick={() => setShowDiff(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50"><Clock size={11} />历史</button>}
+          {costSummary && (
+            <div className="flex items-center gap-1 text-xs text-slate-400" title={`已消费 ¥${costSummary.totalEstimatedCost.toFixed(2)}`}>
+              <Coins size={11} />
+              ¥{costSummary.totalEstimatedCost.toFixed(1)}
+              {costSummary.budgetPercent && costSummary.budgetPercent > 80 && (
+                <span className="text-amber-500 font-medium">{costSummary.budgetPercent.toFixed(0)}%</span>
+              )}
+            </div>
+          )}
+          {selectedChapterId && <ContextDebugPanel novelId={novel.id} chapterId={selectedChapterId} />}
         </div>
       </div>
 
-      {tab === "planning" ? (
-        <div className="flex-1 overflow-y-auto pr-1 space-y-6">
-          {/* Inspiration — always at top */}
-          <section className="rounded-xl border border-amber-200 bg-amber-50/30 p-4">
-            <textarea
-              className="w-full bg-transparent text-sm text-slate-700 resize-none focus:outline-none placeholder:text-slate-400"
-              rows={2}
-              placeholder="一句话灵感…"
-              value={inspiration || novel.description || ""}
-              onChange={(e) => setInspiration(e.target.value)}
-              onBlur={() => {
-                if (inspiration && inspiration !== novel.description) {
-                  updateNovel.mutate({ id: novel.id, description: inspiration });
-                }
-              }}
-              onFocus={() => { if (!inspiration) setInspiration(novel.description ?? ""); }}
-            />
-          </section>
-          <section><StorySeedPanel novelId={novel.id} /></section>
-          <section><CharacterPanel novelId={novel.id} /></section>
-          <section><BlueprintPanel novelId={novel.id} /></section>
-          <AdvancedSettings novelId={novel.id} />
-          <BottomLockBanner novelId={novel.id} onStartWriting={() => setTab("writing")} />
-        </div>
-      ) : (
-        <div className="flex-1 flex gap-4 min-h-0">
+      {/* Writing workspace */}
+      <div className="flex-1 flex gap-4 min-h-0">
           {/* Left: Chapter list with volume word counts */}
           <div className="w-48 shrink-0 flex flex-col min-h-0">
             <div className="flex-1 min-h-0 rounded-xl border border-slate-200 bg-white flex flex-col">
@@ -205,16 +217,16 @@ export function NovelWorkspacePage() {
                     <div className="flex items-center gap-1">
                       <button onClick={async (e) => {
                         e.stopPropagation();
-                        try { await api.post(`/novels/${novelId}/volumes/${vol.sortOrder}/chapters/writing`); qc.invalidateQueries({ queryKey: ["novel", novelId] }); } catch {}
+                        try { await api.post(`/novels/${novelId}/volumes/${vol.sortOrder}/chapters`); qc.invalidateQueries({ queryKey: ["novel", novelId] }); } catch {}
                       }}
-                        className="text-slate-400 hover:text-blue-500 opacity-0 group-hover/volh:opacity-100 transition-opacity" title="新增章节">
+                        className="text-slate-400 hover:text-blue-500 opacity-60 hover:opacity-100 transition-opacity" title="新增章节">
                         <Plus size={12} />
                       </button>
                       <button onClick={async () => {
                         if (window.confirm(`删除"${vol.title}"及其所有章节？`)) {
-                          try { await api.delete(`/novels/${novelId}/volumes/${vol.sortOrder}/writing`); qc.invalidateQueries({ queryKey: ["novel", novelId] }); } catch {}
+                          try { await api.delete(`/novels/${novelId}/volumes/${vol.sortOrder}`); qc.invalidateQueries({ queryKey: ["novel", novelId] }); } catch {}
                         }
-                      }} className="text-slate-300 hover:text-red-500 opacity-0 group-hover/volh:opacity-100 transition-opacity"><Trash2 size={11} /></button>
+                      }} className="text-slate-300 hover:text-red-500 opacity-60 hover:opacity-100 transition-opacity"><Trash2 size={11} /></button>
                     </div>
                   </div>
                   {vol.chapters.map((ch) => (
@@ -233,7 +245,7 @@ export function NovelWorkspacePage() {
                           api.delete(`/novels/${novelId}/chapters/${ch.id}`).then(() => qc.invalidateQueries({ queryKey: ["novel", novelId] })).catch(() => {});
                         }
                       }}
-                        className="shrink-0 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                        className="shrink-0 text-slate-400 hover:text-red-500 opacity-60 hover:opacity-100 transition-opacity ml-1"
                         title={ch.content && ch.content.replace(/<[^>]*>/g, "").trim().length > 50 ? "删除（有内容，需确认）" : "删除空章节"}>
                         <Trash2 size={12} />
                       </button>
@@ -266,15 +278,21 @@ export function NovelWorkspacePage() {
                 </div>
               )}
             </div>
+            {/* Next Chapter Preview (when chapter is selected) */}
+            {selectedChapterId && (
+              <div className="shrink-0">
+                <NextChapterPreview novelId={novel.id} chapterId={selectedChapterId} />
+              </div>
+            )}
             {/* Fixed bottom panel: review + payoffs + scenes */}
             <div className="shrink-0 h-36 rounded-xl border border-slate-200 bg-white p-3">
               <BottomPanel novelId={novel.id} chapterId={selectedChapterId ?? null} />
             </div>
           </div>
 
-          {/* Right: Context Panel */}
-          <div className="w-56 shrink-0 flex flex-col min-h-0 rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <div className="flex-1 overflow-y-auto">
+          {/* Right: Context Panel (full height) */}
+          <div className="w-56 shrink-0 flex flex-col min-h-0">
+            <div className="flex-1 min-h-0 rounded-xl border border-slate-200 bg-white overflow-y-auto p-3">
               <ContextPanel
                 novelId={novel.id}
                 chapterId={selectedChapterId ?? null}
@@ -287,7 +305,9 @@ export function NovelWorkspacePage() {
             </div>
           </div>
         </div>
-      )}
+
+      {/* Planning quick-access drawer */}
+      <PlanningQuickDrawer novelId={novel.id} onSwitchToPlanning={() => navigate(`/novels/${novel.id}/plan`)} />
 
       {/* Delete chapter confirmation */}
       {deleteChapterId && (
@@ -305,3 +325,5 @@ export function NovelWorkspacePage() {
     </div>
   );
 }
+
+

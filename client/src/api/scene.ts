@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../app/api";
 
 export interface Scene {
   id: string;
@@ -20,35 +21,13 @@ export interface ScenePlan {
   enabled: boolean;
 }
 
-async function fetchScenePlan(novelId: string, chapterId: string): Promise<ScenePlan | null> {
-  const res = await fetch(`/api/novels/${novelId}/chapters/${chapterId}/scenes`);
-  if (!res.ok) throw new Error("获取分镜失败");
-  const json = await res.json();
-  return json.data ?? null;
-}
-
-async function generateScenePlan(novelId: string, chapterId: string): Promise<ScenePlan> {
-  const res = await fetch(`/api/novels/${novelId}/chapters/${chapterId}/scenes/generate`, { method: "POST" });
-  if (!res.ok) throw new Error("生成分镜失败");
-  const json = await res.json();
-  return json.data;
-}
-
-async function updateScenePlan(novelId: string, chapterId: string, scenes: Scene[]): Promise<ScenePlan> {
-  const res = await fetch(`/api/novels/${novelId}/chapters/${chapterId}/scenes`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scenes }),
-  });
-  if (!res.ok) throw new Error("保存分镜失败");
-  const json = await res.json();
-  return json.data;
-}
-
 export function useScenePlan(novelId: string, chapterId: string | undefined) {
   return useQuery({
     queryKey: ["scenePlan", novelId, chapterId],
-    queryFn: () => fetchScenePlan(novelId!, chapterId!),
+    queryFn: async () => {
+      const { data } = await api.get(`/novels/${novelId}/chapters/${chapterId}/scenes`);
+      return data.data as ScenePlan | null;
+    },
     enabled: !!novelId && !!chapterId,
   });
 }
@@ -56,7 +35,10 @@ export function useScenePlan(novelId: string, chapterId: string | undefined) {
 export function useGenerateScenePlan(novelId: string, chapterId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => generateScenePlan(novelId!, chapterId!),
+    mutationFn: async () => {
+      const { data } = await api.post(`/novels/${novelId}/chapters/${chapterId}/scenes/generate`);
+      return data.data as ScenePlan;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scenePlan", novelId, chapterId] });
     },
@@ -66,7 +48,10 @@ export function useGenerateScenePlan(novelId: string, chapterId: string | undefi
 export function useUpdateScenePlan(novelId: string, chapterId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (scenes: Scene[]) => updateScenePlan(novelId!, chapterId!, scenes),
+    mutationFn: async (scenes: Scene[]) => {
+      const { data } = await api.put(`/novels/${novelId}/chapters/${chapterId}/scenes`, { scenes });
+      return data.data as ScenePlan;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scenePlan", novelId, chapterId] });
     },
@@ -77,9 +62,7 @@ export function useToggleScenePlan(novelId: string, chapterId: string | undefine
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (enabled: boolean) => {
-      await fetch(`/api/novels/${novelId}/chapters/${chapterId}/scenes/toggle`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
-      });
+      await api.patch(`/novels/${novelId}/chapters/${chapterId}/scenes/toggle`, { enabled });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["scenePlan", novelId, chapterId] });

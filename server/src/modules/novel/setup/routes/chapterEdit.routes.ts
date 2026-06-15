@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { generateScenePlan, getScenePlan, updateScenePlan, toggleScenePlan } from "../../production/scenePlanService";
-import { generateRewriteCandidates, applyRevision } from "../../production/revisionService";
+import { generateScenePlan, getScenePlan, updateScenePlan, toggleScenePlan } from "../../production/context/scenePlanService";
+import { generateRewriteCandidates, applyRevision, cascadeRevision } from "../../production/revision/revisionService";
 
 const router = Router();
 
@@ -64,6 +64,25 @@ router.post("/:novelId/chapters/:chapterId/revision/apply", async (req, res, nex
   try {
     const { selectedParagraphs, replacementText } = req.body;
     const result = await applyRevision(req.params.chapterId, selectedParagraphs, replacementText);
+    res.json({ data: result });
+  } catch (e) { next(e); }
+});
+
+// ─── Cascade Revision (Phase 8) ───────────────────────
+
+router.post("/:novelId/chapters/:chapterId/revision/cascade", async (req, res, next) => {
+  try {
+    const { instruction, scope } = req.body;
+    if (!instruction) {
+      res.status(400).json({ error: { code: "INVALID_INPUT", message: "instruction required" } });
+      return;
+    }
+    const result = await cascadeRevision(
+      req.params.novelId,
+      req.params.chapterId,
+      instruction,
+      scope ?? "single",
+    );
     res.json({ data: result });
   } catch (e) { next(e); }
 });
