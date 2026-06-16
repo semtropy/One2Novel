@@ -1,7 +1,13 @@
-import { Users, History, ClipboardList, X, AlertTriangle, RefreshCw, Search } from "lucide-react";
-import { useState, useCallback, useEffect } from "react";
-import { useNovel, useTimelineReminders, useResources } from "../../api/novel";
-import { useQueryClient } from "@tanstack/react-query";
+/**
+ * ContextPanel — 右侧工具栏，九宫格卡片按钮 + 弹窗面板
+ * 覆盖：写法/伏笔/分镜/角色动态/时间线/审查详情/统计/仪表盘/历史
+ */
+import { useState, useEffect } from "react";
+import {
+  Users, History, ClipboardList, Eye, Target, FileText, BarChart3,
+  RefreshCw, X, AlertTriangle, Gauge, Clock,
+} from "lucide-react";
+import { useNovel, useTimelineReminders, useFormattingIssues, useCleanupChapter, useChapterDynamics, usePayoffStats, useNovelStatistics } from "../../api/novel";
 import { api } from "../../app/api";
 import { SEVERITY_LABEL } from "@one2novel/shared";
 import { OPERATION_LABELS, type WorkspaceDiagnosis } from "../../api/revision";
@@ -13,399 +19,296 @@ interface Props {
   quality: Record<string, unknown> | null;
   diagnosis: WorkspaceDiagnosis | null;
   reviewing: boolean;
+  onReview: () => void;
 }
 
-export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagnosis, reviewing }: Props) {
-  const { data: novel, refetch: refetchNovel } = useNovel(novelId);
-  const qc = useQueryClient();
-  const [showDetail, setShowDetail] = useState(false);
-  const chars: Array<{ id: string; name: string; role?: string; currentGoal?: string; currentLocation?: string; currentStatus?: string; voiceTexture?: string; identityLabel?: string; factionLabel?: string }> = ((novel as unknown) as { characters?: Array<{ id: string; name: string; role?: string; currentGoal?: string; currentLocation?: string; currentStatus?: string; voiceTexture?: string; identityLabel?: string; factionLabel?: string }> }).characters ?? [];
-  const [showCharDetail, setShowCharDetail] = useState(false);
-  const { data: resources } = useResources(showCharDetail ? novelId : undefined);
-  const activeChars = chars.filter(c => c.currentGoal || c.currentLocation || c.currentStatus);
-  const ROLE_LABEL: Record<string, string> = { protagonist: "主角", antagonist: "对手", supporting: "配角", minor: "次要" };
-  const timelines: Array<{ title: string; category: string; sortOrder: number; status?: string }> =
-    ((novel as unknown) as { timelineItems?: Array<{ title: string; category: string; sortOrder: number; status?: string }> }).timelineItems ?? [];
-  const [checkingConflicts, setCheckingConflicts] = useState(false);
-  const [conflicts, setConflicts] = useState<Array<{ type: string; description: string; severity: string }>>([]);
-  const [reExtracting, setReExtracting] = useState(false);
+type PanelKey = "style" | "payoff" | "scene" | "character" | "timeline" | "review" | "stats" | "dashboard" | "history";
 
-  // Clear per-chapter state on switch
-  useEffect(() => { setConflicts([]); }, [chapterId]);
+const PANELS: Array<{ key: PanelKey; label: string; icon: any }> = [
+  { key: "style",     label: "写法",     icon: Eye },
+  { key: "payoff",    label: "伏笔",     icon: Target },
+  { key: "scene",     label: "分镜",     icon: FileText },
+  { key: "character", label: "角色动态", icon: Users },
+  { key: "timeline",  label: "时间线",   icon: History },
+  { key: "review",    label: "审查详情", icon: ClipboardList },
+  { key: "stats",     label: "统计",     icon: BarChart3 },
+  { key: "dashboard", label: "仪表盘",   icon: Gauge },
+  { key: "history",   label: "历史",     icon: Clock },
+];
 
-  // Check if current chapter has content (for re-extract button availability)
-  const currentChapter = chapterId
-    ? ((novel as unknown) as { chapters?: Array<{ id: string; content?: string }> })?.chapters?.find(c => c.id === chapterId)
-    : null;
-  const hasContent = !!(currentChapter?.content && currentChapter.content.length > 100);
-
-  const handleReExtract = useCallback(async () => {
-    if (!chapterId || reExtracting) return;
-    setReExtracting(true);
-    try {
-      await api.post(`/novels/${novelId}/chapters/${chapterId}/timeline/re-extract`);
-      await refetchNovel();
-      qc.invalidateQueries({ queryKey: ["timeline-reminders", novelId, chapterOrder] });
-    } catch { /* toast could go here */ }
-    finally { setReExtracting(false); }
-  }, [novelId, chapterId, chapterOrder, reExtracting, refetchNovel, qc]);
-
-  // Phase 16: pre-chapter timeline reminders (auto-loaded on chapter select)
-  const { data: remindersResult } = useTimelineReminders(novelId, chapterOrder);
-
-  // Extract quality scores — prefer fresh prop, fallback to DB
-  const chapterFromNovel = chapterId
-    ? ((novel as unknown) as { chapters?: Array<Record<string, unknown>> } | undefined)?.chapters?.find(c => (c as Record<string, unknown>).id === chapterId)
-    : null;
-
-  const scores = (() => {
-    // Prefer fresh review result from parent state
-    if (quality) {
-      return {
-        openingScore: quality.openingScore as number ?? 0,
-        plotScore: quality.plotScore as number ?? 0,
-        characterScore: quality.characterScore as number ?? 0,
-        dialogueScore: quality.dialogueScore as number ?? 0,
-        suspenseScore: quality.suspenseScore as number ?? 0,
-        pacingScore: quality.pacingScore as number ?? 0,
-        showNotTellScore: quality.showNotTellScore as number ?? 0,
-        languageScore: quality.languageScore as number ?? 0,
-        genreScore: quality.genreScore as number ?? 0,
-        coherenceScore: quality.coherenceScore as number ?? 0,
-        overallComment: quality.overallComment as string ?? "",
-        issues: (quality.issues as Array<{ type: string; severity: string; description: string; fixSuggestion: string }> | undefined) ?? [],
-      };
-    }
-    // Fallback: reconstruct from DB-stored chapter data
-    if (chapterFromNovel && (chapterFromNovel.qualityScore as number) > 0) {
-      let issues: Array<{ type: string; severity: string; description: string; fixSuggestion: string }> = [];
-      let comment = "";
-      try {
-        const h = JSON.parse((chapterFromNovel.repairHistory as string) ?? "{}");
-        comment = (h.overallComment as string) ?? "";
-        issues = (h.issues as Array<{ type: string; severity: string; description: string; fixSuggestion: string }>) ?? [];
-      } catch { /* ignore */ }
-      return {
-        openingScore: (chapterFromNovel.openingScore as number) ?? 0,
-        plotScore: (chapterFromNovel.plotScore as number) ?? 0,
-        characterScore: (chapterFromNovel.characterScore as number) ?? 0,
-        dialogueScore: (chapterFromNovel.dialogueScore as number) ?? 0,
-        suspenseScore: (chapterFromNovel.suspenseScore as number) ?? 0,
-        pacingScore: (chapterFromNovel.pacingScore as number) ?? 0,
-        showNotTellScore: (chapterFromNovel.showNotTellScore as number) ?? 0,
-        languageScore: (chapterFromNovel.languageScore as number) ?? 0,
-        genreScore: (chapterFromNovel.genreScore as number) ?? 0,
-        coherenceScore: (chapterFromNovel.coherenceScore as number) ?? 0,
-        overallComment: comment,
-        issues,
-      };
-    }
-    return null;
-  })();
-
-  const totalScore = scores
-    ? scores.openingScore + scores.plotScore + scores.characterScore + scores.dialogueScore
-      + scores.suspenseScore + scores.pacingScore + scores.showNotTellScore + scores.languageScore + scores.genreScore + scores.coherenceScore
-    : 0;
-
-  // diagnosis: prefer fresh prop, fallback to DB
-  const displayDiagnosis: WorkspaceDiagnosis | null = diagnosis ?? (() => {
-    if (!chapterFromNovel?.diagnosis) return null;
-    try { return JSON.parse(chapterFromNovel.diagnosis as string) as WorkspaceDiagnosis; }
-    catch { return null; }
-  })();
+export function ContextPanel(p: Props) {
+  const [active, setActive] = useState<PanelKey | null>(null);
 
   return (
-    <div className="flex flex-col h-full text-xs">
-      {/* Character Dynamics */}
-      <div className="p-3 border-b border-slate-100">
-        <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-1.5"><Users size={13} />角色动态</h4>
-        {activeChars.length > 0 ? (
-          <div>
-            <div className="space-y-1 mb-1.5">
-              {activeChars.slice(0, 4).map((c, i) => (
-                <div key={i} className="text-slate-600 text-xs">
-                  <div className="font-medium text-slate-700 truncate">{c.name}{c.role ? ` · ${ROLE_LABEL[c.role] ?? c.role}` : ""}</div>
-                  {c.currentGoal && <div className="text-slate-500 truncate ml-1">目标 {c.currentGoal}</div>}
-                </div>
-              ))}
-            </div>
-            <button onClick={() => setShowCharDetail(true)} className="w-full text-xs text-slate-700 hover:text-slate-900 text-left mt-1">
-              查看详情
-            </button>
-          </div>
-        ) : <p className="text-slate-400 italic text-xs">写完后自动更新</p>}
+    <div className="flex flex-col h-full">
+      <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2 px-1">工具箱</h4>
+      <div className="grid grid-cols-2 gap-1.5">
+        {PANELS.map(panel => (
+          <button key={panel.key} onClick={() => setActive(panel.key)} disabled={!p.chapterId}
+            className="flex flex-col items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white p-2.5 transition-all hover:border-slate-400 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+            <panel.icon size={16} className="text-slate-600" />
+            <span className="text-[10px] font-medium text-slate-500">{panel.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Timeline */}
-      <div className="p-3 border-b border-slate-100">
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="font-semibold text-slate-700 flex items-center gap-1.5"><History size={13} />时间线</h4>
-          <div className="flex items-center gap-1">
-            {hasContent && (
-              <button
-                onClick={handleReExtract}
-                disabled={reExtracting}
-                className="text-xs text-slate-400 hover:text-blue-500 disabled:opacity-50 flex items-center gap-0.5"
-                title="从本章正文重新提取时间线事件"
-              >
-                <RefreshCw size={10} className={reExtracting ? "animate-spin" : ""} />
-                {reExtracting ? "提取中..." : "重提"}
-              </button>
-            )}
-            {timelines.length > 1 && (
-              <button
-                onClick={async () => {
-                  setCheckingConflicts(true);
-                  try {
-                    const r = await api.get(`/novels/${novelId}/timeline/conflicts`);
-                    setConflicts(r.data.data ?? []);
-                  } catch { setConflicts([]); }
-                  finally { setCheckingConflicts(false); }
-                }}
-                disabled={checkingConflicts}
-                className="text-xs text-slate-400 hover:text-accent-500 disabled:opacity-50 flex items-center gap-0.5"
-                title="检查时间线冲突"
-              ><Search size={10} />{checkingConflicts ? "检查中..." : "检查"}</button>
-            )}
-          </div>
-        </div>
-
-        {/* Color legend */}
-        {timelines.length > 0 && (
-          <div className="flex items-center gap-2 mb-2 text-[10px] text-slate-400">
-            <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" />事件</span>
-            <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-brand-400" />里程碑</span>
-            <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400" />截止日</span>
-            <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-accent-400" />约束</span>
-          </div>
-        )}
-        {conflicts.length > 0 && (
-          <div className="mb-2 rounded bg-accent-50 p-1.5 text-[10px] text-accent-700 space-y-0.5">
-            {conflicts.slice(0, 3).map((c, i) => (
-              <div key={i} className="flex items-start gap-1">
-                <AlertTriangle size={10} className="shrink-0 mt-0.5" />
-                <span>{c.description}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Pre-chapter reminders */}
-        {remindersResult && remindersResult.reminders.length > 0 && (
-          <div className="mb-2 rounded bg-blue-50 p-1.5 text-[10px]">
-            <p className="font-medium text-blue-700 mb-1">写前提醒</p>
-            {remindersResult.summary && (
-              <p className="text-blue-600 mb-1">{remindersResult.summary}</p>
-            )}
-            <div className="space-y-0.5 max-h-24 overflow-y-auto">
-              {remindersResult.reminders.map((r, i) => (
-                <div key={i} className={cn(
-                  "flex items-center gap-1",
-                  r.isOverdue ? "text-red-600 font-medium" : r.isUpcoming ? "text-blue-600" : "text-blue-500",
-                )}>
-                  <span className="shrink-0">
-                    {r.isOverdue ? "⚠" : r.isUpcoming ? "🔔" : r.status === "violated" ? "❌" : "•"}
-                  </span>
-                  <span className="truncate">{r.title}</span>
-                  <span className="shrink-0 text-[9px] opacity-60">第{r.sortOrder}章</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {timelines.length > 0 ? (
-          <div className="space-y-1">
-            {timelines.slice(-8).reverse().map((t, i) => (
-              <div key={i} className="text-slate-600 flex items-center gap-1.5">
-                <span className={cn(
-                  "shrink-0 w-1.5 h-1.5 rounded-full",
-                  t.status === "violated" ? "bg-red-500"
-                  : t.category === "milestone" ? "bg-brand-400"
-                  : t.category === "deadline" ? "bg-red-400"
-                  : t.category === "constraint" ? "bg-accent-400"
-                  : "bg-blue-400"
-                )} />
-                <span className={cn("truncate", t.status === "violated" && "text-red-500 font-medium")}>{t.title}</span>
-              </div>
-            ))}
-          </div>
-        ) : <p className="text-slate-400 italic text-xs">写完章节后自动提取</p>}
-      </div>
-
-      {/* Review Detail */}
-      <div className="p-3">
-        <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-1.5"><ClipboardList size={13} />审查详情</h4>
-        {reviewing ? (
-          <div className="flex items-center gap-1.5 text-xs text-blue-500">
-            <RefreshCw size={12} className="animate-spin" />
-            AI 审查中...
-          </div>
-        ) : scores ? (
-          <div>
-            <div className="text-xs text-slate-600 mb-1.5">
-              总分 <span className="font-bold text-slate-800">{totalScore}</span>/100
-              {scores.issues.length > 0 && <span className="text-slate-400 ml-1">· {scores.issues.length}个问题</span>}
-            </div>
-            <button
-              onClick={() => setShowDetail(true)}
-              className="w-full text-xs text-slate-700 hover:text-slate-900 text-left"
-            >
-              查看详情
-            </button>
-          </div>
-        ) : (
-          <p className="text-slate-400 italic text-xs">点击工具栏「审查」进行评估</p>
-        )}
-      </div>
-
-      {/* Detail Popup */}
-      {showDetail && scores && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowDetail(false)}>
-          <div className="w-[44rem] max-h-[85vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-800">审查详情</h3>
-              <button onClick={() => setShowDetail(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
-            </div>
-
-            {/* Two-column layout */}
-            <div className="grid grid-cols-2 gap-5">
-              {/* Left: Scores + Issues */}
-              <div className="space-y-3">
-                <p className="text-xs text-slate-500">总分 <span className="font-bold text-slate-800">{totalScore}</span> / 100</p>
-                <div className="space-y-0.5">
-                  {[["开头吸引力", scores.openingScore], ["情节推进", scores.plotScore], ["人物塑造", scores.characterScore], ["对话质量", scores.dialogueScore], ["悬念设置", scores.suspenseScore], ["节奏控制", scores.pacingScore], ["展示而非讲述", scores.showNotTellScore], ["语言质量", scores.languageScore], ["题材适应度", scores.genreScore], ["跨章连贯性", scores.coherenceScore]].map(([l, s]) => (
-                    <div key={l as string} className="flex items-center gap-2">
-                      <span className="text-xs text-slate-600 w-[4.5rem] shrink-0 text-right">{l as string}</span>
-                      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full", (s as number) >= 7 ? "bg-green-400" : (s as number) >= 5 ? "bg-accent-400" : "bg-red-400")} style={{ width: `${(s as number) * 10}%` }} />
-                      </div>
-                      <span className="text-xs font-medium w-3 text-right">{s as number}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {scores.overallComment && (
-                  <p className="text-xs text-slate-600 leading-relaxed">{scores.overallComment}</p>
-                )}
-
-                <div className="pt-3 border-t">
-                  <p className="text-xs font-medium text-slate-700 mb-1.5">
-                    整体问题
-                    <span className="text-slate-400 ml-1 font-normal">({scores.issues.length}条)</span>
-                  </p>
-                  {scores.issues.length > 0 ? (
-                    <div className="space-y-1">
-                      {scores.issues.map((iss, i) => (
-                        <div key={i} className="rounded border border-accent-100 bg-accent-50/50 p-1.5 text-xs">
-                          <span className={cn("px-1 py-0.5 rounded mr-1", iss.severity === "high" ? "bg-red-100 text-red-700" : iss.severity === "medium" ? "bg-accent-100 text-accent-700" : "bg-slate-200 text-slate-600")}>{SEVERITY_LABEL[iss.severity as keyof typeof SEVERITY_LABEL] ?? iss.severity}</span>
-                          <span className="text-accent-800">{iss.description}</span>
-                          <div className="text-accent-600 mt-0.5 text-[10px] italic">{iss.fixSuggestion}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic">✓ 无明显问题</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Right: 段落细查 */}
-              <div className="border-l border-slate-100 pl-5">
-                <p className="text-xs font-medium text-slate-700 mb-2">段落细查</p>
-                {displayDiagnosis ? (
-                  <div className="space-y-1.5">
-                    {displayDiagnosis.recommendedTask && (
-                      <div className="p-2 bg-accent-50 border border-accent-200 rounded text-xs">
-                        <span className="font-medium text-accent-800">优先修复</span>
-                        <div className="text-accent-700 mt-0.5">{displayDiagnosis.recommendedTask.title}</div>
-                        <div className="text-accent-600 mt-0.5">{displayDiagnosis.recommendedTask.summary}</div>
-                      </div>
-                    )}
-                    {displayDiagnosis.cards.length > 0 ? (
-                      displayDiagnosis.cards.map((card, i) => (
-                        <div key={i} className={`p-2 rounded border text-xs ${card.severity === "critical" ? "border-red-300 bg-red-50" : card.severity === "high" ? "border-orange-200 bg-orange-50" : "border-slate-200 bg-slate-50"}`}>
-                          <div className="flex items-center gap-1 mb-1">
-                            <span className={`px-1 py-0 rounded text-[10px] font-medium ${card.severity === "critical" ? "bg-red-200 text-red-800" : card.severity === "high" ? "bg-orange-200 text-orange-800" : card.severity === "medium" ? "bg-accent-200 text-accent-800" : "bg-slate-200 text-slate-600"}`}>{SEVERITY_LABEL[card.severity] ?? card.severity}</span>
-                            <span className="font-semibold truncate">{card.title}</span>
-                          </div>
-                          <div className="text-slate-500 mb-1 leading-relaxed">{card.problemSummary}</div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {card.paragraphStart && <span className="text-slate-400 text-[10px]">第{card.paragraphStart}{card.paragraphEnd && card.paragraphEnd !== card.paragraphStart ? `–${card.paragraphEnd}` : ""}段</span>}
-                            <span className="text-brand-600 bg-brand-50 px-1.5 py-0 rounded text-[10px]">{OPERATION_LABELS[card.recommendedAction]?.label ?? card.recommendedAction}</span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-green-600 py-1">✓ 未发现明显问题</p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">点击工具栏「审查」以生成</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Character Detail Popup */}
-      {showCharDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowCharDetail(false)}>
-          <div className="w-[28rem] max-h-[85vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+      {active && p.chapterId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setActive(null)}>
+          <div className="w-[36rem] max-h-[80vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-800">角色动态</h3>
-              <button onClick={() => setShowCharDetail(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+              <h3 className="text-sm font-semibold text-slate-800">{PANELS.find(x => x.key === active)?.label}</h3>
+              <button onClick={() => setActive(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
             </div>
-            <div className="space-y-4">
-              {activeChars.map((c, i) => (
-                <div key={i}>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="font-semibold text-sm text-slate-800">{c.name}</span>
-                    {c.role && <span className="text-xs text-slate-500">{ROLE_LABEL[c.role] ?? c.role}</span>}
-                  </div>
-                  {(c.identityLabel || c.factionLabel) && (
-                    <div className="text-xs text-slate-400 mb-1">
-                      {[c.identityLabel, c.factionLabel].filter(Boolean).join(" · ")}
-                    </div>
-                  )}
-                  <div className="space-y-1 text-xs">
-                    {c.currentLocation && (
-                      <div className="flex items-center gap-2"><span className="text-slate-400 shrink-0 w-8 text-right">位置</span><span className="text-slate-600">{c.currentLocation}</span></div>
-                    )}
-                    {c.currentGoal && (
-                      <div className="flex items-center gap-2"><span className="text-slate-400 shrink-0 w-8 text-right">目标</span><span className="text-slate-600">{c.currentGoal}</span></div>
-                    )}
-                    {c.currentStatus && (
-                      <div className="flex items-center gap-2"><span className="text-slate-400 shrink-0 w-8 text-right">状态</span><span className="text-slate-600">{c.currentStatus}</span></div>
-                    )}
-                    {c.voiceTexture && (
-                      <div className="flex items-center gap-2"><span className="text-slate-400 shrink-0 w-8 text-right">声线</span><span className="text-slate-600 italic">{c.voiceTexture}</span></div>
-                    )}
-                    <div className="flex items-start gap-2">
-                      <span className="text-slate-400 shrink-0 w-8 text-right">资源</span>
-                      <div>
-                        {(() => {
-                          const charResources = (resources ?? []).filter(r => r.ownerId === c.id);
-                          if (!charResources.length) return <span className="text-slate-300 italic">暂无</span>;
-                          return charResources.map(r => (
-                            <div key={r.id} className="text-slate-500">
-                              <span className={r.status === "depleted" ? "text-slate-300 line-through" : "text-slate-600"}>{r.name}</span>
-                              <span className="text-slate-400 ml-1">{r.category}</span>
-                              {r.acquiredIn && <span className="text-slate-300 ml-1">第{r.acquiredIn}章</span>}
-                            </div>
-                          ));
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                  {i < activeChars.length - 1 && <div className="border-b border-slate-100 mt-3" />}
-                </div>
-              ))}
-            </div>
+            <PanelBody novelId={p.novelId} chapterId={p.chapterId} chapterOrder={p.chapterOrder}
+              panelKey={active} quality={p.quality} diagnosis={p.diagnosis}
+              reviewing={p.reviewing} onReview={p.onReview} />
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Panel Body Router ────────────────────────────────────
+
+function PanelBody({ novelId, chapterId, chapterOrder, panelKey, quality, diagnosis, reviewing, onReview }: {
+  novelId: string; chapterId: string; chapterOrder?: number; panelKey: PanelKey;
+  quality: Record<string, unknown> | null; diagnosis: WorkspaceDiagnosis | null;
+  reviewing: boolean; onReview: () => void;
+}) {
+  switch (panelKey) {
+    case "style":     return <StylePanel novelId={novelId} chapterId={chapterId} />;
+    case "payoff":    return <PayoffPanel novelId={novelId} chapterId={chapterId} />;
+    case "scene":     return <ScenePanel novelId={novelId} chapterId={chapterId} />;
+    case "character": return <CharacterPanel novelId={novelId} chapterId={chapterId} />;
+    case "timeline":  return <TimelinePanel novelId={novelId} chapterId={chapterId} chapterOrder={chapterOrder} />;
+    case "review":    return <ReviewPanel novelId={novelId} chapterId={chapterId} quality={quality} diagnosis={diagnosis} reviewing={reviewing} onReview={onReview} />;
+    case "stats":     return <StatsPanel novelId={novelId} />;
+    case "dashboard": return <DashboardPanel novelId={novelId} chapterId={chapterId} />;
+    case "history":   return <HistoryPanel novelId={novelId} chapterId={chapterId} />;
+    default: return null;
+  }
+}
+
+// ─── Individual Panels ────────────────────────────────────
+
+function StylePanel({ novelId, chapterId }: { novelId: string; chapterId: string }) {
+  const { data: issues } = useFormattingIssues(novelId, chapterId);
+  const cleanup = useCleanupChapter();
+  return (
+    <div className="space-y-3 text-xs">
+      <p className="text-slate-500">章节格式检查与清理，去除AI痕迹和冗余表达。</p>
+      {issues && issues.length > 0 ? (
+        <div className="space-y-1">
+          {issues.map((iss, i) => (
+            <div key={i} className="rounded border border-slate-200 p-2">
+              <span className={cn("text-[10px] px-1 py-0.5 rounded mr-1", iss.severity === "high" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600")}>{iss.type}</span>
+              <span className="text-slate-600">{iss.description}</span>
+            </div>
+          ))}
+        </div>
+      ) : <p className="text-slate-400 italic">点击下方按钮检查格式问题</p>}
+      <button onClick={() => cleanup.mutate({ novelId, chapterId })} disabled={cleanup.isPending}
+        className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50">
+        {cleanup.isPending ? "清理中..." : "自动清理格式问题"}
+      </button>
+    </div>
+  );
+}
+
+function PayoffPanel({ novelId, chapterId }: { novelId: string; chapterId: string }) {
+  const stats = usePayoffStats(novelId);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ title: "", summary: "", scopeType: "volume" });
+
+  async function handleAdd() {
+    if (!form.title.trim()) return;
+    try { await api.post(`/novels/${novelId}/payoffs`, form); setShowForm(false); setForm({ title: "", summary: "", scopeType: "volume" }); } catch {}
+  }
+
+  return (
+    <div className="space-y-3 text-xs">
+      {stats.data && (
+        <div className="flex gap-3 text-[10px] text-slate-400">
+          <span>总计{stats.data.total}条</span>
+          <span className="text-accent-500">待兑现{stats.data.pendingPayoff}</span>
+          <span className="text-green-500">已兑现{stats.data.paidOff}</span>
+        </div>
+      )}
+      <button onClick={() => setShowForm(!showForm)}
+        className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">+ 添加伏笔</button>
+      {showForm && (
+        <div className="space-y-2 rounded border border-slate-200 p-3">
+          <input className="w-full rounded border border-slate-200 px-2 py-1 text-xs" placeholder="伏笔标题" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+          <input className="w-full rounded border border-slate-200 px-2 py-1 text-xs" placeholder="简要描述" value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} />
+          <select className="w-full rounded border border-slate-200 px-2 py-1 text-xs" value={form.scopeType} onChange={e => setForm({ ...form, scopeType: e.target.value })}>
+            <option value="book">全书级</option><option value="volume">卷级</option><option value="chapter">章级</option>
+          </select>
+          <button onClick={handleAdd} className="rounded bg-slate-800 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700">确认添加</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScenePanel({ novelId, chapterId }: { novelId: string; chapterId: string }) {
+  const [scenes, setScenes] = useState<Array<{ goal: string; pov: string; summary: string }>>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!chapterId) return;
+    api.get(`/novels/${novelId}/chapters/${chapterId}/scenes`).then(({ data }) => {
+      if (data.data?.scenes) setScenes(data.data.scenes);
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, [novelId, chapterId]);
+
+  async function handleGenerate() {
+    try { const { data } = await api.post(`/novels/${novelId}/chapters/${chapterId}/scenes/generate`); if (data.data?.scenes) setScenes(data.data.scenes); } catch {}
+  }
+
+  return (
+    <div className="space-y-3 text-xs">
+      <p className="text-slate-500">章节分镜计划，2-4个场景，每个场景有明确的叙事目标和POV。</p>
+      {scenes.length > 0 ? (
+        <div className="space-y-2">
+          {scenes.map((s, i) => (
+            <div key={i} className="rounded border border-slate-200 p-2">
+              <div className="font-medium text-slate-700">场景{i + 1} · POV: {s.pov}</div>
+              <div className="text-slate-500 mt-0.5">{s.summary}</div>
+            </div>
+          ))}
+        </div>
+      ) : loaded ? <p className="text-slate-400 italic">暂无分镜，点击生成</p> : <p className="text-slate-400 italic">加载中...</p>}
+      <button onClick={handleGenerate} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">AI 生成分镜</button>
+    </div>
+  );
+}
+
+function CharacterPanel({ novelId, chapterId }: { novelId: string; chapterId: string }) {
+  const { data: novel } = useNovel(novelId);
+  const chars = (novel as any)?.characters ?? [];
+  const active = chars.filter((c: any) => c.currentStatus || c.currentGoal);
+
+  return (
+    <div className="space-y-2 text-xs">
+      {active.length > 0 ? active.slice(0, 8).map((c: any, i: number) => (
+        <div key={i} className="rounded border border-slate-200 p-2">
+          <div className="font-medium text-slate-700">{c.name} · {c.role === "protagonist" ? "主角" : c.role === "antagonist" ? "反派" : "配角"}</div>
+          {c.currentStatus && <div className="text-slate-500">状态：{c.currentStatus}</div>}
+          {c.currentGoal && <div className="text-slate-500">目标：{c.currentGoal}</div>}
+        </div>
+      )) : <p className="text-slate-400 italic">写完章节后自动更新角色状态</p>}
+    </div>
+  );
+}
+
+function TimelinePanel({ novelId, chapterId, chapterOrder }: { novelId: string; chapterId: string; chapterOrder?: number }) {
+  const { data: novel } = useNovel(novelId);
+  const timelines = (novel as any)?.timelineItems ?? [];
+  const { data: reminders } = useTimelineReminders(novelId, chapterOrder);
+  const [conflicts, setConflicts] = useState<Array<{ description: string }>>([]);
+  const [checking, setChecking] = useState(false);
+
+  return (
+    <div className="space-y-3 text-xs">
+      {reminders && reminders.reminders.length > 0 && (
+        <div className="rounded bg-blue-50 p-2 text-[10px]">
+          <p className="font-medium text-blue-700 mb-1">写前提醒</p>
+          {reminders.reminders.map((r, i) => (
+            <div key={i} className={r.isOverdue ? "text-red-600" : "text-blue-600"}>{r.isOverdue ? "⚠" : "•"} {r.title}</div>
+          ))}
+        </div>
+      )}
+      <button onClick={async () => { setChecking(true); try { const r = await api.get(`/novels/${novelId}/timeline/conflicts`); setConflicts(r.data.data ?? []); } catch {} finally { setChecking(false); } }}
+        disabled={checking} className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50">
+        {checking ? "检查中..." : "检查时间线冲突"}
+      </button>
+      {conflicts.length > 0 && conflicts.map((c, i) => (
+        <div key={i} className="rounded border border-red-200 bg-red-50 p-1.5 text-[10px] text-red-600"><AlertTriangle size={10} className="inline mr-1" />{c.description}</div>
+      ))}
+      {timelines.length > 0 && (
+        <div className="space-y-0.5 max-h-40 overflow-y-auto">
+          {timelines.slice(-15).reverse().map((t: any, i: number) => (
+            <div key={i} className="flex items-center gap-1.5 text-slate-600">
+              <span className={cn("shrink-0 w-1.5 h-1.5 rounded-full", t.category === "milestone" ? "bg-brand-400" : t.category === "deadline" ? "bg-red-400" : "bg-blue-400")} />
+              <span className="truncate">{t.title}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReviewPanel({ novelId, chapterId, quality, diagnosis, reviewing, onReview }: {
+  novelId: string; chapterId: string; quality: Record<string, unknown> | null;
+  diagnosis: WorkspaceDiagnosis | null; reviewing: boolean; onReview: () => void;
+}) {
+  const { data: novel } = useNovel(novelId);
+  const chapter = (novel as any)?.chapters?.find((c: any) => c.id === chapterId);
+  const scores = quality ?? (chapter?.qualityScore > 0 ? { openingScore: chapter.openingScore, plotScore: chapter.plotScore, characterScore: chapter.characterScore, dialogueScore: chapter.dialogueScore, suspenseScore: chapter.suspenseScore, pacingScore: chapter.pacingScore, showNotTellScore: chapter.showNotTellScore, languageScore: chapter.languageScore, genreScore: chapter.genreScore, coherenceScore: chapter.coherenceScore } : null);
+  const total = scores ? Object.values(scores as Record<string,number>).reduce((a,b) => a+(b||0), 0) : 0;
+  const displayDiagnosis = diagnosis ?? (() => { try { return chapter?.diagnosis ? JSON.parse(chapter.diagnosis) : null; } catch { return null; } })();
+
+  return (
+    <div className="space-y-4 text-xs">
+      {reviewing ? <div className="flex items-center gap-2 text-blue-500"><RefreshCw size={12} className="animate-spin" />AI 审查中...</div>
+      : !scores ? (
+        <div className="space-y-2">
+          <p className="text-slate-400">点击对本章进行AI审查</p>
+          <button onClick={onReview} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">开始审查</button>
+        </div>
+      ) : (
+        <>
+          <div className="text-slate-600">总分 <span className="font-bold text-slate-800">{total}</span>/100</div>
+          <div className="space-y-0.5">
+            {[["开头吸引力","openingScore"],["情节推进","plotScore"],["人物塑造","characterScore"],["对话质量","dialogueScore"],["悬念设置","suspenseScore"],["节奏控制","pacingScore"],["展示而非讲述","showNotTellScore"],["语言质量","languageScore"],["题材适应度","genreScore"],["跨章连贯性","coherenceScore"]].map(([l,k]) => (
+              <div key={l} className="flex items-center gap-2">
+                <span className="w-16 text-right text-slate-500 shrink-0">{l}</span>
+                <div className="flex-1 h-1.5 bg-slate-100 rounded-full"><div className={cn("h-full rounded-full", (scores as any)[k]>=7?"bg-green-400":(scores as any)[k]>=5?"bg-accent-400":"bg-red-400")} style={{width:`${(scores as any)[k]*10}%`}}/></div>
+                <span className="w-3 text-right font-medium">{(scores as any)[k]}</span>
+              </div>
+            ))}
+          </div>
+          {displayDiagnosis?.cards?.length > 0 && displayDiagnosis.cards.map((card: any, i: number) => (
+            <div key={i} className="rounded border border-slate-200 p-1.5"><span className="text-[10px] px-1 py-0 rounded bg-slate-100 text-slate-600">{card.title}</span><div className="text-slate-500 mt-0.5">{card.problemSummary}</div></div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+function StatsPanel({ novelId }: { novelId: string }) {
+  const stats = useNovelStatistics(novelId);
+  const s = stats.data;
+  if (!s) return <p className="text-xs text-slate-400">加载中...</p>;
+  return (
+    <div className="grid grid-cols-3 gap-2 text-xs">
+      {[["总字数", `${(s.totalChars/1000).toFixed(0)}k`],["章数", `${s.completedChapters}/${s.totalChapters}`],["质量", s.avgQualityScore.toFixed(0)],["伏笔兑现", `${s.payoffCompletionRate.toFixed(0)}%`],["角色", String(s.totalCharacters)],["阅读", `${s.estimatedReadingMinutes}分钟`]].map(([l,v]) => (
+        <div key={l} className="rounded-lg border border-slate-200 p-2 text-center"><div className="text-lg font-bold text-slate-700">{v}</div><div className="text-[10px] text-slate-400">{l}</div></div>
+      ))}
+    </div>
+  );
+}
+
+function DashboardPanel({ novelId, chapterId }: { novelId: string; chapterId: string }) {
+  return <div className="text-xs text-slate-500">写作仪表盘 — 章节进度和质量指标概览。<p className="mt-2 text-slate-400">选择章节后查看完整仪表盘。</p></div>;
+}
+
+function HistoryPanel({ novelId, chapterId }: { novelId: string; chapterId: string }) {
+  const [history, setHistory] = useState<Array<{ id: string; content: string; createdAt: string }>>([]);
+  useEffect(() => { api.get(`/novels/${novelId}/chapters/${chapterId}/edit-history`).then(({ data }) => setHistory(data.data ?? [])).catch(() => {}); }, [novelId, chapterId]);
+  if (history.length === 0) return <p className="text-xs text-slate-400">暂无编辑历史</p>;
+  return (
+    <div className="space-y-2 text-xs">
+      {history.map(h => (
+        <div key={h.id} className="rounded border border-slate-200 p-2">
+          <div className="text-[10px] text-slate-400 mb-1">{new Date(h.createdAt).toLocaleString("zh-CN")}</div>
+          <div className="text-slate-600 line-clamp-3">{h.content.slice(0, 200)}</div>
+        </div>
+      ))}
     </div>
   );
 }

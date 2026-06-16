@@ -9,7 +9,6 @@ import { PlanningQuickDrawer } from "../components/workspace/PlanningQuickDrawer
 import { ChapterDiffModal } from "../components/workspace/ChapterDiffModal";
 import { ChapterWritePanel } from "../components/workspace/ChapterWritePanel";
 import { ContextPanel } from "../components/workspace/ContextPanel";
-import { BottomPanel } from "../components/workspace/BottomPanel";
 import { type WorkspaceDiagnosis } from "../api/revision";
 import { ProgressBar } from "../components/novel/ProgressBar";
 import { DirectorPanel } from "../components/workspace/DirectorPanel";
@@ -272,13 +271,9 @@ export function NovelWorkspacePage() {
                 <NextChapterPreview novelId={novel.id} chapterId={selectedChapterId} />
               </div>
             )}
-            {/* Fixed bottom panel: review + payoffs + scenes */}
-            <div className="shrink-0 h-36 rounded-xl border border-slate-200 bg-white p-3">
-              <BottomPanel novelId={novel.id} chapterId={selectedChapterId ?? null} />
-            </div>
           </div>
 
-          {/* Right: Context Panel (full height) */}
+          {/* Right: Context Panel — toolbox grid */}
           <div className="w-56 shrink-0 flex flex-col min-h-0">
             <div className="flex-1 min-h-0 rounded-xl border border-slate-200 bg-white overflow-y-auto p-3">
               <ContextPanel
@@ -289,6 +284,7 @@ export function NovelWorkspacePage() {
                 quality={quality as Record<string, number | string | Array<Record<string, string>>> | null}
                 diagnosis={diagnosis}
                 reviewing={reviewing}
+                onReview={handleReview}
               />
             </div>
           </div>
