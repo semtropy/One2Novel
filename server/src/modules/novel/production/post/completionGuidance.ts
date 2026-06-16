@@ -73,23 +73,24 @@ export async function checkCompletionReadiness(novelId: string): Promise<Complet
   const plannedEnding: string | null = novel.endingDirection ?? null;
 
   const recommendations: string[] = [];
+  // Long-form: 500章的小说，80% = 400章后视为接近完本
   const isNearEnd = progressPercent !== null && progressPercent >= 80;
 
-  // Recommendation: unresolved payoffs
-  const veryStale = unresolved.filter(p => p.chaptersStale > 50);
+  // Recommendation: unresolved payoffs — 100章阈值适配长篇
+  const veryStale = unresolved.filter(p => p.chaptersStale > 100);
   if (veryStale.length > 0) {
-    recommendations.push(`还有${veryStale.length}条伏笔超过50章未推进：${veryStale.map(p => p.title).join("、")}。建议在最后几章集中回收或标记为废弃。`);
+    recommendations.push(`还有${veryStale.length}条伏笔超过100章未推进：${veryStale.map(p => p.title).join("、")}。建议在后续章节集中回收或标记为废弃。`);
   }
-  if (unresolved.length > 5 && isNearEnd) {
+  if (unresolved.length > 10 && isNearEnd) {
     recommendations.push(`接近完本但还有${unresolved.length}条未兑现伏笔，建议梳理回收计划。`);
   }
 
   // Recommendation: ending alignment
   if (isNearEnd && plannedEnding && lastChapter?.content) {
-    recommendations.push(`规划结局方向为「${plannedEnding.slice(0, 60)}...」。请在最后几章确认实际走向与规划一致。`);
+    recommendations.push(`规划结局方向为「${plannedEnding.slice(0, 60)}...」。请在最后阶段确认实际走向与规划一致。`);
   }
 
-  // Recommendation: volume completeness
+  // Recommendation: volume completeness — 长篇允许最后几卷未完成
   const volumes = await prisma.volume.findMany({
     where: { novelId },
     orderBy: { sortOrder: "asc" },
@@ -98,11 +99,12 @@ export async function checkCompletionReadiness(novelId: string): Promise<Complet
   const incompleteVolumes = volumes.filter(v =>
     v.chapterPlans.some(cp => cp.chapter?.chapterStatus !== "completed")
   );
-  if (incompleteVolumes.length > 0 && isNearEnd) {
-    recommendations.push(`还有${incompleteVolumes.length}卷未完成所有章节，建议在完本前完成。`);
+  if (incompleteVolumes.length > 3 && isNearEnd) {
+    recommendations.push(`还有${incompleteVolumes.length}卷未完成所有章节，建议在完本前收尾。`);
   }
 
-  const readyToComplete = unresolved.length <= 5 && incompleteVolumes.length <= 1;
+  // 长篇网文：允许10条以内未兑现伏笔、3卷以内未完成即可完本
+  const readyToComplete = unresolved.length <= 10 && incompleteVolumes.length <= 3;
 
   return {
     novelId,
