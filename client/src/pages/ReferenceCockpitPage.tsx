@@ -22,56 +22,74 @@ const ARCH_LABELS: Record<string, string> = {
 };
 const HOOK_LABELS: Record<string, string> = { suspense:"悬念型", reversal:"反转型", preview:"预告型", emotional:"情绪型" };
 
-type Technique = { category: string; observation: string; rule: string; confidence: number };
-type WritingAssets = {
-  overallStyleDescription?: string;
-  narrativeAssets?: Technique[]; languageAssets?: Technique[];
-  characterAssets?: Technique[]; rhythmAssets?: Technique[]; antiAiAssets?: Technique[];
-};
+function StatusLine({ label }: { label?: string }) {
+  return <span className="text-sm text-slate-500">{label || "分析完成"}</span>;
+}
 
-function WritingDetail({ data }: { data: WritingAssets }) {
-  const categories = [
-    { key: "narrativeAssets" as const, label: "叙事技法" },
-    { key: "languageAssets" as const, label: "语言风格" },
-    { key: "characterAssets" as const, label: "角色塑造" },
-    { key: "rhythmAssets" as const, label: "节奏控制" },
-    { key: "antiAiAssets" as const, label: "反AI特征" },
-  ];
-  return (
-    <div className="space-y-5">
-      {data.overallStyleDescription && (
-        <div className="rounded-lg bg-slate-50 p-3">
-          <p className="text-sm font-medium text-slate-600 mb-1">整体风格</p>
-          <p className="text-sm text-slate-700 leading-relaxed">{data.overallStyleDescription}</p>
-        </div>
-      )}
-      {categories.map(({ key, label }) => {
-        const techniques = data[key] ?? [];
-        if (techniques.length === 0) return null;
-        return (
-          <div key={key}>
-            <p className="text-sm font-semibold text-slate-700 mb-2">{label} ({techniques.length}条)</p>
-            <div className="space-y-2">
-              {techniques.map((t, i) => (
-                <div key={i} className="rounded-lg border border-slate-200 p-3">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-medium text-slate-500">{t.category}</span>
-                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full", t.confidence >= 0.9 ? "bg-green-100 text-green-700" : t.confidence >= 0.8 ? "bg-accent-100 text-accent-700" : "bg-slate-100 text-slate-500")}>
-                      置信度 {(t.confidence*100).toFixed(0)}%
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mb-1">对标书做法：</p>
-                  <p className="text-sm text-slate-600 mb-2 leading-relaxed">{t.observation}</p>
-                  <p className="text-xs text-slate-400 mb-1">可模仿规则：</p>
-                  <p className="text-sm text-slate-800 leading-relaxed">{t.rule}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+// ═══ Detail Components (modals) ═══
+
+function ArchDetail({ data, onApply, applied, disabled }: { data: { type: string; confidence?: number; reasoning?: string; observedPatterns?: string[] }; onApply: () => void; applied: boolean; disabled: boolean }) {
+  return <div className="space-y-4">
+    <div className="flex items-center gap-3"><span className="text-lg font-bold text-slate-800">{ARCH_LABELS[data.type] ?? data.type}</span>{data.confidence && <span className="text-sm text-slate-400">置信度 {(data.confidence*100).toFixed(0)}%</span>}</div>
+    {data.reasoning && <p className="text-sm text-slate-600">{data.reasoning}</p>}
+    {data.observedPatterns?.length! > 0 && <div className="flex flex-wrap gap-1">{data.observedPatterns!.map((p,i) => <span key={i} className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">{p}</span>)}</div>}
+    <button onClick={onApply} disabled={applied || disabled} className={cn("rounded-lg px-4 py-1.5 text-xs font-medium", applied?"bg-green-100 text-green-700":"bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40")}>{applied?"已应用":"应用"}</button>
+  </div>;
+}
+
+function HookDetail({ data }: { data: { distribution: Record<string,number>; avgHookStrength: number; typicalHookStyle: string } }) {
+  return <div className="space-y-3">
+    <div className="grid grid-cols-2 gap-2">{(Object.entries(data.distribution ?? {}) as [string,number][]).map(([k,v]) => <div key={k} className="rounded-lg border border-slate-200 p-3 text-center"><div className="text-2xl font-bold text-slate-700">{v}</div><div className="text-xs text-slate-400">{HOOK_LABELS[k]??k}</div></div>)}</div>
+    <div className="text-sm text-slate-600">平均钩力 <b className="text-slate-800">{(data.avgHookStrength*100).toFixed(0)}%</b> · {data.typicalHookStyle}</div>
+  </div>;
+}
+
+function GFDetail({ data }: { data: { abilities: string[]; limits: string[] } }) {
+  return <div className="grid grid-cols-2 gap-4 text-sm">
+    <div><p className="font-semibold text-slate-700 mb-2">能力 ({data.abilities.length})</p><div className="space-y-1">{data.abilities.map((a,i) => <div key={i} className="rounded bg-green-50 px-2 py-1 text-xs text-green-700">{a}</div>)}</div></div>
+    <div><p className="font-semibold text-slate-700 mb-2">限制 ({data.limits.length})</p><div className="space-y-1">{data.limits.map((l,i) => <div key={i} className="rounded bg-red-50 px-2 py-1 text-xs text-red-600">{l}</div>)}</div></div>
+  </div>;
+}
+
+function BeatDetail({ data, onApply, disabled }: { data: { beatTypes: string[]; overallDistribution: Record<string,number>; totalChapters: number }; onApply: () => void; disabled: boolean }) {
+  return <div className="space-y-3">
+    <div className="grid grid-cols-3 gap-2">{data.beatTypes.map(bt => { const c = data.overallDistribution[bt] ?? 0; return <div key={bt} className="rounded-lg border border-slate-200 p-3 text-center"><div className="text-2xl font-bold text-slate-700">{c}</div><div className="text-xs text-slate-400">{bt}章</div><div className="text-[10px] text-slate-300">{(c/data.totalChapters*100).toFixed(0)}%</div></div>; })}</div>
+    <button onClick={onApply} disabled={disabled} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-40">应用</button>
+  </div>;
+}
+
+function CoolPointDetail({ high, low }: { high: number[]; low: number[] }) {
+  return <div className="space-y-4">
+    <div className="flex items-center gap-4 text-sm"><span>高爽点 <b className="text-green-600">{high.length}章</b></span><span>低爽点 <b className="text-red-400">{low.length}章</b></span></div>
+    <div className="flex flex-wrap gap-1 text-xs">{high.map(ch => <span key={ch} className="rounded bg-green-50 px-1.5 py-0.5 text-green-700">第{ch}章</span>)}</div>
+    {low.length > 0 && <div className="flex flex-wrap gap-1 text-xs">{low.map(ch => <span key={ch} className="rounded bg-red-50 px-1.5 py-0.5 text-red-400">第{ch}章</span>)}</div>}
+  </div>;
+}
+
+function TimelineDetail({ data }: { data: Array<{ chapterIndex: number; settingName: string }> }) {
+  return <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">{data.map((s,i) => <div key={i} className="flex items-center gap-2"><span className="text-slate-400 w-14 shrink-0">第{s.chapterIndex}章</span><span className="text-slate-600">{s.settingName}</span></div>)}</div>;
+}
+
+type Technique = { category: string; observation: string; rule: string; confidence: number };
+type WritingAssets = { overallStyleDescription?: string; narrativeAssets?: Technique[]; languageAssets?: Technique[]; characterAssets?: Technique[]; rhythmAssets?: Technique[]; antiAiAssets?: Technique[]; };
+
+function WritingDetail({ data, onApply, applied, disabled }: { data: WritingAssets; onApply: () => void; applied: boolean; disabled: boolean }) {
+  const cats = [{k:"narrativeAssets" as const,l:"叙事技法"},{k:"languageAssets" as const,l:"语言风格"},{k:"characterAssets" as const,l:"角色塑造"},{k:"rhythmAssets" as const,l:"节奏控制"},{k:"antiAiAssets" as const,l:"反AI特征"}];
+  return <div className="space-y-5">
+    {data.overallStyleDescription && <div className="rounded-lg bg-slate-50 p-3"><p className="text-sm font-medium text-slate-600 mb-1">整体风格</p><p className="text-sm text-slate-700 leading-relaxed">{data.overallStyleDescription}</p></div>}
+    {cats.map(({k,l}) => { const ts = data[k]??[]; if(!ts.length) return null; return <div key={k}><p className="text-sm font-semibold text-slate-700 mb-2">{l} ({ts.length}条)</p><div className="space-y-2">{ts.map((t,i) => <div key={i} className="rounded-lg border border-slate-200 p-3"><div className="flex items-center justify-between mb-1.5"><span className="text-xs font-medium text-slate-500">{t.category}</span><span className={cn("text-[10px] px-1.5 py-0.5 rounded-full",t.confidence>=0.9?"bg-green-100 text-green-700":t.confidence>=0.8?"bg-accent-100 text-accent-700":"bg-slate-100 text-slate-500")}>置信度 {(t.confidence*100).toFixed(0)}%</span></div><p className="text-xs text-slate-400 mb-1">对标书做法：</p><p className="text-sm text-slate-600 mb-2 leading-relaxed">{t.observation}</p><p className="text-xs text-slate-400 mb-1">可模仿规则：</p><p className="text-sm text-slate-800 leading-relaxed">{t.rule}</p></div>)}</div></div>; })}
+    <button onClick={onApply} disabled={applied || disabled} className={cn("rounded-lg px-4 py-1.5 text-xs font-medium",applied?"bg-green-100 text-green-700":"bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40")}>{applied?"已应用":"应用"}</button>
+  </div>;
+}
+
+function LoopDetail({ boundaries, total }: { boundaries: Array<{chapterIndex:number;type:string}>; total: number }) {
+  const starts = boundaries.filter(b => b.type === "start");
+  const ends = boundaries.filter(b => b.type === "end");
+  const loops = starts.map((s,i) => ({ start: s.chapterIndex, end: ends[i]?.chapterIndex ?? "?" }));
+  return <div className="space-y-3">
+    <div className="text-sm text-slate-500">共 <b className="text-slate-700">{loops.length}轮回环</b>，平均 {loops.length>0?Math.round(total/loops.length):"?"} 章/轮</div>
+    <div className="flex flex-wrap gap-1 text-xs">{loops.map((l,i) => <span key={i} className="rounded bg-brand-50 border border-brand-100 px-2 py-1 text-slate-600">第{i+1}轮: 第{l.start}-{l.end}章</span>)}</div>
+  </div>;
 }
 const KEYS = ["loops","coolpoints","architecture","hooks","goldenFinger","timeline","writing","contentBeats"];
 
@@ -287,88 +305,45 @@ export function ReferenceCockpitPage() {
         </div>
 
         {/* Analysis Results */}
-        <div className="space-y-4">
-          <Section title="架构判定" icon={GitBranch} done={done.architecture} running={running === "architecture"} onRun={() => run("architecture")} hasFile={!!fileName || !!profId}>
-            {archData && <>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-base font-bold text-slate-800">{ARCH_LABELS[archData.type] ?? archData.type}</span>
-                {archData.confidence && <span className="text-xs text-slate-400">置信度 {(archData.confidence*100).toFixed(0)}%</span>}
-              </div>
-              {archData.reasoning && <p className="text-sm text-slate-600 mb-2">{archData.reasoning}</p>}
-              {archData.observedPatterns?.length > 0 && <div className="flex flex-wrap gap-1 mb-3">{archData.observedPatterns.map((p,i) => <span key={i} className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">{p}</span>)}</div>}
-              <button onClick={handleApplyArchitecture} disabled={appliedArch || !applyTargetId} className={cn("rounded-lg px-4 py-1.5 text-xs font-medium", appliedArch ? "bg-green-100 text-green-700" : "bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40")}>{appliedArch ? <><Check size={10} className="inline mr-1"/>已应用</> : "应用"}</button>
-            </>}
+        <div className="space-y-3">
+          <Section title="架构判定" icon={GitBranch} done={done.architecture} running={running === "architecture"} onRun={() => run("architecture")} hasFile={!!fileName || !!profId}
+            detailContent={archData ? <ArchDetail data={archData} onApply={handleApplyArchitecture} applied={appliedArch} disabled={!applyTargetId} /> : null}>
+            {done.architecture && <StatusLine label={ARCH_LABELS[archData?.type ?? ""] ?? archData?.type} />}
           </Section>
 
-          <Section title="钩子模式" icon={Eye} done={done.hooks} running={running === "hooks"} onRun={() => run("hooks")} hasFile={!!fileName || !!profId}>
-            {hookData && <div className="flex items-center gap-4 text-sm">
-              {Object.entries(hookData.distribution ?? {}).map(([k,v]) => <div key={k} className="flex items-center gap-1"><span className="text-slate-500">{HOOK_LABELS[k]??k}</span><span className="font-bold text-slate-700">{v as number}章</span></div>)}
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-500">平均钩力 <b className="text-slate-700">{(hookData.avgHookStrength*100).toFixed(0)}%</b></span>
-              <span className="text-slate-500">· {hookData.typicalHookStyle}</span>
-            </div>}
+          <Section title="钩子模式" icon={Eye} done={done.hooks} running={running === "hooks"} onRun={() => run("hooks")} hasFile={!!fileName || !!profId}
+            detailContent={hookData ? <HookDetail data={hookData} /> : null}>
+            {done.hooks && <StatusLine label={`${Object.values(hookData?.distribution ?? {}).reduce((a:number,b:number)=>a+b,0)}章 · 平均钩力${((hookData?.avgHookStrength??0)*100).toFixed(0)}%`} />}
           </Section>
 
-          <Section title="金手指" icon={Sparkles} done={done.goldenFinger} running={running === "goldenFinger"} onRun={() => run("goldenFinger")} hasFile={!!fileName || !!profId}>
-            {gfData && <div className="space-y-2 text-sm">
-              <div><span className="font-medium text-slate-600">能力</span><div className="flex flex-wrap gap-1 mt-1">{gfData.abilities.map((a,i) => <span key={i} className="rounded bg-green-50 px-2 py-1 text-xs text-green-700">{a}</span>)}</div></div>
-              <div><span className="font-medium text-slate-600">限制</span><div className="flex flex-wrap gap-1 mt-1">{gfData.limits.map((l,i) => <span key={i} className="rounded bg-red-50 px-2 py-1 text-xs text-red-600">{l}</span>)}</div></div>
-            </div>}
+          <Section title="金手指" icon={Sparkles} done={done.goldenFinger} running={running === "goldenFinger"} onRun={() => run("goldenFinger")} hasFile={!!fileName || !!profId}
+            detailContent={gfData ? <GFDetail data={gfData} /> : null}>
+            {done.goldenFinger && <StatusLine label={`${gfData?.abilities?.length??0}项能力 · ${gfData?.limits?.length??0}条限制`} />}
           </Section>
 
-          <Section title="内容节拍DNA" icon={BookOpen} done={done.contentBeats} running={running === "contentBeats"} onRun={() => run("contentBeats")} hasFile={!!fileName || !!profId}>
-            {beatData && <div className="space-y-2">
-              <div className="flex flex-wrap gap-1 text-xs">{beatData.beatTypes.map(bt => { const c = beatData.overallDistribution[bt] ?? 0; const t = beatData.totalChapters; return <span key={bt} className="rounded bg-slate-100 px-2 py-1" title={`${c}章 (${t>0?(c/t*100).toFixed(0):0}%)`}>{bt} <b className="text-slate-700">{c}章</b></span>; })}</div>
-              <button onClick={handleApplyContentBeats} disabled={!applyTargetId} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-40">应用</button>
-            </div>}
+          <Section title="内容节拍DNA" icon={BookOpen} done={done.contentBeats} running={running === "contentBeats"} onRun={() => run("contentBeats")} hasFile={!!fileName || !!profId}
+            detailContent={beatData ? <BeatDetail data={beatData} onApply={handleApplyContentBeats} disabled={!applyTargetId} /> : null}>
+            {done.contentBeats && <StatusLine label={`${beatData?.beatTypes?.length??0}种节拍 · ${beatData?.totalChapters??0}章`} />}
           </Section>
 
-          <Section title="爽点分布" icon={TrendingUp} done={done.coolpoints} running={running === "coolpoints"} onRun={() => run("coolpoints")} hasFile={!!fileName || !!profId}>
-            {done.coolpoints && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-slate-500">高爽点 <b className="text-green-600">{(annotData.highCoolChapters as any[])?.length ?? 0}章</b></span>
-                  <span className="text-slate-500">低爽点 <b className="text-red-400">{(annotData.lowCoolChapters as any[])?.length ?? 0}章</b></span>
-                </div>
-                {(annotData.highCoolChapters as number[])?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 text-xs">
-                    {(annotData.highCoolChapters as number[]).map(ch => <span key={ch} className="rounded bg-green-50 px-1.5 py-0.5 text-green-700">第{ch}章</span>)}
-                  </div>
-                )}
-              </div>
-            )}
+          <Section title="爽点分布" icon={TrendingUp} done={done.coolpoints} running={running === "coolpoints"} onRun={() => run("coolpoints")} hasFile={!!fileName || !!profId}
+            detailContent={done.coolpoints ? <CoolPointDetail high={(annotData.highCoolChapters as number[])??[]} low={(annotData.lowCoolChapters as number[])??[]} /> : null}>
+            {done.coolpoints && <StatusLine label={`高爽点${(annotData.highCoolChapters as any[])?.length??0}章 · 低爽点${(annotData.lowCoolChapters as any[])?.length??0}章`} />}
           </Section>
 
-          <Section title="设定释放时间线" icon={FileText} done={done.timeline} running={running === "timeline"} onRun={() => run("timeline")} hasFile={!!fileName || !!profId}>
-            {timelineData && <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">{timelineData.map((s,i) => <div key={i} className="flex items-center gap-2"><span className="text-slate-400 text-xs w-14 shrink-0">第{s.chapterIndex}章</span><span className="text-slate-600">{s.settingName}</span></div>)}</div>}
+          <Section title="设定释放时间线" icon={FileText} done={done.timeline} running={running === "timeline"} onRun={() => run("timeline")} hasFile={!!fileName || !!profId}
+            detailContent={timelineData ? <TimelineDetail data={timelineData} /> : null}>
+            {done.timeline && <StatusLine label={`${timelineData?.length??0}条设定`} />}
           </Section>
 
           <Section title="写法技法" icon={BookOpen} done={done.writing} running={running === "writing"} onRun={() => run("writing")} hasFile={!!fileName || !!profId}
-            detailContent={writingData ? <WritingDetail data={writingData} /> : null}>
-            {writingData && <div className="space-y-2">
-              {writingData.overallStyleDescription && <p className="text-sm text-slate-600 line-clamp-2">{writingData.overallStyleDescription}</p>}
-              <div className="grid grid-cols-5 gap-3 text-sm">{[{label:"叙事技法",n:writingData.narrativeAssets?.length??0},{label:"语言风格",n:writingData.languageAssets?.length??0},{label:"角色塑造",n:writingData.characterAssets?.length??0},{label:"节奏控制",n:writingData.rhythmAssets?.length??0},{label:"反AI特征",n:writingData.antiAiAssets?.length??0}].map(c => <div key={c.label} className="rounded-lg border border-slate-200 p-3 text-center"><div className="text-2xl font-bold text-slate-700">{c.n}</div><div className="text-xs text-slate-400 mt-1">{c.label}</div></div>)}</div>
-              <button onClick={handleApplyStyle} disabled={profileCreated || !applyTargetId} className={cn("rounded-lg px-4 py-1.5 text-xs font-medium", profileCreated ? "bg-green-100 text-green-700" : "bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40")}>{profileCreated ? <><Check size={10} className="inline mr-1"/>已应用</> : "应用"}</button>
-            </div>}
+            detailContent={writingData ? <WritingDetail data={writingData} onApply={handleApplyStyle} applied={profileCreated} disabled={!applyTargetId} /> : null}>
+            {done.writing && <StatusLine label={`${(writingData?.narrativeAssets?.length??0)+(writingData?.languageAssets?.length??0)+(writingData?.characterAssets?.length??0)+(writingData?.rhythmAssets?.length??0)+(writingData?.antiAiAssets?.length??0)}条技法`} />}
           </Section>
 
-          <Section title="回环推断" icon={GitBranch} done={done.loops} running={running === "loops"} onRun={() => run("loops")} hasFile={!!fileName || !!profId}>
-            {done.loops && (() => {
-              const boundaries = (annotData.loopBoundaries as Array<{chapterIndex: number; type: string}>) ?? [];
-              const starts = boundaries.filter(b => b.type === "start");
-              const ends = boundaries.filter(b => b.type === "end");
-              const loops = starts.map((s, i) => ({ start: s.chapterIndex, end: ends[i]?.chapterIndex ?? "?" }));
-              return (
-                <div className="space-y-2">
-                  <div className="text-sm text-slate-500">共 <b className="text-slate-700">{loops.length}轮回环</b>，平均每轮 {stats?.totalChapters && loops.length > 0 ? Math.round(stats!.totalChapters / loops.length) : "?"} 章</div>
-                  <div className="flex flex-wrap gap-1 text-xs">
-                    {loops.map((l, i) => (
-                      <span key={i} className="rounded bg-brand-50 border border-brand-100 px-2 py-1 text-slate-600">第{i+1}轮: 第{l.start}-{l.end}章</span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+          <Section title="回环推断" icon={GitBranch} done={done.loops} running={running === "loops"} onRun={() => run("loops")} hasFile={!!fileName || !!profId}
+            detailContent={done.loops ? <LoopDetail boundaries={(annotData.loopBoundaries as Array<{chapterIndex:number;type:string}>)??[]} total={stats?.totalChapters??0} /> : null}>
+            {done.loops && <StatusLine label={`${((annotData.loopBoundaries as any[])??[]).filter((b:any)=>b.type==="start").length}轮回环`} />}
           </Section>
         </div>
       </div>
