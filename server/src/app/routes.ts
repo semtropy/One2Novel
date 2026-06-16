@@ -11,6 +11,7 @@ import directorRoutes from "./routes/director.routes";
 import settingsRoutes from "./routes/settings.routes";
 import worldRoutes from "./routes/world.routes";
 import payoffRoutes from "./routes/payoff.routes";
+import referenceProfileRoutes from "../modules/novel/setup/routes/planning/reference-profile.routes";
 
 export function registerRoutes(app: Express) {
   const api = Router();
@@ -30,6 +31,7 @@ export function registerRoutes(app: Express) {
   api.use("/", settingsRoutes);
   api.use("/", worldRoutes);
   api.use("/", payoffRoutes);
+  api.use("/", referenceProfileRoutes);
   api.use("/novels", novelRoutes);
   api.use("/styles", styleRoutes);
 
