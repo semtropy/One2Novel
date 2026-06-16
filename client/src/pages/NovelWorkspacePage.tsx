@@ -8,13 +8,11 @@ import { PlanningQuickDrawer } from "../components/workspace/PlanningQuickDrawer
 import { ChapterWritePanel } from "../components/workspace/ChapterWritePanel";
 import { ContextPanel } from "../components/workspace/ContextPanel";
 import { type WorkspaceDiagnosis } from "../api/revision";
-import { ProgressBar } from "../components/novel/ProgressBar";
 import { DirectorPanel } from "../components/workspace/DirectorPanel";
 import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
-import { AlertTriangle, PenLine, Download, Trash2, Plus, ShieldCheck } from "lucide-react";
+import { AlertTriangle, PenLine, Trash2, Plus, ShieldCheck } from "lucide-react";
 import { useCompletionReadiness } from "../api/novel";
-import ExportDialog from "../components/workspace/ExportDialog";
 import { cn } from "../lib/cn";
 
 export function NovelWorkspacePage() {
@@ -24,8 +22,6 @@ export function NovelWorkspacePage() {
   const qc = useQueryClient();
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [deleteChapterId, setDeleteChapterId] = useState<string | null>(null);
-  const [showExport, setShowExport] = useState(false);
-
   // ─── Review + Diagnosis state (lifted from ChapterWritePanel) ───
   const [quality, setQuality] = useState<Record<string, unknown> | null>(null);
   const [diagnosis, setDiagnosis] = useState<WorkspaceDiagnosis | null>(null);
@@ -111,8 +107,6 @@ export function NovelWorkspacePage() {
   return (
     <div className="flex flex-col h-full max-h-full">
       {/* Dialogs */}
-      {showExport && <ExportDialog novelId={novel.id} onClose={() => setShowExport(false)} />}
-
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between mb-3">
         <div>
@@ -141,25 +135,6 @@ export function NovelWorkspacePage() {
               </>
             )}
           </div>
-        </div>
-        <div className="shrink-0">
-          <ProgressBar steps={(() => {
-            const hasCore = !!(novel.storySummary || novel.centralQuestion);
-            const hasChars = (novel.characters?.length ?? 0) > 0;
-            const hasOutline = !!novel.structuredOutline;
-            const hasWritten = allChapters.some(c => c.chapterStatus === "completed");
-            const allDone = allChapters.length > 0 && allChapters.every(c => c.chapterStatus === "completed");
-            return [
-              { key: "core", label: "核心", done: hasCore, current: !hasCore },
-              { key: "chars", label: "角色", done: hasChars, current: hasCore && !hasChars },
-              { key: "outline", label: "大纲", done: hasOutline, current: hasChars && !hasOutline },
-              { key: "writing", label: "写作", done: hasWritten, current: hasOutline && !hasWritten },
-              { key: "done", label: "完本", done: allDone, current: false },
-            ];
-          })()} />
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-lg bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700"><Download size={13} />导出</button>
         </div>
       </div>
 
@@ -251,8 +226,8 @@ export function NovelWorkspacePage() {
             )}
           </div>
 
-          {/* Right: Context Panel — toolbox grid */}
-          <div className="w-56 shrink-0 flex flex-col min-h-0">
+          {/* Right: Context Panel — toolbox */}
+          <div className="w-32 shrink-0 flex flex-col min-h-0">
             <div className="flex-1 min-h-0 rounded-xl border border-slate-200 bg-white overflow-y-auto p-3">
               <ContextPanel
                 novelId={novel.id}

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { RefreshCw, XCircle, Play, Save, X, ChevronDown, Lightbulb } from "lucide-react";
+import { RefreshCw, XCircle, Play, Save, Download, X, ChevronDown, Lightbulb } from "lucide-react";
 import { api } from "../../app/api";
 import { useNovel } from "../../api/novel";
 import { type RevisionOperation } from "../../api/revision";
@@ -7,6 +7,7 @@ import { ChapterEditor } from "./ChapterEditor";
 import { RevisionToolbar } from "./RevisionToolbar";
 import { RevisionWorkbench } from "./RevisionWorkbench";
 import { AutoWriteModal } from "./AutoWriteModal";
+import ExportDialog from "./ExportDialog";
 import { cn } from "../../lib/cn";
 
 interface Props { novelId: string; chapterId: string; reviewing: boolean; onReview: () => void }
@@ -28,6 +29,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
   const [saved, setSaved] = useState(false);
   const [savedContent, setSavedContent] = useState("");
   const [showAutoWrite, setShowAutoWrite] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [aiDetection, setAiDetection] = useState<AiDetectionResult | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -237,11 +239,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center justify-between mb-3 shrink-0 gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-slate-400">第{chapter?.order ?? "?"}章</span>
-          <span className="text-xs text-slate-300">{wordCount}字</span>
-          {saved && <span className="text-xs text-green-500">已保存</span>}
-        </div>
+        <div className="flex-1" />
         <div className="flex items-center gap-1.5">
           {/* Generate dropdown — single chapter (default click) or batch (dropdown) */}
           <div className="relative">
@@ -256,14 +254,19 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
               </div>
             )}
           </div>
-          <button onClick={onReview} disabled={!hasContent || generating || reviewing} className={cn("flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium", hasContent && !generating ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100" : "bg-slate-200 text-slate-400")}>{reviewing ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />}审查</button>
-          <button onClick={handleSave} disabled={generating || !isDirty} className={cn("flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium", !isDirty ? "border-slate-200 bg-slate-50 text-slate-400" : "border-green-300 bg-green-50 text-green-700 hover:bg-green-100")}><Save size={12} />保存</button>
+          <button onClick={handleSave} disabled={generating || !isDirty} className={cn("flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium", !isDirty ? "bg-slate-200 text-slate-400" : "bg-slate-800 text-white hover:bg-slate-700")}><Save size={12} />保存</button>
+          <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-700"><Download size={12} />导出</button>
         </div>
       </div>
 
-      {/* Title */}
-      <input value={displayTitle} onChange={(e) => setTitle(e.target.value)} onBlur={handleSaveTitle} placeholder="无标题"
-        className="mb-3 w-full text-xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-slate-400 focus:outline-none pb-1" />
+      {/* Chapter order + Title */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs text-slate-400 shrink-0">第{chapter?.order ?? "?"}章</span>
+        <input value={displayTitle} onChange={(e) => setTitle(e.target.value)} onBlur={handleSaveTitle} placeholder="无标题"
+          className="flex-1 text-xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-slate-400 focus:outline-none pb-1" />
+        <span className="text-xs text-slate-300 shrink-0">{wordCount}字</span>
+        {saved && <span className="text-xs text-green-500 shrink-0">已保存</span>}
+      </div>
 
       {/* Editor */}
       <div className="flex-1 min-h-0 relative">
@@ -306,6 +309,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
       )}
 
       {showAutoWrite && <AutoWriteModal novelId={novelId} onClose={() => setShowAutoWrite(false)} />}
+      {showExport && <ExportDialog novelId={novelId} onClose={() => setShowExport(false)} />}
 
       {/* Revision Toolbar */}
       {showToolbar && !generating && (
