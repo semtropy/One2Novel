@@ -71,13 +71,15 @@ export function ReferenceDomain({ novelId }: Props) {
   function setProfileData(p: any) {
     const annot: Record<string, any> = {};
     if (p.loopBoundaries) Object.assign(annot, JSON.parse(p.loopBoundaries));
-    if (p.coolPointDensity) { const cp = JSON.parse(p.coolPointDensity); annot.highCoolChapters = cp.highCoolChapters; annot.lowCoolChapters = cp.lowCoolChapters; }
-    if (p.hookPatterns) annot.hookPatterns = JSON.parse(p.hookPatterns);
-    if (p.goldenFingerBounds) annot.goldenFingerBounds = JSON.parse(p.goldenFingerBounds);
-    if (p.contentBeatPatterns) annot.contentBeatPatterns = JSON.parse(p.contentBeatPatterns);
-    if (p.settingTimeline) annot.keySettings = JSON.parse(p.settingTimeline);
+    if (p.coolPointDensity) { const cp = JSON.parse(p.coolPointDensity); annot.highCoolChapters = cp.highCoolChapters ?? []; annot.lowCoolChapters = cp.lowCoolChapters ?? []; }
+    if (p.hookPatterns) annot.hookPatterns = typeof p.hookPatterns === "string" ? JSON.parse(p.hookPatterns) : p.hookPatterns;
+    if (p.goldenFingerBounds) annot.goldenFingerBounds = typeof p.goldenFingerBounds === "string" ? JSON.parse(p.goldenFingerBounds) : p.goldenFingerBounds;
+    if (p.contentBeatPatterns) annot.contentBeatPatterns = typeof p.contentBeatPatterns === "string" ? JSON.parse(p.contentBeatPatterns) : p.contentBeatPatterns;
+    if (p.settingTimeline) annot.keySettings = typeof p.settingTimeline === "string" ? JSON.parse(p.settingTimeline) : p.settingTimeline;
     if (p.architectureType) annot.detectedArchitecture = { type: p.architectureType };
-    applyAnnotations(annot, { writingAssets: p.writingAssets, totalChapters: p.totalChapters });
+    // writingAssets stored as JSON string in profile
+    if (p.writingAssets) annot.writingAssets = typeof p.writingAssets === "string" ? JSON.parse(p.writingAssets) : p.writingAssets;
+    applyAnnotations(annot, { totalChapters: p.totalChapters });
   }
 
   function applyAnnotations(annot: Record<string, any>, raw?: Record<string, any>) {
@@ -92,7 +94,7 @@ export function ReferenceDomain({ novelId }: Props) {
     if (annot.goldenFingerBounds) nd.goldenFinger = true;
     const ks = annot.keySettings as any[];
     if (ks?.length > 0) nd.timeline = true;
-    if (raw?.writingAssets) nd.writing = true;
+    if (annot.writingAssets || (raw as any)?.writingAssets) nd.writing = true;
     if (annot.contentBeatPatterns) nd.contentBeats = true;
     setDone(nd);
     setAnnotData(annot as DataMap);
