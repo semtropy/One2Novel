@@ -133,13 +133,13 @@ export function SceneCardPanel({ novelId, chapterId }: Props) {
               </div>
               <div className="flex items-center gap-1.5">
                 <button onClick={handleGenerate} disabled={generate.isPending}
-                  className="text-xs px-2 py-1 rounded bg-brand-50 text-brand-600 hover:bg-brand-100 disabled:opacity-50 flex items-center gap-0.5">
+                  className="text-xs px-2 py-1 rounded bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center gap-0.5">
                   <Wand2 size={10} />{generate.isPending ? "生成中..." : scenes.length > 0 ? "重新生成" : "AI 生成"}
                 </button>
                 <button onClick={() => {
                   setScenes(plan!.scenes.map(s => ({ ...s })));
                   setDirty(false);
-                }} className={`text-xs px-2 py-1 rounded border ${dirty ? "border-slate-200 text-slate-600 hover:bg-slate-50" : "border-slate-100 text-slate-300"}`}>
+                }} className={`text-xs px-2 py-1 rounded border ${dirty ? "border-slate-300 text-slate-700 hover:bg-slate-100" : "border-slate-100 text-slate-300"}`}>
                   撤销
                 </button>
                 <button onClick={handleSave} disabled={update.isPending || !dirty}

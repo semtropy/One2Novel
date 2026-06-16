@@ -179,10 +179,10 @@ export function NovelWorkspacePage() {
           })()} />
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowStats(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"><BarChart3 size={13} />统计</button>
-          <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"><Download size={13} />导出</button>
-          {selectedChapterId && <button onClick={() => setShowDashboard(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50"><BarChart3 size={11} />仪表盘</button>}
-          {selectedChapterId && <button onClick={() => setShowDiff(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50"><Clock size={11} />历史</button>}
+          <button onClick={() => setShowStats(true)} className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg"><BarChart3 size={13} />统计</button>
+          <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg"><Download size={13} />导出</button>
+          {selectedChapterId && <button onClick={() => setShowDashboard(true)} className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-2.5 py-1 text-xs font-medium hover:bg-slate-700 rounded-lg"><BarChart3 size={11} />仪表盘</button>}
+          {selectedChapterId && <button onClick={() => setShowDiff(true)} className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-2.5 py-1 text-xs font-medium hover:bg-slate-700 rounded-lg"><Clock size={11} />历史</button>}
         </div>
       </div>
 
@@ -304,7 +304,7 @@ export function NovelWorkspacePage() {
             <h3 className="text-sm font-semibold text-slate-800 mb-2">删除章节</h3>
             <p className="text-xs text-slate-500 mb-4">此操作不可撤销。删除后章节将从列表中移除。</p>
             <div className="flex gap-2">
-              <button onClick={() => setDeleteChapterId(null)} className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">取消</button>
+              <button onClick={() => setDeleteChapterId(null)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">取消</button>
               <button onClick={handleDeleteChapter} className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">确认删除</button>
             </div>
           </div>

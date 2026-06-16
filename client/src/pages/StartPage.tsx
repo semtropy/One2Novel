@@ -217,7 +217,7 @@ export function StartPage() {
             className={cn(
               "w-full flex items-center justify-center gap-2 rounded-xl px-6 py-4 text-sm font-medium transition-all",
               inspiration.trim()
-                ? "bg-brand-600 text-white hover:bg-brand-700 shadow-sm"
+                ? "bg-slate-900 text-white hover:bg-slate-800 shadow-sm"
                 : "bg-slate-200 text-slate-400 cursor-not-allowed",
               creating && "opacity-60",
             )}

@@ -298,7 +298,7 @@ export function PlanningHubPage() {
                   "flex items-center gap-1 rounded-lg border px-4 py-2 text-sm transition-colors",
                   currentStep === 0
                     ? "border-slate-100 text-slate-300 cursor-not-allowed"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50",
+                    : "border-slate-300 text-slate-700 hover:bg-slate-100",
                 )}
               >
                 <ChevronLeft size={14} />
@@ -316,7 +316,7 @@ export function PlanningHubPage() {
                   className={cn(
                     "flex items-center gap-1 rounded-lg px-5 py-2 text-sm font-medium transition-colors",
                     completedSteps.has(currentStep)
-                      ? "bg-brand-600 text-white hover:bg-brand-700"
+                      ? "bg-slate-900 text-white hover:bg-slate-800"
                       : "bg-slate-200 text-slate-400 cursor-not-allowed",
                   )}
                 >

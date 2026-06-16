@@ -336,7 +336,7 @@ export function StyleDomain({ novelId: _novelId }: { novelId?: string }) {
                               />
                               <button
                                 onClick={() => handleAddRule(p.id, field)}
-                                className="text-xs px-2 py-0.5 rounded bg-brand-50 text-brand-600 hover:bg-brand-100"
+                                className="text-xs px-2 py-0.5 rounded bg-slate-900 text-white hover:bg-slate-800"
                               >
                                 添加
                               </button>

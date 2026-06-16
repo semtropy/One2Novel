@@ -158,7 +158,7 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-slate-700">力量体系树状图</h3>
-              <button onClick={handleSavePowerNodes} className="rounded border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50">保存</button>
+              <button onClick={handleSavePowerNodes} className="rounded border bg-slate-800 text-white px-2.5 py-1 text-xs font-medium hover:bg-slate-700 rounded-lg">保存</button>
             </div>
             <PowerSystemTree nodes={powerNodes} onChange={setPowerNodes} />
           </div>
@@ -228,7 +228,7 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
           <button onClick={handleCalibrate} disabled={calibrating || calibrated}
             className={cn(
               "w-full rounded-lg py-2.5 text-sm font-medium transition-colors disabled:opacity-50",
-              calibrated ? "bg-green-600 text-white" : "bg-brand-600 text-white hover:bg-brand-700",
+              calibrated ? "bg-green-600 text-white" : "bg-slate-900 text-white hover:bg-slate-800",
             )}>
             {calibrating ? <RefreshCw size={14} className="animate-spin inline mr-1" /> :
              calibrated ? <CheckCircle size={14} className="inline mr-1" /> :

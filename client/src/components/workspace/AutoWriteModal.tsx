@@ -97,7 +97,7 @@ export function AutoWriteModal({ novelId, onClose }: Props) {
               <span className="text-sm text-slate-600">章</span>
             </div>
             <div className="flex gap-2">
-              <button onClick={onClose} className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">取消</button>
+              <button onClick={onClose} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100">取消</button>
               <button onClick={start} className="flex-1 rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700">开始</button>
             </div>
           </>

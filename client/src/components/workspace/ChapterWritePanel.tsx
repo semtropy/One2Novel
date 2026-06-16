@@ -256,7 +256,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
               </div>
             )}
           </div>
-          <button onClick={onReview} disabled={!hasContent || generating || reviewing} className={cn("flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium", hasContent && !generating ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100" : "border-slate-200 bg-slate-50 text-slate-300")}>{reviewing ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />}审查</button>
+          <button onClick={onReview} disabled={!hasContent || generating || reviewing} className={cn("flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium", hasContent && !generating ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100" : "bg-slate-200 text-slate-400")}>{reviewing ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />}审查</button>
           <button onClick={handleSave} disabled={generating || !isDirty} className={cn("flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium", !isDirty ? "border-slate-200 bg-slate-50 text-slate-400" : "border-green-300 bg-green-50 text-green-700 hover:bg-green-100")}><Save size={12} />保存</button>
         </div>
       </div>

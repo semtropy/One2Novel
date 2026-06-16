@@ -161,7 +161,7 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
       <button onClick={handleConfirmArchitecture} disabled={saving || saveSuccess}
         className={cn(
           "w-full rounded-xl py-2.5 text-sm font-medium transition-colors disabled:opacity-50",
-          saveSuccess ? "bg-green-600 text-white" : "bg-brand-600 text-white hover:bg-brand-700",
+          saveSuccess ? "bg-green-600 text-white" : "bg-slate-900 text-white hover:bg-slate-800",
         )}>
         {saving ? <RefreshCw size={14} className="animate-spin inline mr-1" /> :
          saveSuccess ? <CheckCircle size={14} className="inline mr-1" /> :

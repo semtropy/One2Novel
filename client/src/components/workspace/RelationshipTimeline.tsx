@@ -32,7 +32,7 @@ export function RelationshipTimeline({ novelId }: Props) {
   return (
     <>
       <button onClick={() => setShow(true)}
-        className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50">
+        className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-2.5 py-1 text-xs font-medium hover:bg-slate-700 rounded-lg">
         <GitBranch size={11} />关系
       </button>
       {show && (

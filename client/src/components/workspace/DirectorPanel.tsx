@@ -69,7 +69,7 @@ export function DirectorPanel({ novelId, compact }: Props) {
               <RotateCcw size={12} className={resuming ? "animate-spin" : ""} /> 恢复
             </button>
           )}
-          <button onClick={() => setShowAutoWrite(true)} disabled={isRunning} className={cn("flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium", isRunning ? "bg-slate-100 text-slate-400" : "bg-slate-800 text-white hover:bg-slate-700")}>
+          <button onClick={() => setShowAutoWrite(true)} disabled={isRunning} className={cn("flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium", isRunning ? "bg-slate-100 text-slate-400" : "bg-slate-900 text-white hover:bg-slate-800")}>
             {isRunning ? <><RefreshCw size={12} className="animate-spin" /> 运行中...</> : <><Play size={12} /> 启动</>}
           </button>
           {showAutoWrite && <AutoWriteModal novelId={novelId} onClose={() => setShowAutoWrite(false)} />}

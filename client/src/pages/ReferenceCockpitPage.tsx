@@ -204,7 +204,7 @@ export function ReferenceCockpitPage() {
                     )}
                     <button onClick={handleApplyArchitecture} disabled={appliedArch}
                       className={cn("w-full rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                        appliedArch ? "bg-green-100 text-green-700" : "bg-brand-600 text-white hover:bg-brand-700")}>
+                        appliedArch ? "bg-green-100 text-green-700" : "bg-slate-900 text-white hover:bg-slate-800")}>
                       {appliedArch ? <><Check size={10} className="inline mr-1" />已应用</> : "应用到当前小说"}
                     </button>
                   </div>
@@ -273,7 +273,7 @@ export function ReferenceCockpitPage() {
                     </div>
                     <button onClick={handleCreateProfile} disabled={profileCreated || createProfile.isPending}
                       className={cn("w-full rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                        profileCreated ? "bg-green-100 text-green-700" : "bg-green-600 text-white hover:bg-green-700")}>
+                        profileCreated ? "bg-green-100 text-green-700" : "bg-slate-900 text-white hover:bg-slate-800")}>
                       {profileCreated ? <><Check size={10} className="inline mr-1" />风格配置已创建</> : createProfile.isPending ? "创建中..." : "创建风格配置"}
                     </button>
                   </div>
@@ -302,7 +302,7 @@ function AnalysisCard({ title, icon: Icon, done, running, onRun, children }: {
         </div>
         {!done && (
           <button onClick={onRun} disabled={running}
-            className="flex items-center gap-1 rounded border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50">
+            className="flex items-center gap-1 rounded border bg-slate-800 text-white px-2.5 py-1 text-xs font-medium hover:bg-slate-700 rounded-lg disabled:opacity-50">
             {running ? <RefreshCw size={11} className="animate-spin" /> : <Sparkles size={11} />}
             {running ? "分析中" : "分析"}
           </button>

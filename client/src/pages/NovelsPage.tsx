@@ -93,7 +93,7 @@ export function NovelsPage() {
               <div><h3 className="text-sm font-semibold text-slate-800">删除小说</h3><p className="text-xs text-slate-500">此操作不可撤销</p></div>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setDeleteId(null)} className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">取消</button>
+              <button onClick={() => setDeleteId(null)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">取消</button>
               <button onClick={handleDelete} className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">确认删除</button>
             </div>
           </div>

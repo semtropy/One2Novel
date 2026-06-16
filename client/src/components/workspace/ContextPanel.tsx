@@ -130,7 +130,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
                 </div>
               ))}
             </div>
-            <button onClick={() => setShowCharDetail(true)} className="w-full text-xs text-brand-500 hover:text-brand-700 text-left mt-1">
+            <button onClick={() => setShowCharDetail(true)} className="w-full text-xs text-slate-700 hover:text-slate-900 text-left mt-1">
               查看详情
             </button>
           </div>
@@ -250,7 +250,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
             </div>
             <button
               onClick={() => setShowDetail(true)}
-              className="w-full text-xs text-brand-500 hover:text-brand-700 text-left"
+              className="w-full text-xs text-slate-700 hover:text-slate-900 text-left"
             >
               查看详情
             </button>

@@ -157,7 +157,7 @@ export function BottomPanel({ novelId, chapterId }: Props) {
               </div>
               <div className="flex items-center gap-1.5">
                 <button onClick={handleScanPayoffs} disabled={scanning}
-                  className="text-xs px-2 py-1 rounded border border-brand-200 bg-brand-50 text-brand-600 hover:bg-brand-100 disabled:opacity-50 flex items-center gap-0.5">
+                  className="text-xs px-2 py-1 rounded border border-brand-200 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center gap-0.5">
                   <Sparkles size={10} />{scanning ? "扫描中..." : "AI 扫描"}
                 </button>
                 <AddPayoffForm novelId={novelId} onDone={() => {
@@ -215,7 +215,7 @@ export function BottomPanel({ novelId, chapterId }: Props) {
                       <span className="text-slate-400">{label}绑定</span>
                       <div className="relative">
                         <button onClick={() => loadProfilesAndOpenDropdown(target)}
-                          className="text-brand-500 hover:text-brand-700 text-xs">＋ 选择</button>
+                          className="text-slate-700 hover:text-slate-900 text-xs">＋ 选择</button>
                         {openDropdown === target && unbound.length > 0 && (
                           <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-[70] max-h-40 overflow-y-auto">
                             {unbound.map(p => (
@@ -319,8 +319,8 @@ function PayoffCard({ payoff, statusMap, novelId, onUpdated }: {
             <input type="number" className="w-16 border border-slate-200 rounded px-1 py-0.5 text-xs" value={form.targetEndOrder || ""} onChange={e => setForm({ ...form, targetEndOrder: parseInt(e.target.value) || 0 })} placeholder="止" />
           </div>
           <div className="flex gap-1 justify-end">
-            <button onClick={() => setEditing(false)} className="text-xs px-2 py-0.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-50">取消</button>
-            <button onClick={handleSave} className="text-xs px-2 py-0.5 rounded bg-brand-50 text-brand-600 hover:bg-brand-100">保存</button>
+            <button onClick={() => setEditing(false)} className="text-xs px-2 py-0.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-100">取消</button>
+            <button onClick={handleSave} className="text-xs px-2 py-0.5 rounded bg-slate-900 text-white hover:bg-slate-800">保存</button>
           </div>
         </div>
       ) : (
@@ -378,6 +378,6 @@ function AddPayoffForm({ novelId, onDone }: { novelId: string; onDone: () => voi
       <button onClick={handleAdd} disabled={!title.trim()} className="w-full rounded bg-brand-600 px-3 py-1.5 text-xs text-white hover:bg-brand-700 disabled:opacity-50">添加</button>
     </div>
   ) : (
-    <button onClick={() => setShow(true)} className="text-xs px-2 py-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-0.5"><Plus size={10} />添加</button>
+    <button onClick={() => setShow(true)} className="text-xs px-2 py-1 rounded border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center gap-0.5"><Plus size={10} />添加</button>
   );
 }

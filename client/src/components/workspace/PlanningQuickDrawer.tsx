@@ -187,7 +187,7 @@ export function PlanningQuickDrawer({ novelId, onSwitchToPlanning }: Props) {
       {/* Footer — go to planning tab + emergency modify */}
       <div className="shrink-0 border-t border-slate-100 px-4 py-2 space-y-1.5">
         <button onClick={() => { setOpen(false); onSwitchToPlanning?.(); }}
-          className="block w-full text-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50">
+          className="block w-full text-center rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg">
           切换到规划面板编辑
         </button>
         <button onClick={() => setShowEmergencyDialog(true)}
