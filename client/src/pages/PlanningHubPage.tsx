@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   BookOpen, GitBranch, Users, Map, Target,
-  PenLine, ChevronRight, ChevronLeft, CheckCircle, Upload,
+  PenLine, ChevronRight, ChevronLeft, CheckCircle, Upload, Sparkles,
 } from "lucide-react";
 import { useNovel } from "../api/novel";
 import { api } from "../app/api";
@@ -26,8 +26,8 @@ import { BlueprintDomain } from "../components/planning/BlueprintDomain";
 import { PositioningDomain } from "../components/planning/PositioningDomain";
 
 const STEPS = [
-  { id: "input",        label: "创作起点", icon: BookOpen,    hint: "输入灵感 · 生成故事核心" },
-  { id: "architecture", label: "架构选择", icon: GitBranch,   hint: "内置架构模板 · 参考书分析 · 金手指 · 世界规则" },
+  { id: "input",        label: "创作起点", icon: BookOpen,    hint: "故事核心 · 世界规则 · 金手指设定" },
+  { id: "architecture", label: "架构选择", icon: GitBranch,   hint: "内置架构模板 · 参考书分析" },
   { id: "characters",   label: "角色阵容", icon: Users,       hint: "AI 生成角色 · 设置功能标签 · 编辑关系网络" },
   { id: "blueprint",    label: "章节蓝图", icon: Map,         hint: "生成回环骨架 · 逐卷展开 · 章节分配" },
   { id: "calibration",  label: "发布定位", icon: Target,      hint: "商业定位 · 爽点配方 · 期待管理" },
@@ -42,8 +42,8 @@ export function PlanningHubPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set([0]));
 
-  // Step1 sub-tabs: 内置架构 | 参考书分析 | 世界规则
-  const [archSubTab, setArchSubTab] = useState<"arch" | "reference" | "world">("arch");
+  // Step sub-tabs: Step0(arch/world/golden) Step1(arch/reference)
+  const [subTab, setSubTab] = useState("arch");
 
   // Load persisted pipeline state on mount
   useEffect(() => {
@@ -67,7 +67,7 @@ export function PlanningHubPage() {
   }, []);
 
   // Free navigation — any step clickable at any time
-  const goToStep = (idx: number) => setCurrentStep(idx);
+  const goToStep = (idx: number) => { setCurrentStep(idx); setSubTab("arch"); };
 
   const goToNext = () => {
     if (currentStep < STEPS.length - 1) setCurrentStep(currentStep + 1);
@@ -155,47 +155,55 @@ export function PlanningHubPage() {
           <div className="max-w-4xl mx-auto">
             <div className="rounded-xl border border-slate-200 bg-white p-6 min-h-[400px]">
 
-              {/* Step 0: 创作起点 — 故事核心 */}
+              {/* Step 0: 创作起点 — 故事核心 + 世界规则 + 金手指 */}
               {currentStep === 0 && (
-                <StoryCoreDomain
-                  novelId={novel.id}
-                  onComplete={() => onStepComplete(0)}
-                />
+                <div className="space-y-4">
+                  <div className="flex gap-1 border-b border-slate-100 pb-2">
+                    <button onClick={() => setSubTab("arch")}
+                      className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                        subTab === "arch" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
+                      <BookOpen size={12} />故事核心
+                    </button>
+                    <button onClick={() => setSubTab("world")}
+                      className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                        subTab === "world" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
+                      <Target size={12} />世界规则
+                    </button>
+                    <button onClick={() => setSubTab("golden")}
+                      className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                        subTab === "golden" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
+                      <Sparkles size={12} />金手指
+                    </button>
+                  </div>
+                  {subTab === "arch" ? (
+                    <StoryCoreDomain novelId={novel.id} onComplete={() => onStepComplete(0)} />
+                  ) : subTab === "world" ? (
+                    <WorldPanel novelId={novel.id} />
+                  ) : (
+                    <GoldenFingerPanel novelId={novel.id} />
+                  )}
+                </div>
               )}
 
-              {/* Step 1: 架构选择 — 内置架构 | 参考书分析 | 世界规则 */}
+              {/* Step 1: 架构选择 — 内置架构 | 参考书分析 */}
               {currentStep === 1 && (
                 <div className="space-y-4">
                   <div className="flex gap-1 border-b border-slate-100 pb-2">
-                    <button
-                      onClick={() => setArchSubTab("arch")}
+                    <button onClick={() => setSubTab("arch")}
                       className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        archSubTab === "arch" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}
-                    >
+                        subTab === "arch" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
                       <GitBranch size={12} />内置架构
                     </button>
-                    <button
-                      onClick={() => setArchSubTab("reference")}
+                    <button onClick={() => setSubTab("reference")}
                       className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        archSubTab === "reference" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}
-                    >
+                        subTab === "reference" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
                       <Upload size={12} />参考书分析
                     </button>
-                    <button
-                      onClick={() => setArchSubTab("world")}
-                      className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        archSubTab === "world" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}
-                    >
-                      <Target size={12} />世界规则
-                    </button>
                   </div>
-
-                  {archSubTab === "arch" ? (
+                  {subTab === "arch" ? (
                     <ArchitectureDomain novelId={novel.id} onComplete={() => onStepComplete(1)} />
-                  ) : archSubTab === "reference" ? (
-                    <ReferenceDomain novelId={novel.id} />
                   ) : (
-                    <WorldPanel novelId={novel.id} />
+                    <ReferenceDomain novelId={novel.id} />
                   )}
                 </div>
               )}
@@ -270,6 +278,49 @@ export function PlanningHubPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function GoldenFingerPanel({ novelId }: { novelId: string }) {
+  const { data: novel } = useNovel(novelId);
+  const [abilities, setAbilities] = useState("");
+  const [limits, setLimits] = useState("");
+
+  useEffect(() => {
+    if (novel?.goldenFinger) {
+      try {
+        const gf = JSON.parse(novel.goldenFinger);
+        if (Array.isArray(gf.abilities)) setAbilities(gf.abilities.join("\n"));
+        if (Array.isArray(gf.limits)) setLimits(gf.limits.join("\n"));
+      } catch {}
+    }
+  }, [novel?.goldenFinger]);
+
+  async function handleSave() {
+    const abilityList = abilities.split("\n").filter(Boolean);
+    const limitList = limits.split("\n").filter(Boolean);
+    await api.patch(`/novels/${novelId}`, { goldenFinger: JSON.stringify({ abilities: abilityList, limits: limitList }) });
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-slate-500">设定主角的独特能力及其边界——网文最核心的爽点引擎。能力的稀缺感和代价感比能力本身更重要。</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <span className="text-xs font-medium text-slate-500">能力清单</span>
+          <textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-slate-400 focus:outline-none" rows={6}
+            value={abilities} onChange={e => setAbilities(e.target.value)} placeholder="每行一条能力" />
+        </div>
+        <div>
+          <span className="text-xs font-medium text-slate-500">限制清单</span>
+          <textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-slate-400 focus:outline-none" rows={6}
+            value={limits} onChange={e => setLimits(e.target.value)} placeholder="每行一条限制" />
+        </div>
+      </div>
+      <button onClick={handleSave} className="rounded-lg bg-slate-800 px-4 py-1.5 text-xs font-medium text-white hover:bg-slate-700">
+        保存金手指设定
+      </button>
     </div>
   );
 }

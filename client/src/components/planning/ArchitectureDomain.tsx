@@ -26,8 +26,6 @@ interface PhaseDef {
 export function ArchitectureDomain({ novelId, onComplete }: Props) {
   const { data: novel, refetch } = useNovel(novelId);
   const updateNovel = useUpdateNovel();
-  const [localAbilities, setLocalAbilities] = useState("");
-  const [localLimits, setLocalLimits] = useState("");
   const [selectedArch, setSelectedArch] = useState(novel?.architectureType ?? "");
   const [showLoopEditor, setShowLoopEditor] = useState(false);
   const [phases, setPhases] = useState<PhaseDef[]>([]);
@@ -39,16 +37,6 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => { if (novel?.architectureType && !selectedArch) setSelectedArch(novel.architectureType); }, [novel?.architectureType]);
-
-  useEffect(() => {
-    if (novel?.goldenFinger) {
-      try {
-        const gf = JSON.parse(novel.goldenFinger);
-        if (Array.isArray(gf.abilities)) setLocalAbilities(gf.abilities.join("\n"));
-        if (Array.isArray(gf.limits)) setLocalLimits(gf.limits.join("\n"));
-      } catch {}
-    }
-  }, [novel?.goldenFinger]);
 
   useEffect(() => {
     if (!novelId || phasesLoaded) return;
@@ -76,7 +64,6 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
       if (phases.length > 0) await api.put(`/novels/${novelId}/loop-definition`, { phases }).catch(() => {});
       await api.post(`/novels/${novelId}/pipeline/step/architecture`, {
         architectureType: selectedArch || "case_driven",
-        goldenFinger: { abilities: localAbilities.split("\n").filter(Boolean), limits: localLimits.split("\n").filter(Boolean) },
         centralQuestion: novel?.centralQuestion ?? undefined,
         endingDirection: novel?.endingDirection ?? undefined,
       });
@@ -151,14 +138,6 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
             </div>
           </div>
         )}
-      </section>
-
-      <section className="rounded-xl border border-brand-200 bg-brand-50/30 p-4">
-        <h3 className="text-sm font-medium text-brand-800 mb-3">金手指设定</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <div><span className="text-xs font-medium text-slate-500">能力清单</span><textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-brand-300 focus:outline-none" rows={5} value={localAbilities} onChange={e => setLocalAbilities(e.target.value)} placeholder={"每行一条能力\n如：\n可以看到物品的隐藏信息\n能在战斗中预判敌人动作"} /></div>
-          <div><span className="text-xs font-medium text-slate-500">限制清单</span><textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-brand-300 focus:outline-none" rows={5} value={localLimits} onChange={e => setLocalLimits(e.target.value)} placeholder={"每行一条限制\n如：\n每天只能使用3次预判\n吞噬能力有30%失败率"} /></div>
-        </div>
       </section>
 
       <button onClick={handleConfirmArchitecture} disabled={saving || saveSuccess}
