@@ -35,6 +35,7 @@ export function ReferenceCockpitPage() {
 
   const [name, setName] = useState("");
   const [profId, setProfId] = useState<string | null>(isNew ? null : profileId ?? null);
+  const [hostNovelId, setHostNovelId] = useState<string>(""); // 承载上传分析的小说
   const [fileName, setFileName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
@@ -92,19 +93,14 @@ export function ReferenceCockpitPage() {
       if (!targetNovelId) { setUploadMsg("请先创建一本小说"); return; }
       await api.post(`/novels/${targetNovelId}/reference-book`, { fileName: fname, content: text });
       setFileName(fname); setName(fname.replace(/\.txt$/i, ""));
+      setHostNovelId(targetNovelId);
       setUploadMsg("");
-      // Store the novelId so we can use it for analysis
-      (window as any).__refNovelId = targetNovelId;
     } catch { setUploadMsg("上传失败"); }
     finally { setUploading(false); }
   }
 
-  function getNovelId(): string {
-    return (window as any).__refNovelId || novels[0]?.id || "";
-  }
-
   async function run(k: string) {
-    const nid = getNovelId();
+    const nid = hostNovelId;
     if (!nid) return;
     setRunning(k);
     try {
@@ -120,7 +116,7 @@ export function ReferenceCockpitPage() {
     // Reload profile if it exists, otherwise check the reference book
     if (profId) { await loadProfile(profId); }
     else {
-      const nid2 = getNovelId();
+      const nid2 = hostNovelId;
       if (nid2) {
         const { data } = await api.get(`/novels/${nid2}/reference-book`);
         if (data.data?.profileId) { setProfId(data.data.profileId); navigate(`/reference-profiles/${data.data.profileId}`, { replace: true }); }
@@ -196,18 +192,25 @@ export function ReferenceCockpitPage() {
 
         {/* Upload area (new profile only) */}
         {!profId && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 py-8 text-center">
-            <Upload size={32} className="mx-auto mb-3 text-slate-300" />
-            <p className="text-sm text-slate-600 mb-1">上传对标网络小说 .txt 文件</p>
-            <p className="text-xs text-slate-400 mb-4">支持百万字以上，AI 将分析回环结构、爽点分布、写作技法等 8 个维度</p>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-slate-800 px-4 py-2 text-xs font-medium text-white hover:bg-slate-700">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 py-8 text-center space-y-3">
+            <Upload size={32} className="mx-auto text-slate-300" />
+            <p className="text-sm text-slate-600">上传对标网络小说 .txt 文件</p>
+            <p className="text-xs text-slate-400">支持百万字以上，AI 将分析回环结构、爽点分布、写作技法等 8 个维度</p>
+            {novels.length > 0 && (
+              <select value={hostNovelId} onChange={e => setHostNovelId(e.target.value)}
+                className="mx-auto block rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 focus:border-slate-400 focus:outline-none">
+                <option value="">选择承载小说</option>
+                {novels.map(n => <option key={n.id} value={n.id}>{n.title}</option>)}
+              </select>
+            )}
+            <label className={cn("inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white", hostNovelId ? "bg-slate-800 hover:bg-slate-700" : "bg-slate-300 cursor-not-allowed")}>
               <Upload size={12} />{uploading ? "上传中..." : "选择文件"}
-              <input type="file" accept=".txt" className="hidden" onChange={e => {
+              {hostNovelId && <input type="file" accept=".txt" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
                 if (file) { const r = new FileReader(); r.onload = ev => handleUpload(ev.target?.result as string, file.name); r.readAsText(file); }
-              }} />
+              }} />}
             </label>
-            {uploadMsg && <p className={cn("text-xs mt-2", uploadMsg.includes("失败") ? "text-red-500" : "text-green-600")}>{uploadMsg}</p>}
+            {uploadMsg && <p className={cn("text-xs", uploadMsg.includes("失败") ? "text-red-500" : "text-green-600")}>{uploadMsg}</p>}
           </div>
         )}
 
