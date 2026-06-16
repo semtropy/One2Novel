@@ -231,6 +231,7 @@ export interface NovelDetail {
   writingMode?: string | null;
   writingScale?: WritingScale;
   architectureType?: ArchitectureType | null;
+  activeProfileId?: string | null;
   loopSkeleton?: string | null;
   goldenFinger?: string | null;
   expectationProfile?: string | null;

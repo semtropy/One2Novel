@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { api } from "../app/api";
 import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import type { ProviderInfo } from "../components/settings/ProviderConfigDialog";
-import { StyleDomain } from "../components/planning/StyleDomain";
-
 const SELECT_STYLE = "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:ring-1 focus:ring-brand-200 focus:outline-none bg-white";
 
 export const MODEL_OPTIONS = [
@@ -239,12 +237,6 @@ export function SettingsPage() {
           </div>
         </section>
 
-        {/* ════════════════ 文风配置 ════════════════ */}
-        <section className="rounded-xl border border-slate-200 bg-white p-6">
-          <h3 className="text-sm font-semibold text-slate-800 mb-1">文风配置</h3>
-          <p className="text-xs text-slate-400 mb-5">创建和管理写作风格配置文件，上传范文让 AI 学习你的写作风格，然后在小说中绑定使用。</p>
-          <StyleDomain novelId="" />
-        </section>
       </div>
     </div>
 

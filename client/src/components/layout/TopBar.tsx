@@ -4,6 +4,7 @@ import { cn } from "../../lib/cn";
 
 const NAV_ITEMS = [
   { path: "/novels", label: "我的小说", icon: BookOpen },
+  { path: "/reference-profiles", label: "参考书档案", icon: BookOpen },
 ];
 
 export function TopBar() {
