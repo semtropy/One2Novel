@@ -31,7 +31,7 @@ export async function fetchAssemblyBase(novelId: string, chapterId: string) {
       targetAudience: true, bookSellingPoint: true, competingFeel: true, first30ChapterPromise: true,
       commercialTags: true, structuredOutline: true, estimatedChapterCount: true,
       chapters: { orderBy: { order: "asc" } },
-      characters: { take: 15 },
+      characters: { take: 50 },
     },
   });
   if (!novel) throw new Error("Novel not found");

@@ -85,7 +85,7 @@ async function extractTimelineEvents(
   const existing = await prisma.timelineItem.findMany({
     where: { novelId },
     orderBy: { sortOrder: "asc" },
-    take: 20,
+    take: 50,
   });
   const existingText = existing
     .map(e => `[sortOrder=${e.sortOrder}] [${e.category}] ${e.title}: ${e.description ?? ""}`)
@@ -260,14 +260,14 @@ export async function getPreChapterReminders(
 
   if (items.length === 0) return { reminders: [], summary: "" };
 
-  // Only show: overdue items (deadlines past due, violated items) + upcoming items (next 5 chapters)
+  // Only show: overdue items + upcoming items (next 10 chapters, scaled for long-form)
   const overdue = items.filter(i =>
     (i.sortOrder < chapterOrder - 2 && i.category === "deadline" && i.status !== "resolved")
     || (i.status === "violated" && i.sortOrder < chapterOrder)
   );
 
   const upcoming = items.filter(i =>
-    i.sortOrder > chapterOrder && i.sortOrder <= chapterOrder + 5
+    i.sortOrder > chapterOrder && i.sortOrder <= chapterOrder + 10
   );
 
   const relevant = [...overdue, ...upcoming];

@@ -50,5 +50,22 @@ export function buildLiveCharacters(novel: {
     prohibitions?: string | null;
   }>;
 }): string {
-  return novel.characters.map(c => formatCharacterRecord(c)).join("\n");
+  const active = novel.characters.filter(c => c.currentStatus || c.currentGoal || c.personality);
+  const roster = novel.characters.filter(c => !c.currentStatus && !c.currentGoal && !c.personality);
+
+  const parts: string[] = [];
+  // Full roster (compact: name + role only)
+  if (novel.characters.length > 0) {
+    parts.push(`[角色名录 ${novel.characters.length}人] ${novel.characters.map(c => `${c.name}(${c.role})`).join("、")}`);
+  }
+  // Detailed info for active characters only
+  if (active.length > 0) {
+    parts.push(`\n[活跃角色详情]`);
+    parts.push(active.map(c => formatCharacterRecord(c)).join("\n"));
+  }
+  // Brief info for inactive characters
+  if (roster.length > 0 && roster.length <= 30) {
+    parts.push(roster.map(c => formatCharacterRecord(c)).join("\n"));
+  }
+  return parts.join("\n");
 }

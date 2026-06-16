@@ -65,10 +65,10 @@ export function detectChapterPosition(
   totalChapters: number,
 ): ChapterPosition {
   if (chapterOrder <= 1) return "first";
-  if (chapterOrder <= 3) return "early";
-  // Last 20% of chapters or explicitly marked as climax
+  if (chapterOrder <= 10) return "early";  // First 10 chapters = early (long-form scale)
+  // Last 20% of chapters
   if (chapterOrder >= totalChapters * 0.8) return "climax";
-  // Middle chapters with even order numbers are often transitions
-  if (chapterOrder > 3 && chapterOrder < totalChapters * 0.5 && chapterOrder % 3 === 0) return "transition";
+  // Middle chapters (~10%-50%), every 5th could be a transition/cooldown chapter
+  if (chapterOrder > 10 && chapterOrder < totalChapters * 0.5 && chapterOrder % 5 === 0) return "transition";
   return "normal";
 }

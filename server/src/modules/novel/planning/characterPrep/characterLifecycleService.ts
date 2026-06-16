@@ -166,12 +166,12 @@ export async function recommendVolumeCast(
         activeCharacters.push({ characterId: char.id, characterName: char.name, role: char.role, reason: "对手持续施压" });
       }
     } else if (char.role === "supporting") {
-      // Rotate supporting cast based on consecutive active volumes: after 3+ active volumes, suggest rest
+      // Rotate supporting cast: after 5+ consecutive active volumes (~90 chapters), suggest rest
       const consecutiveActive = prev?.presence === "active" ? ((prev as any).consecutiveActive ?? 1) + 1 : 0;
       if (!prev || prev.presence === "inactive" || prev.presence === "departing") {
         returningCharacters.push({ characterId: char.id, characterName: char.name, role: char.role, returnReason: "配角回归补充阵容" });
-      } else if (volumeOrder > 2 && consecutiveActive >= 3) {
-        departingCharacters.push({ characterId: char.id, characterName: char.name, role: char.role, departReason: `已连续活跃${consecutiveActive}卷，本卷暂离为下卷回归做铺垫` });
+      } else if (consecutiveActive >= 5) {
+        departingCharacters.push({ characterId: char.id, characterName: char.name, role: char.role, departReason: `已连续活跃${consecutiveActive}卷(~${consecutiveActive * 18}章)，本卷暂离为下卷回归做铺垫` });
         restingCharacters.push({ characterId: char.id, characterName: char.name, role: char.role });
       } else {
         activeCharacters.push({ characterId: char.id, characterName: char.name, role: char.role, reason: "配角在场丰富故事层次" });

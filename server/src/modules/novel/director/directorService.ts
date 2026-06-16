@@ -61,7 +61,8 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
   if (!novel) throw new Error("Novel not found");
 
   const startIdx = novel.chapters.findIndex(c => c.chapterStatus !== "completed");
-  const chaptersToWrite = startIdx >= 0 ? novel.chapters.slice(startIdx, startIdx + (maxChapters ?? novel.chapters.length)) : [];
+  const batchLimit = maxChapters ?? 30; // Cap at 30 chapters per director run for long-form
+  const chaptersToWrite = startIdx >= 0 ? novel.chapters.slice(startIdx, startIdx + batchLimit) : [];
 
   const progress: DirectorProgress = {
     novelId, stage: "running", currentChapter: 0,

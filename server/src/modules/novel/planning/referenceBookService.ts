@@ -107,6 +107,20 @@ function countChapters(text: string): number {
   return matches ? matches.length : Math.ceil(text.length / 10000);
 }
 
+/** Uniformly sample N indices from [1, totalChapters], always including first and last. */
+function uniformSample(totalChapters: number, sampleCount: number): number[] {
+  if (totalChapters <= sampleCount) {
+    return Array.from({ length: totalChapters }, (_, i) => i + 1);
+  }
+  const indices: number[] = [1];
+  const step = (totalChapters - 1) / (sampleCount - 1);
+  for (let i = 1; i < sampleCount - 1; i++) {
+    indices.push(Math.round(1 + i * step));
+  }
+  indices.push(totalChapters);
+  return [...new Set(indices)].sort((a, b) => a - b);
+}
+
 function splitChapters(text: string): { title: string; content: string; charStart: number; charEnd: number }[] {
   const matches: Array<{ index: number; title: string }> = [];
   const regex = new RegExp(CHAPTER_HEADING_RE.source, "gim");
@@ -268,26 +282,86 @@ export function createReferenceBookService(): ReferenceBookService {
       const chapters = splitChapters(rb.content);
       const existing = rb.annotations ? JSON.parse(rb.annotations) as ReferenceAnnotation : null;
 
-      // Send chapter titles + user's existing annotations as context
-      const chapterList = chapters.map((ch, i) =>
-        `[${i + 1}] ${ch.title.slice(0, 40)} — ${ch.content.slice(0, 100).replace(/\n/g, " ")}`
-      ).slice(0, 100).join("\n"); // Max 100 chapters for context window
+      // Phase 1: Scan ALL chapter titles (compact, fits in one call) to find loop boundaries
+      const titleList = chapters.map((ch, i) =>
+        `[${i + 1}] ${ch.title.slice(0, 40)}`
+      ).join("\n");
 
       const existingContext = existing?.loopBoundaries?.length
         ? `\n\n用户已标注的回环边界：${existing.loopBoundaries.map(b => `[${b.chapterIndex}]${b.type === "start" ? "起点" : "终点"}`).join("、")}\n请基于这些标注推断其余章节的回环边界。`
         : "";
 
-      const raw = await aiInvoke({
+      // Phase 1: Title-only scan for boundary detection
+      const boundaryResult = await aiInvoke({
         assetId: "reference.loop.infer",
         novelId,
-        userPrompt: `参考书章节列表：\n${chapterList.slice(0, 12000)}${existingContext}`,
+        userPrompt: [
+          `全书共${chapters.length}章。以下是全部章节目录，请从头到尾扫描，标注每轮回环的起止章号。`,
+          `\n${titleList.slice(0, 15000)}${existingContext}`,
+          `\n\n请输出每轮回环的起止章号（chapterIndex + type: \"start\"/\"end\"）。`,
+          `标题不足以判断时，根据标题的内容暗示（如\"突破\"/\"决战\"/\"新篇章\"等）推断。`,
+        ].join("\n"),
         schema: LoopInferenceSchema,
-        temperature: 0.4,
+        temperature: 0.3,
       });
 
-      // Merge with existing annotations
+      // Phase 2: Deep-read around detected boundaries to verify
+      const boundaries = [...(existing?.loopBoundaries ?? []), ...boundaryResult.loopBoundaries];
+      if (boundaries.length > 0) {
+        const verifyIndices = new Set<number>();
+        for (const b of boundaries) {
+          verifyIndices.add(b.chapterIndex);
+          if (b.chapterIndex > 1) verifyIndices.add(b.chapterIndex - 1);
+          if (b.chapterIndex < chapters.length) verifyIndices.add(b.chapterIndex + 1);
+        }
+        const verifyChapters = [...verifyIndices]
+          .filter(i => i >= 1 && i <= chapters.length)
+          .sort((a, b) => a - b)
+          .slice(0, 40);
+
+        const verifyText = verifyChapters.map(i => {
+          const ch = chapters[i - 1];
+          return `[${i}] ${ch.title.slice(0, 40)}\n${ch.content.slice(0, 400).replace(/\n/g, " ")}`;
+        }).join("\n\n");
+
+        try {
+          const refined = await aiInvoke({
+            assetId: "reference.loop.infer",
+            novelId,
+            userPrompt: [
+              `根据以下边界附近章节的正文，修正回环边界位置。`,
+              `当前推断的边界：${boundaries.map(b => `[${b.chapterIndex}]${b.type}`).join("、")}`,
+              `\n边界附近章节正文：\n${verifyText.slice(0, 12000)}`,
+            ].join("\n"),
+            schema: LoopInferenceSchema,
+            temperature: 0.3,
+          });
+          // Merge: user annotations always win, then refined boundaries
+          const userBoundaries = existing?.loopBoundaries ?? [];
+          const userIndices = new Set(userBoundaries.map(b => b.chapterIndex));
+          const mergedBoundaries = [
+            ...userBoundaries,
+            ...refined.loopBoundaries.filter(b => !userIndices.has(b.chapterIndex)),
+          ];
+          const merged: ReferenceAnnotation = {
+            loopBoundaries: mergedBoundaries,
+            highCoolChapters: existing?.highCoolChapters ?? [],
+            lowCoolChapters: existing?.lowCoolChapters ?? [],
+            keySettings: existing?.keySettings ?? [],
+          };
+          await prisma.referenceBook.update({
+            where: { novelId },
+            data: { annotations: JSON.stringify(merged) },
+          });
+          return merged;
+        } catch { /* Phase 2 is best-effort, fall through to Phase 1 result */ }
+      }
+
+      // Fallback: use Phase 1 result
+      const userBoundaries = existing?.loopBoundaries ?? [];
+      const userIndices = new Set(userBoundaries.map(b => b.chapterIndex));
       const merged: ReferenceAnnotation = {
-        loopBoundaries: [...(existing?.loopBoundaries ?? []), ...raw.loopBoundaries],
+        loopBoundaries: [...userBoundaries, ...boundaryResult.loopBoundaries.filter(b => !userIndices.has(b.chapterIndex))],
         highCoolChapters: existing?.highCoolChapters ?? [],
         lowCoolChapters: existing?.lowCoolChapters ?? [],
         keySettings: existing?.keySettings ?? [],
@@ -309,9 +383,12 @@ export function createReferenceBookService(): ReferenceBookService {
       const chapters = splitChapters(rb.content);
       const existing = rb.annotations ? JSON.parse(rb.annotations) as ReferenceAnnotation : null;
 
-      const chapterSnippets = chapters.map((ch, i) =>
-        `[${i + 1}] ${ch.title.slice(0, 40)} — ${ch.content.slice(0, 300).replace(/\n/g, " ")}`
-      ).slice(0, 80).join("\n\n");
+      // Uniformly sample 60 chapters across the entire book
+      const sampleIndices = uniformSample(chapters.length, 60);
+      const chapterSnippets = sampleIndices.map(i => {
+        const ch = chapters[i - 1];
+        return `[${i}] ${ch.title.slice(0, 40)} — ${ch.content.slice(0, 300).replace(/\n/g, " ")}`;
+      }).join("\n\n");
 
       const existingContext = [
         existing?.highCoolChapters?.length ? `已标注高爽点：${existing.highCoolChapters.join("、")}章` : "",
@@ -321,7 +398,7 @@ export function createReferenceBookService(): ReferenceBookService {
       const raw = await aiInvoke({
         assetId: "reference.coolpoint.infer",
         novelId,
-        userPrompt: `参考书章节片段：\n${chapterSnippets.slice(0, 10000)}\n\n${existingContext}`,
+        userPrompt: `参考书章节片段(均匀采样${sampleIndices.length}章覆盖全书${chapters.length}章)：\n${chapterSnippets.slice(0, 15000)}\n\n${existingContext}`,
         schema: CoolPointInferenceSchema,
         temperature: 0.4,
       });
@@ -530,10 +607,16 @@ export function createReferenceBookService(): ReferenceBookService {
       if (!rb?.content) throw new Error("No reference book uploaded");
 
       const chapters = splitChapters(rb.content);
-      // Sample first 30 chapters (where most settings are introduced)
-      const sample = chapters.slice(0, Math.min(30, chapters.length)).map((ch, i) =>
-        `第${i + 1}章 ${ch.title.slice(0, 30)}\n${ch.content.slice(0, 300).replace(/\n/g, " ")}`
-      ).join("\n\n---\n\n");
+      // Sample: first 10 chapters (where most settings debut) + uniform 40 across the rest
+      const earlyIndices = Array.from({ length: Math.min(10, chapters.length) }, (_, i) => i + 1);
+      const laterIndices = uniformSample(Math.max(0, chapters.length - 10), 40)
+        .map(i => i + 10)
+        .filter(i => i <= chapters.length);
+      const sampleIndices = [...new Set([...earlyIndices, ...laterIndices])].sort((a, b) => a - b);
+      const sample = sampleIndices.map(i => {
+        const ch = chapters[i - 1];
+        return `第${i}章 ${ch.title.slice(0, 30)}\n${ch.content.slice(0, 300).replace(/\n/g, " ")}`;
+      }).join("\n\n---\n\n");
 
       const SettingTimelineSchema = z.object({
         settings: z.array(z.object({
