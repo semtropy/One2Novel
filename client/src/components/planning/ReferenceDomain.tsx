@@ -228,78 +228,94 @@ export function ReferenceDomain({ novelId }: Props) {
         )}
       </div>
 
-      {/* Analysis Cards — always visible */}
-      <div className="grid grid-cols-2 gap-3">
-          <Card hasFile={!!fileName} title="架构判定" icon={GitBranch} done={done.architecture} running={running === "architecture"} onRun={() => run("architecture")}>
-            {archData && <>
-              <div className="flex items-center justify-between"><span className="text-sm font-semibold">{ARCH_LABELS[archData.type] ?? archData.type}</span><span className="text-xs text-slate-400">置信度 {(archData.confidence*100).toFixed(0)}%</span></div>
-              <p className="text-xs text-slate-500">{archData.reasoning}</p>
-              {archData.observedPatterns?.length > 0 && <div className="flex flex-wrap gap-1">{archData.observedPatterns.map((p,i) => <span key={i} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">{p}</span>)}</div>}
-              <button onClick={handleApplyArchitecture} disabled={appliedArch} className={cn("w-full rounded-lg px-3 py-1.5 text-xs font-medium", appliedArch ? "bg-green-100 text-green-700" : "bg-slate-800 text-white hover:bg-slate-700")}>{appliedArch ? <><Check size={10} className="inline mr-1"/>已应用</> : "应用到当前小说"}</button>
-            </>}
-          </Card>
+      {/* Analysis Results — full width vertical sections */}
+      <div className="space-y-4">
+        {/* Architecture */}
+        <Section title="架构判定" icon={GitBranch} done={done.architecture} running={running === "architecture"} onRun={() => run("architecture")} hasFile={!!fileName}>
+          {archData && <>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-base font-bold text-slate-800">{ARCH_LABELS[archData.type] ?? archData.type}</span>
+              <span className="text-xs text-slate-400">置信度 {(archData.confidence*100).toFixed(0)}%</span>
+            </div>
+            <p className="text-sm text-slate-600 mb-2">{archData.reasoning}</p>
+            {archData.observedPatterns?.length > 0 && <div className="flex flex-wrap gap-1 mb-3">{archData.observedPatterns.map((p,i) => <span key={i} className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">{p}</span>)}</div>}
+            <button onClick={handleApplyArchitecture} disabled={appliedArch} className={cn("rounded-lg px-4 py-1.5 text-xs font-medium", appliedArch ? "bg-green-100 text-green-700" : "bg-slate-800 text-white hover:bg-slate-700")}>{appliedArch ? <><Check size={10} className="inline mr-1"/>已应用</> : "应用到当前小说"}</button>
+          </>}
+        </Section>
 
-          <Card hasFile={!!fileName} title="钩子模式" icon={Eye} done={done.hooks} running={running === "hooks"} onRun={() => run("hooks")}>
-            {hookData && <div className="space-y-1 text-xs">{Object.entries(hookData.distribution ?? {}).map(([k,v]) => <div key={k} className="flex justify-between"><span className="text-slate-500">{HOOK_LABELS[k]??k}</span><span className="font-medium">{v as number}章</span></div>)}<div className="border-t border-slate-100 pt-1 mt-1 text-slate-400">平均钩力 {(hookData.avgHookStrength*100).toFixed(0)}% · {hookData.typicalHookStyle}</div></div>}
-          </Card>
+        {/* Hook Patterns */}
+        <Section title="钩子模式" icon={Eye} done={done.hooks} running={running === "hooks"} onRun={() => run("hooks")} hasFile={!!fileName}>
+          {hookData && <div className="flex items-center gap-4 text-sm">
+            {Object.entries(hookData.distribution ?? {}).map(([k,v]) => <div key={k} className="flex items-center gap-1"><span className="text-slate-500">{HOOK_LABELS[k]??k}</span><span className="font-bold text-slate-700">{v as number}章</span></div>)}
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-500">平均钩力 <b className="text-slate-700">{(hookData.avgHookStrength*100).toFixed(0)}%</b></span>
+            <span className="text-slate-500">· {hookData.typicalHookStyle}</span>
+          </div>}
+        </Section>
 
-          <Card hasFile={!!fileName} title="金手指" icon={Sparkles} done={done.goldenFinger} running={running === "goldenFinger"} onRun={() => run("goldenFinger")}>
-            {gfData && <div className="space-y-2 text-xs">
-              <div><span className="font-medium">能力：</span><div className="flex flex-wrap gap-1 mt-0.5">{gfData.abilities.map((a,i) => <span key={i} className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">{a}</span>)}</div></div>
-              <div><span className="font-medium">限制：</span><div className="flex flex-wrap gap-1 mt-0.5">{gfData.limits.map((l,i) => <span key={i} className="rounded bg-red-50 px-1.5 py-0.5 text-[10px] text-red-600">{l}</span>)}</div></div>
+        {/* Golden Finger + Content Beats side by side */}
+        <div className="grid grid-cols-2 gap-4">
+          <Section title="金手指" icon={Sparkles} done={done.goldenFinger} running={running === "goldenFinger"} onRun={() => run("goldenFinger")} hasFile={!!fileName}>
+            {gfData && <div className="space-y-2 text-sm">
+              <div><span className="font-medium text-slate-600">能力</span><div className="flex flex-wrap gap-1 mt-1">{gfData.abilities.map((a,i) => <span key={i} className="rounded bg-green-50 px-2 py-1 text-xs text-green-700">{a}</span>)}</div></div>
+              <div><span className="font-medium text-slate-600">限制</span><div className="flex flex-wrap gap-1 mt-1">{gfData.limits.map((l,i) => <span key={i} className="rounded bg-red-50 px-2 py-1 text-xs text-red-600">{l}</span>)}</div></div>
             </div>}
-          </Card>
-
-          <Card hasFile={!!fileName} title="内容节拍DNA" icon={BookOpen} done={done.contentBeats} running={running === "contentBeats"} onRun={() => run("contentBeats")}>
+          </Section>
+          <Section title="内容节拍DNA" icon={BookOpen} done={done.contentBeats} running={running === "contentBeats"} onRun={() => run("contentBeats")} hasFile={!!fileName}>
             {beatData && <div className="space-y-2">
-              <div className="flex flex-wrap gap-1 text-[10px]">{beatData.beatTypes.map(bt => { const c = beatData.overallDistribution[bt] ?? 0; const t = beatData.totalChapters; return <span key={bt} className="rounded bg-slate-100 px-1.5 py-0.5" title={`${c}章 (${t>0?(c/t*100).toFixed(0):0}%)`}>{bt} {c}章</span>; })}</div>
-              <button onClick={async () => { try { await api.put(`/novels/${novelId}/architecture`, { contentBeatProfile: JSON.stringify(beatData.overallDistribution) }); } catch {} }} className="w-full rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">应用内容节拍配方</button>
+              <div className="flex flex-wrap gap-1 text-xs">{beatData.beatTypes.map(bt => { const c = beatData.overallDistribution[bt] ?? 0; const t = beatData.totalChapters; return <span key={bt} className="rounded bg-slate-100 px-2 py-1" title={`${c}章 (${t>0?(c/t*100).toFixed(0):0}%)`}>{bt} <b className="text-slate-700">{c}章</b></span>; })}</div>
+              <button onClick={async () => { try { await api.put(`/novels/${novelId}/architecture`, { contentBeatProfile: JSON.stringify(beatData.overallDistribution) }); } catch {} }} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">应用内容节拍配方</button>
             </div>}
-          </Card>
-
-          <Card hasFile={!!fileName} title="爽点分布" icon={TrendingUp} done={done.coolpoints} running={running === "coolpoints"} onRun={() => run("coolpoints")}>
-            {done.coolpoints && <div className="text-xs text-slate-500">爽点分析已完成</div>}
-          </Card>
-
-          <Card hasFile={!!fileName} title="设定时间线" icon={FileText} done={done.timeline} running={running === "timeline"} onRun={() => run("timeline")}>
-            {timelineData && <div className="space-y-1 max-h-24 overflow-y-auto text-xs">{timelineData.slice(0,8).map((s,i) => <div key={i} className="flex items-center gap-2"><span className="w-12 text-slate-400 shrink-0">第{s.chapterIndex}章</span><span className="text-slate-600">{s.settingName}</span></div>)}</div>}
-          </Card>
-
-          <Card hasFile={!!fileName} title="写法技法" icon={BookOpen} done={done.writing} running={running === "writing"} onRun={() => run("writing")}>
-            {writingData && <div className="space-y-2">
-              {writingData.overallStyleDescription && <p className="text-xs text-slate-600 leading-relaxed">{writingData.overallStyleDescription}</p>}
-              <div className="grid grid-cols-5 gap-1 text-[10px]">{[{label:"叙事",n:writingData.narrativeAssets?.length},{label:"语言",n:writingData.languageAssets?.length},{label:"角色",n:writingData.characterAssets?.length},{label:"节奏",n:writingData.rhythmAssets?.length},{label:"反AI",n:writingData.antiAiAssets?.length}].map(c => <div key={c.label} className="rounded bg-slate-50 px-2 py-1 text-center"><div className="font-bold text-slate-700">{c.n??0}</div><div className="text-slate-400">{c.label}</div></div>)}</div>
-              <button onClick={handleCreateProfile} disabled={profileCreated || createProfile.isPending} className={cn("w-full rounded-lg px-3 py-1.5 text-xs font-medium", profileCreated ? "bg-green-100 text-green-700" : "bg-slate-800 text-white hover:bg-slate-700")}>{profileCreated ? <><Check size={10} className="inline mr-1"/>已创建</> : "创建风格配置"}</button>
-            </div>}
-          </Card>
-
-          <Card hasFile={!!fileName} title="回环推断" icon={GitBranch} done={done.loops} running={running === "loops"} onRun={() => run("loops")}>
-            {done.loops && <div className="text-xs text-slate-500">回环边界推断已完成</div>}
-          </Card>
+          </Section>
         </div>
+
+        {/* Cool Points */}
+        <Section title="爽点分布" icon={TrendingUp} done={done.coolpoints} running={running === "coolpoints"} onRun={() => run("coolpoints")} hasFile={!!fileName}>
+          {done.coolpoints && <div className="text-sm text-slate-500">全书爽点分布分析已完成，覆盖{(annotData.highCoolChapters as any[])?.length ?? 0}个高爽点章节。</div>}
+        </Section>
+
+        {/* Setting Timeline */}
+        <Section title="设定释放时间线" icon={FileText} done={done.timeline} running={running === "timeline"} onRun={() => run("timeline")} hasFile={!!fileName}>
+          {timelineData && <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">{timelineData.slice(0, 20).map((s,i) => <div key={i} className="flex items-center gap-2"><span className="text-slate-400 text-xs w-14 shrink-0">第{s.chapterIndex}章</span><span className="text-slate-600">{s.settingName}</span></div>)}</div>}
+        </Section>
+
+        {/* Writing Assets */}
+        <Section title="写法技法" icon={BookOpen} done={done.writing} running={running === "writing"} onRun={() => run("writing")} hasFile={!!fileName}>
+          {writingData && <div className="space-y-2">
+            {writingData.overallStyleDescription && <p className="text-sm text-slate-600">{writingData.overallStyleDescription}</p>}
+            <div className="grid grid-cols-5 gap-3 text-sm">{[{label:"叙事技法",n:writingData.narrativeAssets?.length??0},{label:"语言风格",n:writingData.languageAssets?.length??0},{label:"角色塑造",n:writingData.characterAssets?.length??0},{label:"节奏控制",n:writingData.rhythmAssets?.length??0},{label:"反AI特征",n:writingData.antiAiAssets?.length??0}].map(c => <div key={c.label} className="rounded-lg border border-slate-200 p-3 text-center"><div className="text-2xl font-bold text-slate-700">{c.n}</div><div className="text-xs text-slate-400 mt-1">{c.label}</div></div>)}</div>
+            <button onClick={handleCreateProfile} disabled={profileCreated || createProfile.isPending} className={cn("rounded-lg px-4 py-1.5 text-xs font-medium", profileCreated ? "bg-green-100 text-green-700" : "bg-slate-800 text-white hover:bg-slate-700")}>{profileCreated ? <><Check size={10} className="inline mr-1"/>已创建</> : "创建风格配置"}</button>
+          </div>}
+        </Section>
+
+        {/* Loop Boundaries */}
+        <Section title="回环推断" icon={GitBranch} done={done.loops} running={running === "loops"} onRun={() => run("loops")} hasFile={!!fileName}>
+          {done.loops && <div className="text-sm text-slate-500">全书回环边界推断已完成，共 {(annotData.loopBoundaries as any[])?.filter((b:any) => b.type === "start").length ?? 0} 轮回环。</div>}
+        </Section>
+      </div>
     </div>
   );
 }
 
-function Card({ title, icon: Icon, done, running, onRun, children, hasFile }: {
+function Section({ title, icon: Icon, done, running, onRun, children, hasFile }: {
   title: string; icon: any; done?: boolean; running?: boolean; onRun: () => void; children?: React.ReactNode; hasFile: boolean;
 }) {
   return (
-    <div className={cn("rounded-xl border p-3", done ? "border-green-200 bg-green-50/20" : "border-slate-200 bg-white")}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5">
-          <span className={done ? "text-green-500" : "text-slate-400"}><Icon size={13} /></span>
-          <span className="text-xs font-medium text-slate-700">{title}</span>
-          {done && <Check size={11} className="text-green-500" />}
+    <div className={cn("rounded-xl border p-4", done ? "border-green-200 bg-green-50/20" : "border-slate-200 bg-white")}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className={cn("p-1 rounded", done ? "bg-green-100 text-green-600" : "bg-slate-100 text-slate-400")}><Icon size={14} /></span>
+          <span className="text-sm font-semibold text-slate-700">{title}</span>
+          {done && <Check size={14} className="text-green-500" />}
         </div>
         {!done && (
           <button onClick={onRun} disabled={!!running || !hasFile}
-            className="flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[10px] text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
-            {running ? <RefreshCw size={10} className="animate-spin"/> : <Sparkles size={10} />}分析
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+            {running ? <RefreshCw size={12} className="animate-spin"/> : <Sparkles size={12} />}{running ? "分析中..." : "分析"}
           </button>
         )}
       </div>
-      {children ?? (!hasFile && <p className="text-[10px] text-slate-300 italic">上传参考书后可分析</p>)}
+      {children ?? (!hasFile && <p className="text-sm text-slate-300 italic">上传参考书或选择档案后可分析</p>)}
     </div>
   );
 }
