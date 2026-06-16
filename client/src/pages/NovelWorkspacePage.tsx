@@ -9,10 +9,8 @@ import { ChapterWritePanel } from "../components/workspace/ChapterWritePanel";
 import { ContextPanel } from "../components/workspace/ContextPanel";
 import { type WorkspaceDiagnosis } from "../api/revision";
 import { DirectorPanel } from "../components/workspace/DirectorPanel";
-import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
 import { AlertTriangle, PenLine, Trash2, Plus, ShieldCheck } from "lucide-react";
-import { useCompletionReadiness } from "../api/novel";
 import { cn } from "../lib/cn";
 
 export function NovelWorkspacePage() {
@@ -56,7 +54,6 @@ export function NovelWorkspacePage() {
   }
 
   // ALL hooks MUST be before any conditional returns (React rule)
-  const { data: completionReadiness } = useCompletionReadiness(novelId);
   const allChapters = novel?.chapters ?? [];
 
   type ChapterWithVol = { id: string; order: number; title: string; content?: string | null; chapterStatus: string; chapterOrder: number };
@@ -107,37 +104,6 @@ export function NovelWorkspacePage() {
   return (
     <div className="flex flex-col h-full max-h-full">
       {/* Dialogs */}
-      {/* Header */}
-      <div className="shrink-0 flex items-center justify-between mb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <TitleEditor novelId={novel.id} currentTitle={novel.title} />
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            {novel.genre && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{novel.genre}</span>}
-            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-600 font-medium">长篇</span>
-            <span className="text-xs text-slate-400">全书 {totalWords.toLocaleString()} 字</span>
-            <span className="text-xs text-slate-300">|</span>
-            <span className="text-xs text-slate-400">{allChapters.filter(c => c.chapterStatus === "completed").length}/{allChapters.length} 章</span>
-            {completionReadiness && (
-              <>
-                <span className="text-xs text-slate-300">|</span>
-                <span className={cn(
-                  "text-xs font-medium",
-                  completionReadiness.readyToComplete ? "text-green-500" :
-                  (completionReadiness.progressPercent ?? 0) >= 80 ? "text-accent-500" :
-                  "text-slate-400",
-                )} title={`待回收伏笔: ${completionReadiness.unresolvedCount} · ${completionReadiness.recommendations?.join("；") ?? ""}`}>
-                  {completionReadiness.readyToComplete ? "可完本" :
-                   (completionReadiness.progressPercent ?? 0) >= 80 ? "接近完本" :
-                   `${completionReadiness.totalChapters}章已完成`}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Writing workspace */}
       <div className="flex-1 flex gap-4 min-h-0">
           {/* Left: Chapter list with volume word counts */}
