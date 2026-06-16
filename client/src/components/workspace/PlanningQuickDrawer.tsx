@@ -56,16 +56,16 @@ export function PlanningQuickDrawer({ novelId, onSwitchToPlanning }: Props) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 rounded-l-lg border border-r-0 border-brand-200 bg-brand-50 px-1.5 py-4 text-brand-500 hover:bg-brand-100 transition-colors shadow-sm"
+        className="fixed left-0 top-1/2 -translate-y-1/2 z-40 rounded-r-lg border border-l-0 border-brand-200 bg-brand-50 px-1.5 py-4 text-brand-500 hover:bg-brand-100 transition-colors shadow-sm"
         title="查看创作规划"
       >
-        <ChevronLeft size={14} />
+        <ChevronRight size={14} />
       </button>
     );
   }
 
   return (
-    <div className="fixed right-0 top-0 z-40 h-full w-72 border-l border-slate-200 bg-white shadow-xl flex flex-col overflow-hidden">
+    <div className="fixed left-0 top-0 z-40 h-full w-72 border-r border-slate-200 bg-white shadow-xl flex flex-col overflow-hidden">
       {/* Header */}
       <div className="shrink-0 border-b border-slate-100 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -74,7 +74,7 @@ export function PlanningQuickDrawer({ novelId, onSwitchToPlanning }: Props) {
         </div>
         <button onClick={() => setOpen(false)}
           className="rounded p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100">
-          <ChevronRight size={14} />
+          <ChevronLeft size={14} />
         </button>
       </div>
 
