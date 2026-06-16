@@ -9,6 +9,7 @@ import { ChapterWritePanel } from "../components/workspace/ChapterWritePanel";
 import { ContextPanel } from "../components/workspace/ContextPanel";
 import { type WorkspaceDiagnosis } from "../api/revision";
 import { DirectorPanel } from "../components/workspace/DirectorPanel";
+import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
 import { AlertTriangle, PenLine, Trash2, Plus, ShieldCheck } from "lucide-react";
 import { cn } from "../lib/cn";
@@ -108,6 +109,9 @@ export function NovelWorkspacePage() {
       <div className="flex-1 flex gap-4 min-h-0">
           {/* Left: Chapter list with volume word counts */}
           <div className="w-48 shrink-0 flex flex-col min-h-0">
+            <div className="shrink-0 mb-2">
+              <TitleEditor novelId={novel.id} currentTitle={novel.title} />
+            </div>
             <div className="flex-1 min-h-0 rounded-xl border border-slate-200 bg-white flex flex-col">
             <div className="shrink-0 px-3 py-2 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-xs font-semibold text-slate-400 uppercase">章节</h3>
