@@ -285,8 +285,7 @@ export function ReferenceDomain({ novelId }: Props) {
               </div>
               {(annotData.highCoolChapters as number[])?.length > 0 && (
                 <div className="flex flex-wrap gap-1 text-xs">
-                  {(annotData.highCoolChapters as number[]).slice(0, 30).map(ch => <span key={ch} className="rounded bg-green-50 px-1.5 py-0.5 text-green-700">第{ch}章</span>)}
-                  {(annotData.highCoolChapters as number[])?.length > 30 && <span className="text-slate-400">...共{(annotData.highCoolChapters as number[]).length}章</span>}
+                  {(annotData.highCoolChapters as number[]).map(ch => <span key={ch} className="rounded bg-green-50 px-1.5 py-0.5 text-green-700">第{ch}章</span>)}
                 </div>
               )}
             </div>
@@ -295,7 +294,7 @@ export function ReferenceDomain({ novelId }: Props) {
 
         {/* Setting Timeline */}
         <Section title="设定释放时间线" icon={FileText} done={done.timeline} running={running === "timeline"} onRun={() => run("timeline")} hasFile={!!fileName}>
-          {timelineData && <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">{timelineData.slice(0, 20).map((s,i) => <div key={i} className="flex items-center gap-2"><span className="text-slate-400 text-xs w-14 shrink-0">第{s.chapterIndex}章</span><span className="text-slate-600">{s.settingName}</span></div>)}</div>}
+          {timelineData && <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">{timelineData.map((s,i) => <div key={i} className="flex items-center gap-2"><span className="text-slate-400 text-xs w-14 shrink-0">第{s.chapterIndex}章</span><span className="text-slate-600">{s.settingName}</span></div>)}</div>}
         </Section>
 
         {/* Writing Assets */}
@@ -318,12 +317,11 @@ export function ReferenceDomain({ novelId }: Props) {
               <div className="space-y-2">
                 <div className="text-sm text-slate-500">共 <b className="text-slate-700">{loops.length}轮回环</b>，总 {stats?.totalChapters ?? "?"} 章，平均每轮 {stats?.totalChapters && loops.length > 0 ? Math.round(stats.totalChapters / loops.length) : "?"} 章</div>
                 <div className="flex flex-wrap gap-1 text-xs">
-                  {loops.slice(0, 30).map((l, i) => (
+                  {loops.map((l, i) => (
                     <span key={i} className="rounded bg-brand-50 border border-brand-100 px-2 py-1 text-slate-600">
                       第{i+1}轮: 第{l.start}-{l.end}章
                     </span>
                   ))}
-                  {loops.length > 30 && <span className="text-slate-400 text-xs">...共{loops.length}轮</span>}
                 </div>
               </div>
             );
