@@ -271,7 +271,21 @@ export function ReferenceDomain({ novelId }: Props) {
 
         {/* Cool Points */}
         <Section title="爽点分布" icon={TrendingUp} done={done.coolpoints} running={running === "coolpoints"} onRun={() => run("coolpoints")} hasFile={!!fileName}>
-          {done.coolpoints && <div className="text-sm text-slate-500">全书爽点分布分析已完成，覆盖{(annotData.highCoolChapters as any[])?.length ?? 0}个高爽点章节。</div>}
+          {done.coolpoints && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-slate-500">高爽点 <b className="text-green-600">{((annotData.highCoolChapters as any[])?.length ?? 0)}章</b></span>
+                <span className="text-slate-500">低爽点 <b className="text-red-400">{((annotData.lowCoolChapters as any[])?.length ?? 0)}章</b></span>
+                <span className="text-slate-500">中性 {(stats?.totalChapters ?? 0) - ((annotData.highCoolChapters as any[])?.length ?? 0) - ((annotData.lowCoolChapters as any[])?.length ?? 0)}章</span>
+              </div>
+              {(annotData.highCoolChapters as number[])?.length > 0 && (
+                <div className="flex flex-wrap gap-1 text-xs">
+                  {(annotData.highCoolChapters as number[]).slice(0, 30).map(ch => <span key={ch} className="rounded bg-green-50 px-1.5 py-0.5 text-green-700">第{ch}章</span>)}
+                  {(annotData.highCoolChapters as number[])?.length > 30 && <span className="text-slate-400">...共{(annotData.highCoolChapters as number[]).length}章</span>}
+                </div>
+              )}
+            </div>
+          )}
         </Section>
 
         {/* Setting Timeline */}
@@ -290,7 +304,25 @@ export function ReferenceDomain({ novelId }: Props) {
 
         {/* Loop Boundaries */}
         <Section title="回环推断" icon={GitBranch} done={done.loops} running={running === "loops"} onRun={() => run("loops")} hasFile={!!fileName}>
-          {done.loops && <div className="text-sm text-slate-500">全书回环边界推断已完成，共 {(annotData.loopBoundaries as any[])?.filter((b:any) => b.type === "start").length ?? 0} 轮回环。</div>}
+          {done.loops && (() => {
+            const boundaries = (annotData.loopBoundaries as Array<{chapterIndex: number; type: string}>) ?? [];
+            const starts = boundaries.filter(b => b.type === "start");
+            const ends = boundaries.filter(b => b.type === "end");
+            const loops = starts.map((s, i) => ({ start: s.chapterIndex, end: ends[i]?.chapterIndex ?? "?" }));
+            return (
+              <div className="space-y-2">
+                <div className="text-sm text-slate-500">共 <b className="text-slate-700">{loops.length}轮回环</b>，总 {stats?.totalChapters ?? "?"} 章，平均每轮 {stats?.totalChapters && loops.length > 0 ? Math.round(stats.totalChapters / loops.length) : "?"} 章</div>
+                <div className="flex flex-wrap gap-1 text-xs">
+                  {loops.slice(0, 30).map((l, i) => (
+                    <span key={i} className="rounded bg-brand-50 border border-brand-100 px-2 py-1 text-slate-600">
+                      第{i+1}轮: 第{l.start}-{l.end}章
+                    </span>
+                  ))}
+                  {loops.length > 30 && <span className="text-slate-400 text-xs">...共{loops.length}轮</span>}
+                </div>
+              </div>
+            );
+          })()}
         </Section>
       </div>
     </div>
