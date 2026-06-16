@@ -2,7 +2,7 @@
  * ReferenceDomain — 参考书上传 + 8维分析驾驶舱，内嵌在规划页面中
  */
 import { useState, useEffect } from "react";
-import { Upload, Sparkles, Check, RefreshCw, Target, BookOpen, Zap, GitBranch, TrendingUp, Eye, FileText, X } from "lucide-react";
+import { Upload, Sparkles, Check, RefreshCw, Target, BookOpen, Zap, GitBranch, TrendingUp, Eye, FileText, X, Save, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNovel, useExtractWritingAssets, useCreateStyleProfileFromAssets } from "../../api/novel";
 import { api } from "../../app/api";
@@ -17,6 +17,8 @@ interface AnalysisState {
 }
 
 type DataMap = Record<string, unknown>;
+
+interface ProfileItem { id: string; name: string; architectureType?: string | null; totalChapters?: number | null; createdAt: string; }
 
 export function ReferenceDomain({ novelId }: Props) {
   const qc = useQueryClient();
@@ -35,30 +37,82 @@ export function ReferenceDomain({ novelId }: Props) {
   const [stats, setStats] = useState<{ totalChapters: number; totalLoops: number } | null>(null);
   const [annotData, setAnnotData] = useState<DataMap>({});
 
+  // Profile selector
+  const [profiles, setProfiles] = useState<ProfileItem[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>("");
+
   const KEYS = ["loops","coolpoints","architecture","hooks","goldenFinger","timeline","writing","contentBeats"];
   const doneCount = KEYS.filter(k => done[k as keyof AnalysisState]).length;
 
-  useEffect(() => { loadState(); }, [novelId]);
+  useEffect(() => { loadProfiles(); loadState(); }, [novelId]);
+
+  async function loadProfiles() {
+    try { const { data } = await api.get("/profiles"); setProfiles(data.data ?? []); } catch {}
+  }
 
   async function loadState() {
     try {
       const { data } = await api.get(`/novels/${novelId}/reference-book`);
-      if (!data.data) return;
-      setFileName(data.data.fileName ?? "");
-      const annot = typeof data.data.annotations === "string" ? JSON.parse(data.data.annotations) : (data.data.annotations ?? {});
-      const nd: AnalysisState = {};
-      if (annot.loopBoundaries?.length > 0) nd.loops = true;
-      if (annot.highCoolChapters?.length > 0 || annot.lowCoolChapters?.length > 0) nd.coolpoints = true;
-      if (annot.detectedArchitecture) nd.architecture = true;
-      if (annot.hookPatterns) nd.hooks = true;
-      if (annot.goldenFingerBounds) nd.goldenFinger = true;
-      if (annot.keySettings?.length > 0) nd.timeline = true;
-      if (data.data.writingAssets) nd.writing = true;
-      if (annot.contentBeatPatterns) nd.contentBeats = true;
-      setDone(nd);
-      setAnnotData(annot);
-      setStats({ totalChapters: data.data.totalChapters ?? 0, totalLoops: annot.loopBoundaries?.filter((b: {type:string}) => b.type === "start").length ?? 0 });
+      if (data.data) {
+        setFileName(data.data.fileName ?? "");
+        const annot = typeof data.data.annotations === "string" ? JSON.parse(data.data.annotations) : (data.data.annotations ?? {});
+        applyAnnotations(annot, data.data);
+      }
     } catch {}
+  }
+
+  function applyAnnotations(annot: Record<string, any>, raw?: Record<string, any>) {
+    const nd: AnalysisState = {};
+    const lb = annot.loopBoundaries as any[];
+    if (lb?.length > 0) nd.loops = true;
+    const hc = annot.highCoolChapters as any[];
+    const lc = annot.lowCoolChapters as any[];
+    if (hc?.length > 0 || lc?.length > 0) nd.coolpoints = true;
+    if (annot.detectedArchitecture) nd.architecture = true;
+    if (annot.hookPatterns) nd.hooks = true;
+    if (annot.goldenFingerBounds) nd.goldenFinger = true;
+    const ks = annot.keySettings as any[];
+    if (ks?.length > 0) nd.timeline = true;
+    if (raw?.writingAssets) nd.writing = true;
+    if (annot.contentBeatPatterns) nd.contentBeats = true;
+    setDone(nd);
+    setAnnotData(annot as DataMap);
+    setStats({ totalChapters: (raw?.totalChapters as number) ?? 0, totalLoops: lb?.filter((b: any) => b.type === "start").length ?? 0 });
+  }
+
+  async function selectProfile(id: string) {
+    setSelectedProfileId(id);
+    if (!id) { setDone({}); setAnnotData({}); setStats(null); return; }
+    try {
+      const { data } = await api.get(`/profiles/${id}`);
+      const p = data.data;
+      const annot: DataMap = {};
+      if (p.loopBoundaries) Object.assign(annot, JSON.parse(p.loopBoundaries));
+      if (p.coolPointDensity) { const cp = JSON.parse(p.coolPointDensity); annot.highCoolChapters = cp.highCoolChapters; annot.lowCoolChapters = cp.lowCoolChapters; }
+      if (p.hookPatterns) annot.hookPatterns = JSON.parse(p.hookPatterns);
+      if (p.goldenFingerBounds) annot.goldenFingerBounds = JSON.parse(p.goldenFingerBounds);
+      if (p.contentBeatPatterns) annot.contentBeatPatterns = JSON.parse(p.contentBeatPatterns);
+      if (p.settingTimeline) annot.keySettings = JSON.parse(p.settingTimeline);
+      if (p.architectureType) annot.detectedArchitecture = { type: p.architectureType };
+      applyAnnotations(annot, { writingAssets: p.writingAssets, totalChapters: p.totalChapters });
+      // Set as active profile for this novel
+      await api.put(`/novels/${novelId}/active-profile`, { profileId: id });
+    } catch {}
+  }
+
+  async function handleSaveProfile() {
+    if (!fileName) return;
+    try {
+      await api.post(`/novels/${novelId}/reference-book/save-profile`, { name: fileName.replace(/\.txt$/i, "") });
+      setProfileCreated(true);
+      loadProfiles();
+      setTimeout(() => setProfileCreated(false), 3000);
+    } catch {}
+  }
+
+  async function handleDeleteProfile(id: string) {
+    if (!window.confirm("删除此档案？分析结果将永久丢失。")) return;
+    try { await api.delete(`/profiles/${id}`); if (selectedProfileId === id) { setSelectedProfileId(""); setDone({}); setAnnotData({}); setStats(null); } loadProfiles(); } catch {}
   }
 
   async function run(k: string) {
@@ -119,6 +173,18 @@ export function ReferenceDomain({ novelId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Profile selector */}
+      <div className="flex items-center gap-2">
+        <select value={selectedProfileId} onChange={e => selectProfile(e.target.value)}
+          className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 focus:border-slate-400 focus:outline-none">
+          <option value="">-- 选择参考书档案（{profiles.length}个） --</option>
+          {profiles.map(p => <option key={p.id} value={p.id}>{p.name}{p.architectureType ? ` · ${ARCH_LABELS[p.architectureType] ?? p.architectureType}` : ""}</option>)}
+        </select>
+        {selectedProfileId && (
+          <button onClick={() => handleDeleteProfile(selectedProfileId)} className="shrink-0 rounded p-1 text-slate-300 hover:text-red-500" title="删除档案"><Trash2 size={12} /></button>
+        )}
+      </div>
+
       {/* Upload + Actions bar */}
       <div className="flex items-center gap-2 flex-wrap">
         {!fileName ? (
@@ -142,6 +208,12 @@ export function ReferenceDomain({ novelId }: Props) {
         )}
         {uploadMsg && <span className={cn("text-xs", uploadMsg.includes("失败") ? "text-red-500" : "text-green-600")}>{uploadMsg}</span>}
         {fileName && <span className="text-xs text-slate-400">{doneCount}/8 项完成</span>}
+        {fileName && doneCount > 0 && !profileCreated && (
+          <button onClick={handleSaveProfile} className="flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-700">
+            <Save size={10} />保存为档案
+          </button>
+        )}
+        {profileCreated && <span className="text-xs text-green-600">✓ 已保存</span>}
       </div>
 
       {/* Stats */}
