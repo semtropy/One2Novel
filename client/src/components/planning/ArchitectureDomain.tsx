@@ -150,14 +150,6 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-        <h3 className="text-sm font-medium text-slate-700">终局悬念</h3>
-        <div className="space-y-2">
-          <div><label className="text-xs text-slate-500">全书最大的秘密是什么？</label><input className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" placeholder="如：这个世界的真相其实是..." defaultValue={novel?.centralQuestion ?? ""} onBlur={e => { if (e.target.value) updateNovel.mutate({ id: novelId, centralQuestion: e.target.value }); }} /></div>
-          <div><label className="text-xs text-slate-500">最终敌人/主角终极形态？</label><input className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none" placeholder="如：太古神王·混沌之主" defaultValue={novel?.endingDirection ?? ""} onBlur={e => { if (e.target.value) updateNovel.mutate({ id: novelId, endingDirection: e.target.value }); }} /></div>
-        </div>
-      </section>
-
       <button onClick={handleConfirmArchitecture} disabled={saving || saveSuccess}
         className={cn(
           "w-full rounded-xl py-2.5 text-sm font-medium transition-colors disabled:opacity-50",
