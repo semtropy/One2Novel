@@ -21,6 +21,58 @@ const ARCH_LABELS: Record<string, string> = {
   cultivation_planning:"修真规划", hexagon_godhood:"六边形成神", historical_transmigration:"穿越历史",
 };
 const HOOK_LABELS: Record<string, string> = { suspense:"悬念型", reversal:"反转型", preview:"预告型", emotional:"情绪型" };
+
+type Technique = { category: string; observation: string; rule: string; confidence: number };
+type WritingAssets = {
+  overallStyleDescription?: string;
+  narrativeAssets?: Technique[]; languageAssets?: Technique[];
+  characterAssets?: Technique[]; rhythmAssets?: Technique[]; antiAiAssets?: Technique[];
+};
+
+function WritingDetail({ data }: { data: WritingAssets }) {
+  const categories = [
+    { key: "narrativeAssets" as const, label: "叙事技法" },
+    { key: "languageAssets" as const, label: "语言风格" },
+    { key: "characterAssets" as const, label: "角色塑造" },
+    { key: "rhythmAssets" as const, label: "节奏控制" },
+    { key: "antiAiAssets" as const, label: "反AI特征" },
+  ];
+  return (
+    <div className="space-y-5">
+      {data.overallStyleDescription && (
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-sm font-medium text-slate-600 mb-1">整体风格</p>
+          <p className="text-sm text-slate-700 leading-relaxed">{data.overallStyleDescription}</p>
+        </div>
+      )}
+      {categories.map(({ key, label }) => {
+        const techniques = data[key] ?? [];
+        if (techniques.length === 0) return null;
+        return (
+          <div key={key}>
+            <p className="text-sm font-semibold text-slate-700 mb-2">{label} ({techniques.length}条)</p>
+            <div className="space-y-2">
+              {techniques.map((t, i) => (
+                <div key={i} className="rounded-lg border border-slate-200 p-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-medium text-slate-500">{t.category}</span>
+                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full", t.confidence >= 0.9 ? "bg-green-100 text-green-700" : t.confidence >= 0.8 ? "bg-accent-100 text-accent-700" : "bg-slate-100 text-slate-500")}>
+                      置信度 {(t.confidence*100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-1">对标书做法：</p>
+                  <p className="text-sm text-slate-600 mb-2 leading-relaxed">{t.observation}</p>
+                  <p className="text-xs text-slate-400 mb-1">可模仿规则：</p>
+                  <p className="text-sm text-slate-800 leading-relaxed">{t.rule}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 const KEYS = ["loops","coolpoints","architecture","hooks","goldenFinger","timeline","writing","contentBeats"];
 
 export function ReferenceCockpitPage() {
@@ -291,9 +343,10 @@ export function ReferenceCockpitPage() {
             {timelineData && <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">{timelineData.map((s,i) => <div key={i} className="flex items-center gap-2"><span className="text-slate-400 text-xs w-14 shrink-0">第{s.chapterIndex}章</span><span className="text-slate-600">{s.settingName}</span></div>)}</div>}
           </Section>
 
-          <Section title="写法技法" icon={BookOpen} done={done.writing} running={running === "writing"} onRun={() => run("writing")} hasFile={!!fileName || !!profId}>
+          <Section title="写法技法" icon={BookOpen} done={done.writing} running={running === "writing"} onRun={() => run("writing")} hasFile={!!fileName || !!profId}
+            detailContent={writingData ? <WritingDetail data={writingData} /> : null}>
             {writingData && <div className="space-y-2">
-              {writingData.overallStyleDescription && <p className="text-sm text-slate-600">{writingData.overallStyleDescription}</p>}
+              {writingData.overallStyleDescription && <p className="text-sm text-slate-600 line-clamp-2">{writingData.overallStyleDescription}</p>}
               <div className="grid grid-cols-5 gap-3 text-sm">{[{label:"叙事技法",n:writingData.narrativeAssets?.length??0},{label:"语言风格",n:writingData.languageAssets?.length??0},{label:"角色塑造",n:writingData.characterAssets?.length??0},{label:"节奏控制",n:writingData.rhythmAssets?.length??0},{label:"反AI特征",n:writingData.antiAiAssets?.length??0}].map(c => <div key={c.label} className="rounded-lg border border-slate-200 p-3 text-center"><div className="text-2xl font-bold text-slate-700">{c.n}</div><div className="text-xs text-slate-400 mt-1">{c.label}</div></div>)}</div>
               <button onClick={handleApplyStyle} disabled={profileCreated || !applyTargetId} className={cn("rounded-lg px-4 py-1.5 text-xs font-medium", profileCreated ? "bg-green-100 text-green-700" : "bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40")}>{profileCreated ? <><Check size={10} className="inline mr-1"/>已应用</> : "应用"}</button>
             </div>}
@@ -323,9 +376,11 @@ export function ReferenceCockpitPage() {
   );
 }
 
-function Section({ title, icon: Icon, done, running, onRun, children, hasFile }: {
+function Section({ title, icon: Icon, done, running, onRun, children, hasFile, onDetail, detailContent }: {
   title: string; icon: any; done?: boolean; running?: boolean; onRun: () => void; children?: React.ReactNode; hasFile: boolean;
+  onDetail?: () => void; detailContent?: React.ReactNode;
 }) {
+  const [showDetail, setShowDetail] = useState(false);
   return (
     <div className={cn("rounded-xl border p-4", done ? "border-green-200 bg-green-50/20" : "border-slate-200 bg-white")}>
       <div className="flex items-center justify-between mb-3">
@@ -334,14 +389,34 @@ function Section({ title, icon: Icon, done, running, onRun, children, hasFile }:
           <span className="text-sm font-semibold text-slate-700">{title}</span>
           {done && <Check size={14} className="text-green-500" />}
         </div>
-        {!done && (
-          <button onClick={onRun} disabled={!!running || !hasFile}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
-            {running ? <RefreshCw size={12} className="animate-spin"/> : <Sparkles size={12} />}{running ? "分析中..." : "分析"}
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {!done && (
+            <button onClick={onRun} disabled={!!running || !hasFile}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
+              {running ? <RefreshCw size={12} className="animate-spin"/> : <Sparkles size={12} />}{running ? "分析中..." : "分析"}
+            </button>
+          )}
+          {done && detailContent && (
+            <button onClick={() => setShowDetail(true)}
+              className="flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50">
+              查看详情
+            </button>
+          )}
+        </div>
       </div>
       {children ?? (!hasFile && <p className="text-sm text-slate-300 italic">上传参考书后可分析</p>)}
+
+      {showDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowDetail(false)}>
+          <div className="w-[48rem] max-h-[85vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-800">{title} · 完整数据</h3>
+              <button onClick={() => setShowDetail(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+            {detailContent}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
