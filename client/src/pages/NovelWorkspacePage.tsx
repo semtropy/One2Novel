@@ -227,7 +227,7 @@ export function NovelWorkspacePage() {
           </div>
 
           {/* Right: Context Panel — toolbox */}
-          <div className="w-32 shrink-0 flex flex-col min-h-0">
+          <div className="w-44 shrink-0 flex flex-col min-h-0">
             <div className="flex-1 min-h-0 rounded-xl border border-slate-200 bg-white overflow-y-auto p-3">
               <ContextPanel
                 novelId={novel.id}
