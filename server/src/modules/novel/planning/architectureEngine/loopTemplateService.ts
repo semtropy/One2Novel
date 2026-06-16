@@ -4,9 +4,9 @@
 import { z } from "zod";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 
-/** 计算长篇网文的回环数：每轮回环约 12 章，最少 3 轮 */
+/** 计算长篇网文的回环数：每轮回环约 18 章，最少 5 轮，500章≈28轮回环 */
 export function computeLoopCount(estimatedChapterCount: number): number {
-  return Math.max(3, Math.round(estimatedChapterCount / 12));
+  return Math.max(5, Math.round(estimatedChapterCount / 18));
 }
 import { getPrisma } from "../../../../platform/db/client";
 import { getArchitectureTemplate } from "./architectureRegistry";
@@ -78,7 +78,7 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
   ].filter(Boolean).join("\n");
 
   // Calculate loop count
-  const estimatedTotal = novel.estimatedChapterCount || 333; // LONG_FORM_DEFAULT_CHAPTERS
+  const estimatedTotal = novel.estimatedChapterCount || 500;
   const loopCount = input.totalLoops || computeLoopCount(estimatedTotal);
 
   // Get golden finger context (unified JSON)
@@ -137,7 +137,7 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
         `升级类：能力提升节奏更重要（收集→验证→突破→新瓶颈）`,
         `办案类：案件推进节奏更重要（案发→调查→受阻→突破→收网）`,
         ``,
-        `【回环数要求】${loopCount}轮回环，每轮10-20章`,
+        `【回环数要求】${loopCount}轮回环，每轮15-25章`,
         ``,
         `【设计原则】`,
         `1. 根据故事的前提和主线，推断最自然的回环单元（如：副本/案件/晋升/事件），不要生搬硬套`,

@@ -281,7 +281,7 @@ promptRegistry.register({
     "每一轮回环必须包含：",
     "- triggerEvent：本轮触发事件（是什么开启了这轮回环）",
     "- dungeonName：副本/事件的具体名称（要有辨识度）",
-    "- estimatedChapters：本章数（6-25章，随回环推进可递增）",
+    "- estimatedChapters：本章数（15-25章，长篇网文典型回环长度）",
     "- settlementContent：结算内容（具体可感知的收获，不能泛泛）",
     "- scaleUpDirection：舞台升级方向（下一轮比这轮「大」在哪）",
     "",

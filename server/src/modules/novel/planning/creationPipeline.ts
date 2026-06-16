@@ -233,7 +233,7 @@ export class CreationPipeline {
 
     // Generate loop skeleton
     onProgress?.({ step: "architecture", detail: "正在生成回环骨架...", percent: 35 });
-    const estCh = novel?.estimatedChapterCount ?? 333;
+    const estCh = novel?.estimatedChapterCount ?? 500;
     const loopCount = computeLoopCount(estCh);
     const skeleton = await generateLoopSkeleton({
       novelId: this.novelId,
@@ -322,7 +322,7 @@ export class CreationPipeline {
     }
 
     const archType = (novel?.architectureType as ArchitectureType) ?? "case_driven";
-    const estCh = novel?.estimatedChapterCount ?? 333;
+    const estCh = novel?.estimatedChapterCount ?? 500;
     const loopCount = computeLoopCount(estCh);
 
     const skeleton = await generateLoopSkeleton({

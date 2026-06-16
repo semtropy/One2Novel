@@ -498,7 +498,7 @@ async function buildReferenceCounterpart(novelId: string, chapterOrder: number):
     where: { id: novelId },
     select: { estimatedChapterCount: true, chapters: { select: { id: true } } },
   });
-  const totalNovelChapters = novel?.estimatedChapterCount ?? novel?.chapters.length ?? 333;
+  const totalNovelChapters = novel?.estimatedChapterCount ?? novel?.chapters.length ?? 500;
 
   // Map current chapter order to reference book chapter index proportionally
   const refTotal = rb.totalChapters;

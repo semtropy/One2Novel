@@ -275,8 +275,8 @@ export interface PaginatedResponse<T> {
 
 // ─── Phase 0: Long-form web novel types ────────────────
 
-/** Default chapter count for long-form web novels: ~1,000,000 chars ÷ 3,000 chars/chapter */
-export const LONG_FORM_DEFAULT_CHAPTERS = 333;
+/** Default chapter count for long-form web novels: ~1,500,000 chars ÷ 3,000 chars/chapter ≈ 500章 */
+export const LONG_FORM_DEFAULT_CHAPTERS = 500;
 
 export type WritingScale = "long";
 export type ArchitectureType = "skill_slot" | "sequence_promotion" | "case_driven" | "cultivation_planning" | "historical_transmigration" | "hexagon_godhood" | "custom";
