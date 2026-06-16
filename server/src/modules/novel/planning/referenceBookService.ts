@@ -838,11 +838,14 @@ export function createReferenceBookService(): ReferenceBookService {
         antiAiAssets: raw.antiAiAssets,
       };
 
-      await prisma.referenceBook.update({
-        where: { novelId },
-        data: { writingAssets: JSON.stringify(assets) },
-      });
-      await syncToProfile(novelId, { writingAssets: assets });
+      // Profile write first (reliable), column write as best-effort
+      await syncToProfile(novelId, { writingAssets: assets, totalChapters: chapters.length });
+      try {
+        await prisma.referenceBook.update({
+          where: { novelId },
+          data: { writingAssets: JSON.stringify(assets) },
+        });
+      } catch { /* column may not exist in SQLite */ }
       return assets;
     },
 
