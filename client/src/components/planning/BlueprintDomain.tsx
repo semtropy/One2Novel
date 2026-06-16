@@ -112,6 +112,24 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
              <Sparkles size={13} className="inline mr-1" />}
             {generating ? "生成中..." : genSuccess ? "生成完成" : genMode === "full" ? "一键生成全书蓝图" : "生成回环骨架"}
           </button>
+          <div className="pt-2 border-t border-brand-200/50">
+            <p className="text-[10px] text-brand-400 mb-1.5">展开后每章将包含以下信息：</p>
+            <div className="flex justify-center gap-1 flex-wrap text-[10px]">
+              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">第N章</span>
+              <span className="text-slate-300">·</span>
+              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">标题</span>
+              <span className="text-slate-300">·</span>
+              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">回环阶段标签</span>
+              <span className="text-slate-300">·</span>
+              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">章节类型</span>
+              <span className="text-slate-300">·</span>
+              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">内容节拍</span>
+              <span className="text-slate-300">·</span>
+              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">核心事件</span>
+              <span className="text-slate-300">·</span>
+              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">章尾钩子</span>
+            </div>
+          </div>
           {genError && <p className="text-xs text-red-500">{genError}</p>}
           {expandError && <div className="rounded-lg bg-red-50 border border-red-200 p-2 text-xs text-red-600">{expandError}</div>}
         </section>

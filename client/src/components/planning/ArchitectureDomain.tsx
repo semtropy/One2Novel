@@ -100,9 +100,18 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
             </button>
           )})}
         </div>
-        <button onClick={() => setShowLoopEditor(!showLoopEditor)} className="mt-3 flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800">
-          {showLoopEditor ? <ChevronDown size={12} /> : <ChevronRight size={12} />}编辑回环阶段 ({phases.length}个阶段)
-        </button>
+        {phases.length > 0 && (
+          <div className="mt-3">
+            <button onClick={() => setShowLoopEditor(!showLoopEditor)} className="flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900 font-medium">
+              {showLoopEditor ? <ChevronDown size={12} /> : <ChevronRight size={12} />}编辑回环阶段 ({phases.length}个阶段)
+            </button>
+            {!showLoopEditor && (
+              <div className="mt-1.5 flex flex-wrap gap-1 text-[10px] text-slate-400">
+                {phases.map((p, i) => <span key={i} className="rounded bg-slate-100 px-1.5 py-0.5">{p.label}{i < phases.length - 1 ? " →" : ""}</span>)}
+              </div>
+            )}
+          </div>
+        )}
         {showLoopEditor && phases.length > 0 && (
           <div className="mt-2 rounded-lg border border-brand-100 bg-white p-3 space-y-2">
             <div className="flex items-center justify-between mb-2">

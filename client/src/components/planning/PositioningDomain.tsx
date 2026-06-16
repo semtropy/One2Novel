@@ -221,7 +221,22 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-slate-400 italic text-center py-4">暂无设定释放计划。写作过程中AI会自动提取。</p>
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
+                <p className="text-xs text-slate-400">拖拽排序 · 释放顺序 · 章节标注</p>
+                <div className="flex justify-center gap-2 mt-2 text-[10px]">
+                  <span className="rounded bg-white px-2 py-1 border border-slate-200 text-slate-400 flex items-center gap-1">
+                    <span className="w-3 h-0.5 bg-slate-300 rounded-full" />
+                    设定A
+                    <span className="text-slate-300">第N章</span>
+                  </span>
+                  <span className="rounded bg-white px-2 py-1 border border-slate-200 text-slate-400 flex items-center gap-1">
+                    <span className="w-3 h-0.5 bg-slate-300 rounded-full" />
+                    设定B
+                    <span className="text-slate-300">第N章</span>
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-1.5">写作过程中AI会自动提取设定释放节点</p>
+              </div>
             )}
           </div>
 

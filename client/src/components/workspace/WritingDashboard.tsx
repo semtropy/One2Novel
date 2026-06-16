@@ -125,7 +125,10 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
             </div>
           )}
           {!coolPointStatus && !loopProgress && (
-            <p className="text-slate-400 text-center py-4">展开章节并完成写作后显示节奏数据</p>
+            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
+              <p className="text-xs text-slate-400">爽点分布 · 钩子密度 · 角色提醒</p>
+              <p className="text-[10px] text-slate-300 mt-1">展开章节并完成写作后显示节奏数据</p>
+            </div>
           )}
         </div>
       )}
@@ -168,7 +171,7 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
             </div>
           )}
           {!hookDensity && !hookCheck && (
-            <p className="text-slate-400 text-center py-4">完成章节后显示钩子数据</p>
+            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center"><p className="text-xs text-slate-400">钩子密度 · 钩子强度 · 章节钩子检查</p><p className="text-[10px] text-slate-300 mt-1">完成章节后显示钩子数据</p></div>
           )}
         </div>
       )}
@@ -187,7 +190,7 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
               </div>
             ))
           ) : (
-            <p className="text-slate-400 text-center py-4">暂无写作提醒</p>
+            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center"><p className="text-xs text-slate-400">爽点逾期 · 伏笔提醒 · 角色缺席</p><p className="text-[10px] text-slate-300 mt-1">暂无写作提醒</p></div>
           )}
         </div>
       )}
@@ -208,7 +211,7 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
             </div>
           )}
           {(!longAbsent || longAbsent.length === 0) && (
-            <p className="text-slate-400 text-center py-4">所有角色状态正常</p>
+            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center"><p className="text-xs text-slate-400">超过阈值未出场的角色</p><p className="text-[10px] text-slate-300 mt-1">所有角色状态正常</p></div>
           )}
         </div>
       )}
