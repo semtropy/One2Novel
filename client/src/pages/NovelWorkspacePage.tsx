@@ -3,10 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useNovel } from "../api/novel";
 import { api } from "../app/api";
 import { useQueryClient } from "@tanstack/react-query";
-import { WritingDashboard } from "../components/workspace/WritingDashboard";
 import { NextChapterPreview } from "../components/workspace/NextChapterPreview";
 import { PlanningQuickDrawer } from "../components/workspace/PlanningQuickDrawer";
-import { ChapterDiffModal } from "../components/workspace/ChapterDiffModal";
 import { ChapterWritePanel } from "../components/workspace/ChapterWritePanel";
 import { ContextPanel } from "../components/workspace/ContextPanel";
 import { type WorkspaceDiagnosis } from "../api/revision";
@@ -14,10 +12,9 @@ import { ProgressBar } from "../components/novel/ProgressBar";
 import { DirectorPanel } from "../components/workspace/DirectorPanel";
 import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
-import { AlertTriangle, PenLine, Download, BarChart3, Trash2, Plus, ShieldCheck, Clock, X } from "lucide-react";
+import { AlertTriangle, PenLine, Download, Trash2, Plus, ShieldCheck } from "lucide-react";
 import { useCompletionReadiness } from "../api/novel";
 import ExportDialog from "../components/workspace/ExportDialog";
-import { StatisticsDashboard } from "../components/workspace/StatisticsDashboard";
 import { cn } from "../lib/cn";
 
 export function NovelWorkspacePage() {
@@ -28,9 +25,6 @@ export function NovelWorkspacePage() {
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [deleteChapterId, setDeleteChapterId] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
-  const [showStats, setShowStats] = useState(false);
-  const [showDiff, setShowDiff] = useState(false);
-  const [showDashboard, setShowDashboard] = useState(false);
 
   // ─── Review + Diagnosis state (lifted from ChapterWritePanel) ───
   const [quality, setQuality] = useState<Record<string, unknown> | null>(null);
@@ -118,19 +112,6 @@ export function NovelWorkspacePage() {
     <div className="flex flex-col h-full max-h-full">
       {/* Dialogs */}
       {showExport && <ExportDialog novelId={novel.id} onClose={() => setShowExport(false)} />}
-      {showStats && <StatisticsDashboard novelId={novel.id} onClose={() => setShowStats(false)} />}
-      {showDiff && selectedChapterId && <ChapterDiffModal novelId={novel.id} chapterId={selectedChapterId} onClose={() => setShowDiff(false)} />}
-      {showDashboard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowDashboard(false)}>
-          <div className="w-[42rem] max-h-[85vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-800">写作仪表盘</h3>
-              <button onClick={() => setShowDashboard(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
-            </div>
-            <WritingDashboard novelId={novel.id} chapterId={selectedChapterId ?? null} />
-          </div>
-        </div>
-      )}
 
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between mb-3">
@@ -178,10 +159,7 @@ export function NovelWorkspacePage() {
           })()} />
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowStats(true)} className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg"><BarChart3 size={13} />统计</button>
-          <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg"><Download size={13} />导出</button>
-          {selectedChapterId && <button onClick={() => setShowDashboard(true)} className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-2.5 py-1 text-xs font-medium hover:bg-slate-700 rounded-lg"><BarChart3 size={11} />仪表盘</button>}
-          {selectedChapterId && <button onClick={() => setShowDiff(true)} className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-2.5 py-1 text-xs font-medium hover:bg-slate-700 rounded-lg"><Clock size={11} />历史</button>}
+          <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-lg bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700"><Download size={13} />导出</button>
         </div>
       </div>
 
