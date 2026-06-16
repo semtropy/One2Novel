@@ -7,7 +7,10 @@ import {
   Users, History, ClipboardList, Eye, Target, FileText, BarChart3,
   RefreshCw, X, AlertTriangle, Gauge, Clock,
 } from "lucide-react";
-import { useNovel, useTimelineReminders, useFormattingIssues, useCleanupChapter, useChapterDynamics, usePayoffStats, useNovelStatistics } from "../../api/novel";
+import { useNovel, useTimelineReminders, useFormattingIssues, useCleanupChapter, usePayoffStats, useNovelStatistics } from "../../api/novel";
+import { StatisticsDashboard } from "./StatisticsDashboard";
+import { WritingDashboard } from "./WritingDashboard";
+import { ChapterDiffModal } from "./ChapterDiffModal";
 import { api } from "../../app/api";
 import { SEVERITY_LABEL } from "@one2novel/shared";
 import { OPERATION_LABELS, type WorkspaceDiagnosis } from "../../api/revision";
@@ -52,7 +55,23 @@ export function ContextPanel(p: Props) {
         ))}
       </div>
 
-      {active && p.chapterId && (
+      {/* Full components (self-contained modals) */}
+      {active === "stats" && p.chapterId && <StatisticsDashboard novelId={p.novelId} onClose={() => setActive(null)} />}
+      {active === "dashboard" && p.chapterId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setActive(null)}>
+          <div className="w-[42rem] max-h-[85vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-800">写作仪表盘</h3>
+              <button onClick={() => setActive(null)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+            <WritingDashboard novelId={p.novelId} chapterId={p.chapterId} />
+          </div>
+        </div>
+      )}
+      {active === "history" && p.chapterId && <ChapterDiffModal novelId={p.novelId} chapterId={p.chapterId} onClose={() => setActive(null)} />}
+
+      {/* Generic modal for other panels */}
+      {active && p.chapterId && !["stats", "dashboard", "history"].includes(active) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setActive(null)}>
           <div className="w-[36rem] max-h-[80vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
@@ -83,9 +102,6 @@ function PanelBody({ novelId, chapterId, chapterOrder, panelKey, quality, diagno
     case "character": return <CharacterPanel novelId={novelId} chapterId={chapterId} />;
     case "timeline":  return <TimelinePanel novelId={novelId} chapterId={chapterId} chapterOrder={chapterOrder} />;
     case "review":    return <ReviewPanel novelId={novelId} chapterId={chapterId} quality={quality} diagnosis={diagnosis} reviewing={reviewing} onReview={onReview} />;
-    case "stats":     return <StatsPanel novelId={novelId} />;
-    case "dashboard": return <DashboardPanel novelId={novelId} chapterId={chapterId} />;
-    case "history":   return <HistoryPanel novelId={novelId} chapterId={chapterId} />;
     default: return null;
   }
 }
@@ -280,35 +296,3 @@ function ReviewPanel({ novelId, chapterId, quality, diagnosis, reviewing, onRevi
   );
 }
 
-function StatsPanel({ novelId }: { novelId: string }) {
-  const stats = useNovelStatistics(novelId);
-  const s = stats.data;
-  if (!s) return <p className="text-xs text-slate-400">加载中...</p>;
-  return (
-    <div className="grid grid-cols-3 gap-2 text-xs">
-      {[["总字数", `${(s.totalChars/1000).toFixed(0)}k`],["章数", `${s.completedChapters}/${s.totalChapters}`],["质量", s.avgQualityScore.toFixed(0)],["伏笔兑现", `${s.payoffCompletionRate.toFixed(0)}%`],["角色", String(s.totalCharacters)],["阅读", `${s.estimatedReadingMinutes}分钟`]].map(([l,v]) => (
-        <div key={l} className="rounded-lg border border-slate-200 p-2 text-center"><div className="text-lg font-bold text-slate-700">{v}</div><div className="text-[10px] text-slate-400">{l}</div></div>
-      ))}
-    </div>
-  );
-}
-
-function DashboardPanel({ novelId, chapterId }: { novelId: string; chapterId: string }) {
-  return <div className="text-xs text-slate-500">写作仪表盘 — 章节进度和质量指标概览。<p className="mt-2 text-slate-400">选择章节后查看完整仪表盘。</p></div>;
-}
-
-function HistoryPanel({ novelId, chapterId }: { novelId: string; chapterId: string }) {
-  const [history, setHistory] = useState<Array<{ id: string; content: string; createdAt: string }>>([]);
-  useEffect(() => { api.get(`/novels/${novelId}/chapters/${chapterId}/edit-history`).then(({ data }) => setHistory(data.data ?? [])).catch(() => {}); }, [novelId, chapterId]);
-  if (history.length === 0) return <p className="text-xs text-slate-400">暂无编辑历史</p>;
-  return (
-    <div className="space-y-2 text-xs">
-      {history.map(h => (
-        <div key={h.id} className="rounded border border-slate-200 p-2">
-          <div className="text-[10px] text-slate-400 mb-1">{new Date(h.createdAt).toLocaleString("zh-CN")}</div>
-          <div className="text-slate-600 line-clamp-3">{h.content.slice(0, 200)}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
