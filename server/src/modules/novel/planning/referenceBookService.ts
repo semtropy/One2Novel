@@ -174,6 +174,34 @@ function splitChapters(text: string): { title: string; content: string; charStar
 
 // ─── Service Factory ────────────────────────────────────
 
+/** Sync analysis data from ReferenceBook annotations to the linked ReferenceProfile. */
+async function syncToProfile(novelId: string, fields: Record<string, unknown>) {
+  const prisma = getPrisma();
+  const rb = await prisma.referenceBook.findUnique({ where: { novelId }, select: { profileId: true, fileName: true, totalChapters: true } });
+  if (!rb) return;
+
+  const data: Record<string, unknown> = {};
+  if (fields.loopBoundaries) data.loopBoundaries = JSON.stringify(fields.loopBoundaries);
+  if (fields.coolPointDensity) data.coolPointDensity = JSON.stringify(fields.coolPointDensity);
+  if (fields.detectedArchitecture) data.architectureType = (fields.detectedArchitecture as { type: string }).type;
+  if (fields.hookPatterns) data.hookPatterns = JSON.stringify(fields.hookPatterns);
+  if (fields.goldenFingerBounds) data.goldenFingerBounds = JSON.stringify(fields.goldenFingerBounds);
+  if (fields.contentBeatPatterns) data.contentBeatPatterns = JSON.stringify(fields.contentBeatPatterns);
+  if (fields.writingAssets) data.writingAssets = JSON.stringify(fields.writingAssets);
+  if (fields.keySettings) data.settingTimeline = JSON.stringify(fields.keySettings);
+  if (fields.totalChapters !== undefined) data.totalChapters = fields.totalChapters as number;
+
+  if (rb.profileId) {
+    await prisma.referenceProfile.update({ where: { id: rb.profileId }, data });
+  } else {
+    const profile = await prisma.referenceProfile.create({
+      data: { name: rb.fileName || "未命名", ...data },
+    });
+    await prisma.referenceBook.update({ where: { novelId }, data: { profileId: profile.id } });
+    await prisma.novel.update({ where: { id: novelId }, data: { activeProfileId: profile.id } });
+  }
+}
+
 export function createReferenceBookService(): ReferenceBookService {
   return {
     async upload(novelId, fileName, content) {
@@ -384,7 +412,7 @@ export function createReferenceBookService(): ReferenceBookService {
         where: { novelId },
         data: { annotations: JSON.stringify(merged) },
       });
-
+      await syncToProfile(novelId, merged as unknown as Record<string, unknown>);
       return merged;
     },
 
@@ -427,7 +455,7 @@ export function createReferenceBookService(): ReferenceBookService {
         where: { novelId },
         data: { annotations: JSON.stringify(merged) },
       });
-
+      await syncToProfile(novelId, merged as unknown as Record<string, unknown>);
       return merged;
     },
 
@@ -487,7 +515,7 @@ export function createReferenceBookService(): ReferenceBookService {
         where: { novelId },
         data: { annotations: JSON.stringify(existing) },
       });
-
+      await syncToProfile(novelId, { detectedArchitecture: existing.detectedArchitecture });
       return existing.detectedArchitecture;
     },
 
@@ -549,7 +577,7 @@ export function createReferenceBookService(): ReferenceBookService {
         where: { novelId },
         data: { annotations: JSON.stringify(existing) },
       });
-
+      await syncToProfile(novelId, { hookPatterns: existing.hookPatterns });
       return existing.hookPatterns;
     },
 
@@ -608,7 +636,7 @@ export function createReferenceBookService(): ReferenceBookService {
         where: { novelId },
         data: { annotations: JSON.stringify(existing) },
       });
-
+      await syncToProfile(novelId, { goldenFingerBounds: existing.goldenFingerBounds });
       return { abilities: raw.abilities, limits: raw.limits };
     },
 
@@ -667,7 +695,7 @@ export function createReferenceBookService(): ReferenceBookService {
         where: { novelId },
         data: { annotations: JSON.stringify(existing) },
       });
-
+      await syncToProfile(novelId, { keySettings: existing.keySettings });
       return raw.settings;
     },
 
@@ -735,7 +763,7 @@ export function createReferenceBookService(): ReferenceBookService {
         where: { novelId },
         data: { annotations: JSON.stringify(existing) },
       });
-
+      await syncToProfile(novelId, { contentBeatPatterns: annotation });
       return annotation;
     },
 
@@ -814,7 +842,7 @@ export function createReferenceBookService(): ReferenceBookService {
         where: { novelId },
         data: { writingAssets: JSON.stringify(assets) },
       });
-
+      await syncToProfile(novelId, { writingAssets: assets });
       return assets;
     },
 

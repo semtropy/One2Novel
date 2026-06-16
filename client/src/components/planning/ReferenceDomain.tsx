@@ -2,7 +2,7 @@
  * ReferenceDomain — 参考书上传 + 8维分析驾驶舱，内嵌在规划页面中
  */
 import { useState, useEffect } from "react";
-import { Upload, Sparkles, Check, RefreshCw, Target, BookOpen, Zap, GitBranch, TrendingUp, Eye, FileText, X, Save, Trash2 } from "lucide-react";
+import { Upload, Sparkles, Check, RefreshCw, Target, BookOpen, Zap, GitBranch, TrendingUp, Eye, FileText, X, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNovel, useExtractWritingAssets, useCreateStyleProfileFromAssets } from "../../api/novel";
 import { api } from "../../app/api";
@@ -55,10 +55,29 @@ export function ReferenceDomain({ novelId }: Props) {
       const { data } = await api.get(`/novels/${novelId}/reference-book`);
       if (data.data) {
         setFileName(data.data.fileName ?? "");
-        const annot = typeof data.data.annotations === "string" ? JSON.parse(data.data.annotations) : (data.data.annotations ?? {});
-        applyAnnotations(annot, data.data);
+        // If a profile is linked, load canonical data from profile
+        if (data.data.profileId) {
+          const profileRes = await api.get(`/profiles/${data.data.profileId}`);
+          if (profileRes.data.data) setProfileData(profileRes.data.data);
+        } else {
+          // Fallback: parse annotations JSON
+          const annot = typeof data.data.annotations === "string" ? JSON.parse(data.data.annotations) : (data.data.annotations ?? {});
+          applyAnnotations(annot, data.data);
+        }
       }
     } catch {}
+  }
+
+  function setProfileData(p: any) {
+    const annot: Record<string, any> = {};
+    if (p.loopBoundaries) Object.assign(annot, JSON.parse(p.loopBoundaries));
+    if (p.coolPointDensity) { const cp = JSON.parse(p.coolPointDensity); annot.highCoolChapters = cp.highCoolChapters; annot.lowCoolChapters = cp.lowCoolChapters; }
+    if (p.hookPatterns) annot.hookPatterns = JSON.parse(p.hookPatterns);
+    if (p.goldenFingerBounds) annot.goldenFingerBounds = JSON.parse(p.goldenFingerBounds);
+    if (p.contentBeatPatterns) annot.contentBeatPatterns = JSON.parse(p.contentBeatPatterns);
+    if (p.settingTimeline) annot.keySettings = JSON.parse(p.settingTimeline);
+    if (p.architectureType) annot.detectedArchitecture = { type: p.architectureType };
+    applyAnnotations(annot, { writingAssets: p.writingAssets, totalChapters: p.totalChapters });
   }
 
   function applyAnnotations(annot: Record<string, any>, raw?: Record<string, any>) {
@@ -97,16 +116,6 @@ export function ReferenceDomain({ novelId }: Props) {
       applyAnnotations(annot, { writingAssets: p.writingAssets, totalChapters: p.totalChapters });
       // Set as active profile for this novel
       await api.put(`/novels/${novelId}/active-profile`, { profileId: id });
-    } catch {}
-  }
-
-  async function handleSaveProfile() {
-    if (!fileName) return;
-    try {
-      await api.post(`/novels/${novelId}/reference-book/save-profile`, { name: fileName.replace(/\.txt$/i, "") });
-      setProfileCreated(true);
-      loadProfiles();
-      setTimeout(() => setProfileCreated(false), 3000);
     } catch {}
   }
 
@@ -208,12 +217,6 @@ export function ReferenceDomain({ novelId }: Props) {
         )}
         {uploadMsg && <span className={cn("text-xs", uploadMsg.includes("失败") ? "text-red-500" : "text-green-600")}>{uploadMsg}</span>}
         {fileName && <span className="text-xs text-slate-400">{doneCount}/8 项完成</span>}
-        {fileName && doneCount > 0 && !profileCreated && (
-          <button onClick={handleSaveProfile} className="flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-700">
-            <Save size={10} />保存为档案
-          </button>
-        )}
-        {profileCreated && <span className="text-xs text-green-600">✓ 已保存</span>}
       </div>
 
       {/* Stats */}
