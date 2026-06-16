@@ -58,6 +58,15 @@ const SKILL_SLOT_TEMPLATE: ArchitectureTemplate = {
   },
   defaultCoolPointRecipe: { collect: 30, strategy: 25, verify: 20, reveal: 15, upgrade: 10 },
   defaultHookProfile: { shortTermPerChapter: 1, mediumTermPerVolume: 3, longTermLines: 4 },
+  defaultContentBeats: {
+    修炼: { pct: 25, span: "2-4章", label: "修炼" },
+    显圣: { pct: 20, span: "1-2章", label: "显圣" },
+    赚钱: { pct: 15, span: "1-2章", label: "赚钱" },
+    日常: { pct: 15, span: "1-2章", label: "日常" },
+    恋爱: { pct: 10, span: "1章", label: "恋爱" },
+    过渡: { pct: 10, span: "1章", label: "过渡" },
+    说明: { pct: 5, span: "1章", label: "说明" },
+  },
   representativeWorks: ["《不科学御兽》", "《全职高手》", "《超神机械师》"],
 };
 
@@ -115,6 +124,15 @@ const SEQUENCE_PROMOTION_TEMPLATE: ArchitectureTemplate = {
   },
   defaultCoolPointRecipe: { collect: 20, strategy: 30, verify: 15, reveal: 25, upgrade: 10 },
   defaultHookProfile: { shortTermPerChapter: 1, mediumTermPerVolume: 4, longTermLines: 5 },
+  defaultContentBeats: {
+    调查: { pct: 25, span: "2-4章", label: "调查" },
+    显圣: { pct: 20, span: "1-2章", label: "显圣" },
+    修炼: { pct: 15, span: "2-3章", label: "修炼" },
+    说明: { pct: 15, span: "1-2章", label: "说明" },
+    日常: { pct: 10, span: "1章", label: "日常" },
+    过渡: { pct: 10, span: "1章", label: "过渡" },
+    赚钱: { pct: 5, span: "1章", label: "赚钱" },
+  },
   representativeWorks: ["《诡秘之主》", "《深海余烬》", "《道诡异仙》"],
 };
 
@@ -172,6 +190,15 @@ const CASE_DRIVEN_TEMPLATE: ArchitectureTemplate = {
   },
   defaultCoolPointRecipe: { collect: 15, strategy: 20, verify: 15, reveal: 35, upgrade: 15 },
   defaultHookProfile: { shortTermPerChapter: 1, mediumTermPerVolume: 3, longTermLines: 4 },
+  defaultContentBeats: {
+    调查: { pct: 30, span: "2-4章", label: "调查" },
+    显圣: { pct: 20, span: "1-2章", label: "显圣" },
+    推理: { pct: 15, span: "1-2章", label: "推理" },
+    日常: { pct: 15, span: "1章", label: "日常" },
+    赚钱: { pct: 10, span: "1章", label: "赚钱" },
+    过渡: { pct: 5, span: "1章", label: "过渡" },
+    说明: { pct: 5, span: "1章", label: "说明" },
+  },
   representativeWorks: ["《大奉打更人》", "《警探长》", "《我有一座恐怖屋》"],
 };
 
@@ -228,6 +255,15 @@ const CULTIVATION_PLANNING_TEMPLATE: ArchitectureTemplate = {
   },
   defaultCoolPointRecipe: { collect: 25, strategy: 30, verify: 20, reveal: 15, upgrade: 10 },
   defaultHookProfile: { shortTermPerChapter: 1, mediumTermPerVolume: 3, longTermLines: 5 },
+  defaultContentBeats: {
+    修炼: { pct: 35, span: "2-5章", label: "修炼" },
+    显圣: { pct: 20, span: "1-2章", label: "显圣" },
+    赚钱: { pct: 15, span: "1-2章", label: "赚钱" },
+    日常: { pct: 10, span: "1章", label: "日常" },
+    恋爱: { pct: 5, span: "1章", label: "恋爱" },
+    过渡: { pct: 10, span: "1章", label: "过渡" },
+    说明: { pct: 5, span: "1章", label: "说明" },
+  },
   representativeWorks: ["《凡人修仙传》", "《遮天》", "《仙逆》"],
 };
 
@@ -282,6 +318,15 @@ const HISTORICAL_TRANSMIGRATION_TEMPLATE: ArchitectureTemplate = {
   },
   defaultCoolPointRecipe: { collect: 15, strategy: 20, verify: 15, reveal: 20, upgrade: 30 },
   defaultHookProfile: { shortTermPerChapter: 1, mediumTermPerVolume: 4, longTermLines: 4 },
+  defaultContentBeats: {
+    显圣: { pct: 25, span: "1-3章", label: "显圣" },
+    赚钱: { pct: 15, span: "1-2章", label: "赚钱" },
+    修炼: { pct: 15, span: "2-3章", label: "修炼" },
+    日常: { pct: 15, span: "1-2章", label: "日常" },
+    恋爱: { pct: 10, span: "1章", label: "恋爱" },
+    过渡: { pct: 10, span: "1章", label: "过渡" },
+    说明: { pct: 10, span: "1-2章", label: "说明" },
+  },
   representativeWorks: ["《赘婿》", "《庆余年》", "《新宋》"],
 };
 
@@ -338,6 +383,15 @@ const HEXAGON_GODHOOD_TEMPLATE: ArchitectureTemplate = {
   },
   defaultCoolPointRecipe: { collect: 20, strategy: 35, verify: 15, reveal: 20, upgrade: 10 },
   defaultHookProfile: { shortTermPerChapter: 1, mediumTermPerVolume: 3, longTermLines: 4 },
+  defaultContentBeats: {
+    修炼: { pct: 20, span: "2-4章", label: "修炼" },
+    显圣: { pct: 20, span: "1-2章", label: "显圣" },
+    赚钱: { pct: 15, span: "1-2章", label: "赚钱" },
+    日常: { pct: 15, span: "1-2章", label: "日常" },
+    恋爱: { pct: 10, span: "1章", label: "恋爱" },
+    过渡: { pct: 10, span: "1章", label: "过渡" },
+    说明: { pct: 10, span: "1章", label: "说明" },
+  },
   representativeWorks: ["《亵渎》", "《佣兵天下》", "《紫川》"],
 };
 

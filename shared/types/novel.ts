@@ -346,6 +346,35 @@ export interface ReferenceBookAnnotation {
   keySettings?: Array<{ chapterIndex: number; settingName: string; description: string }>;
 }
 
+// ─── Content Beat — 内容节拍类型 ────────────────────
+
+/** Per-beat configuration: target percentage of chapters + typical chapter span */
+export interface ContentBeatDef {
+  pct: number;          // Target % of chapters in a loop
+  span: string;         // Typical chapter span, e.g. "1-2章"
+  label: string;        // Display label in Chinese
+}
+
+/** Full content beat recipe for a novel or architecture template */
+export type ContentBeatProfile = Record<string, ContentBeatDef>;
+
+/** Per-loop content beat distribution extracted from reference book */
+export interface LoopContentBeatPattern {
+  loopIndex: number;
+  startChapter: number;
+  endChapter: number;
+  beats: Record<string, number>;  // beat type → chapter count in this loop
+}
+
+/** Reference book content beat analysis result */
+export interface ContentBeatAnnotation {
+  extractedAt: string;
+  beatTypes: string[];                          // All detected beat types
+  overallDistribution: Record<string, number>;   // beat type → total chapters
+  loopPatterns: LoopContentBeatPattern[];        // Per-loop breakdown
+  totalChapters: number;
+}
+
 export interface CostSummary {
   totalInputTokens: number;
   totalOutputTokens: number;

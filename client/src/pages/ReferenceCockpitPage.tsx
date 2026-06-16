@@ -22,9 +22,10 @@ interface AnalysisState {
   goldenFinger?: { done: boolean; data?: { abilities: string[]; limits: string[] } };
   timeline?: { done: boolean; data?: Array<{ chapterIndex: number; settingName: string; description: string }> };
   writing?: { done: boolean; data?: unknown };
+  contentBeats?: { done: boolean; data?: { beatTypes: string[]; overallDistribution: Record<string, number>; loopPatterns: Array<{ loopIndex: number; startChapter: number; endChapter: number; beats: Record<string, number> }>; totalChapters: number } };
 }
 
-const ANALYSIS_KEYS = ["loops", "coolpoints", "architecture", "hooks", "goldenFinger", "timeline", "writing"] as const;
+const ANALYSIS_KEYS = ["loops", "coolpoints", "architecture", "hooks", "goldenFinger", "timeline", "writing", "contentBeats"] as const;
 
 export function ReferenceCockpitPage() {
   const { novelId } = useParams<{ novelId: string }>();
@@ -60,6 +61,7 @@ export function ReferenceCockpitPage() {
       if (annot?.goldenFingerBounds) newAnalysis.goldenFinger = { done: true, data: annot.goldenFingerBounds };
       if (annot?.keySettings?.length > 0) newAnalysis.timeline = { done: true, data: annot.keySettings };
       if (data.data?.writingAssets) newAnalysis.writing = { done: true, data: JSON.parse(data.data.writingAssets) };
+      if (annot?.contentBeatPatterns) newAnalysis.contentBeats = { done: true, data: annot.contentBeatPatterns };
       setAnalysis(newAnalysis);
       if (data.data?.totalChapters) setStats({ totalChapters: data.data.totalChapters, totalLoops: annot?.loopBoundaries?.filter((b: {type:string}) => b.type === "start").length ?? 0 });
     } catch {}
@@ -75,6 +77,7 @@ export function ReferenceCockpitPage() {
       else if (key === "goldenFinger") await api.post(`/novels/${nid}/reference-book/extract-golden-finger`);
       else if (key === "timeline") await api.post(`/novels/${nid}/reference-book/extract-setting-timeline`);
       else if (key === "writing") await extractWriting.mutateAsync(nid);
+      else if (key === "contentBeats") await api.post(`/novels/${nid}/reference-book/extract-content-beats`);
     } catch {} finally { setRunning(null); }
     await loadState();
   }
@@ -136,7 +139,7 @@ export function ReferenceCockpitPage() {
           {fileName && <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">{fileName}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {doneCount < 7 && (
+          {doneCount < 8 && (
             <button onClick={handleRunAll} disabled={runAll || !fileName}
               className={cn("flex items-center gap-1 rounded-lg px-4 py-1.5 text-xs font-medium text-white transition-colors",
                 runAll ? "bg-slate-400" : "bg-brand-600 hover:bg-brand-700")}>
@@ -257,6 +260,35 @@ export function ReferenceCockpitPage() {
                     {(timelineData as Array<{chapterIndex: number; settingName: string}>).slice(0, 10).map((s, i) => (
                       <div key={i} className="flex items-center gap-2"><span className="w-12 text-slate-400 shrink-0">第{s.chapterIndex}章</span><span className="text-slate-600">{s.settingName}</span></div>
                     ))}
+                  </div>
+                )}
+              </AnalysisCard>
+
+              {/* Content Beats */}
+              <AnalysisCard title="内容节拍DNA" icon={BookOpen} done={analysis.contentBeats?.done} running={running === "contentBeats"} onRun={() => runAnalysis("contentBeats")}>
+                {analysis.contentBeats?.data && (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-1 text-[10px]">
+                      {analysis.contentBeats.data.beatTypes.map((bt: string) => {
+                        const pct = analysis.contentBeats!.data!.overallDistribution[bt] ?? 0;
+                        const total = analysis.contentBeats!.data!.totalChapters;
+                        return (
+                          <span key={bt} className="rounded bg-slate-100 px-1.5 py-0.5" title={`${pct}章 (${total > 0 ? (pct / total * 100).toFixed(0) : 0}%)`}>
+                            {bt} {pct}章
+                          </span>
+                        );
+                      })}
+                    </div>
+                    {analysis.contentBeats.data.loopPatterns.length > 0 && (
+                      <div className="text-xs text-slate-500">
+                        共 {analysis.contentBeats.data.loopPatterns.length} 轮回环已分析内容节拍分布
+                      </div>
+                    )}
+                    <button onClick={async () => {
+                      try { await api.put(`/novels/${nid}/architecture`, { contentBeatProfile: JSON.stringify(analysis.contentBeats?.data?.overallDistribution) }); } catch {}
+                    }} className="w-full rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">
+                      应用内容节拍配方
+                    </button>
                   </div>
                 )}
               </AnalysisCard>

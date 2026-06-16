@@ -5,6 +5,7 @@
 import { z } from "zod";
 import { getPrisma } from "../../../platform/db/client";
 import { aiInvoke } from "../../../platform/llm/aiService";
+import type { ContentBeatAnnotation } from "@one2novel/shared/types/novel";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ export interface ReferenceBookService {
   extractHookPatterns(novelId: string): Promise<{ distribution: Record<string, number>; avgHookStrength: number; typicalHookStyle: string }>;
   extractGoldenFingerBounds(novelId: string): Promise<{ abilities: string[]; limits: string[] }>;
   extractSettingTimeline(novelId: string): Promise<Array<{ chapterIndex: number; settingName: string; description: string }>>;
+  extractContentBeats(novelId: string): Promise<ContentBeatAnnotation>;
 }
 
 // ─── LLM Schemas ───────────────────────────────────────
@@ -91,6 +93,17 @@ const LoopInferenceSchema = z.object({
     chapterIndex: z.number().int(),
     type: z.enum(["start", "end"]),
   })),
+});
+
+const ContentBeatExtractionSchema = z.object({
+  loopPatterns: z.array(z.object({
+    loopIndex: z.number().int(),
+    startChapter: z.number().int(),
+    endChapter: z.number().int(),
+    beats: z.record(z.string(), z.number()), // beat type → chapter count
+  })),
+  overallDistribution: z.record(z.string(), z.number()),
+  beatTypes: z.array(z.string()),
 });
 
 const CoolPointInferenceSchema = z.object({
@@ -656,6 +669,74 @@ export function createReferenceBookService(): ReferenceBookService {
       });
 
       return raw.settings;
+    },
+
+    // ─── Content Beat Extraction ─────────────────────
+
+    async extractContentBeats(novelId) {
+      const prisma = getPrisma();
+      const rb = await prisma.referenceBook.findUnique({ where: { novelId } });
+      if (!rb?.content) throw new Error("No reference book uploaded");
+
+      const chapters = splitChapters(rb.content);
+      const annotations: ReferenceAnnotation | null = rb.annotations ? JSON.parse(rb.annotations) : null;
+      const loopBoundaries = annotations?.loopBoundaries ?? [];
+
+      // Build loops from boundaries
+      const starts = loopBoundaries.filter(b => b.type === "start").sort((a, b) => a.chapterIndex - b.chapterIndex);
+      const ends = loopBoundaries.filter(b => b.type === "end").sort((a, b) => a.chapterIndex - b.chapterIndex);
+      const loops = [];
+      for (let i = 0; i < Math.min(starts.length, ends.length); i++) {
+        loops.push({ loopIndex: i + 1, startChapter: starts[i].chapterIndex, endChapter: ends[i].chapterIndex });
+      }
+      if (loops.length === 0) {
+        // Fallback: treat whole book as one loop
+        loops.push({ loopIndex: 1, startChapter: 1, endChapter: chapters.length });
+      }
+
+      // Sample 2-3 chapters per loop for content beat classification
+      const samples: string[] = [];
+      for (const loop of loops) {
+        const chapterCount = loop.endChapter - loop.startChapter + 1;
+        const sampleCount = Math.min(3, chapterCount);
+        const step = Math.max(1, Math.floor(chapterCount / (sampleCount + 1)));
+        for (let j = 1; j <= sampleCount; j++) {
+          const idx = loop.startChapter + step * j - 1;
+          if (idx >= 1 && idx <= chapters.length) {
+            const ch = chapters[idx - 1];
+            samples.push(`[回环${loop.loopIndex}·第${idx}章] ${ch.title}\n${ch.content.slice(0, 500).replace(/\n/g, " ")}`);
+          }
+        }
+      }
+
+      const raw = await aiInvoke({
+        assetId: "reference.content-beats.extract",
+        novelId,
+        userPrompt: [
+          `全书共${chapters.length}章，${loops.length}轮回环。以下是从每轮回环均匀采样的章节片段：`,
+          samples.join("\n\n---\n\n").slice(0, 18000),
+          `\n\n请分析每轮回环的内容节拍分布。`,
+        ].join("\n"),
+        schema: ContentBeatExtractionSchema,
+        temperature: 0.4,
+      });
+
+      // Store in annotations
+      const existing = rb.annotations ? JSON.parse(rb.annotations) : {};
+      const annotation: ContentBeatAnnotation = {
+        extractedAt: new Date().toISOString(),
+        beatTypes: raw.beatTypes,
+        overallDistribution: raw.overallDistribution,
+        loopPatterns: raw.loopPatterns,
+        totalChapters: chapters.length,
+      };
+      existing.contentBeatPatterns = annotation;
+      await prisma.referenceBook.update({
+        where: { novelId },
+        data: { annotations: JSON.stringify(existing) },
+      });
+
+      return annotation;
     },
 
     // ─── Writing Assets Extraction ──────────────────

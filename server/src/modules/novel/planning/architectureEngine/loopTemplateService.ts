@@ -35,6 +35,7 @@ const ExpandedChapterSchema = z.object({
   coolPointType: z.enum(["collect", "strategy", "verify", "reveal", "upgrade", "face_slap"]).optional(),
   hookType: z.enum(["short_term", "medium_term"]).optional(),
   chapterType: z.enum(["advance", "transition", "cooldown", "climax"]),
+  contentBeat: z.string().optional(),
   expectation: z.string(),
   coreEvent: z.string(),
   endingHook: z.string(),
@@ -236,6 +237,24 @@ export async function expandLoopToVolume(
     ? `\n【前卷实际进展】\n${previousVolumeSummaries.map((s, i) => `第${i + 1}卷：${s}`).join("\n")}`
     : "";
 
+  // Build content beat hint from novel profile or architecture default
+  let contentBeatHint = "";
+  let beatProfile: Record<string, { pct: number; span: string; label: string }> | null = null;
+  if (novel.contentBeatProfile) {
+    try { beatProfile = JSON.parse(novel.contentBeatProfile); } catch {}
+  }
+  if (!beatProfile && arch?.defaultContentBeats) {
+    beatProfile = arch.defaultContentBeats;
+  }
+  if (beatProfile && Object.keys(beatProfile).length > 0) {
+    const beatEntries = Object.entries(beatProfile);
+    const chapterCount = loopItem.estimatedChapters;
+    const beatAssignments = beatEntries.map(([type, def]) =>
+      `  ${def.label}（${type}）：占比${def.pct}%，约${Math.round(chapterCount * def.pct / 100)}章，每段${def.span}`
+    ).join("\n");
+    contentBeatHint = `内容节拍配比（共${chapterCount}章）：\n${beatAssignments}`;
+  }
+
   const systemPrompt = arch
     ? [
         `你是资深网文分章策划师。将一回环（第${loopIndex}轮）展开为详细的卷章结构。`,
@@ -254,6 +273,8 @@ export async function expandLoopToVolume(
         `4. 爽点类型按节奏自然分配：collect/strategy/verify/reveal/upgrade/face_slap`,
         `5. 每章结尾必须有钩子（15-30字），推动读者继续阅读`,
         `6. 章与章之间要有因果推进关系`,
+        `7. 每章标注内容节拍(contentBeat)，从以下类型中选择并按配比分配：`,
+        ...(contentBeatHint ? [contentBeatHint] : []),
       ].join("\n")
     : [
         `你是资深网文分章策划师。将一回环（第${loopIndex}轮）展开为详细的卷章结构。`,

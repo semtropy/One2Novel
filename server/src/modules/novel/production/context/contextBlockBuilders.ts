@@ -83,7 +83,7 @@ export async function assembleChapterBlocks(
   // ── chapter_mission ──
   const chapterPlan = await prisma.volumeChapterPlan.findFirst({
     where: { chapterId: chapter.id },
-    select: { purpose: true, exclusiveEvent: true, endingState: true, mustAvoid: true, chapterOrder: true, summary: true, loopPhase: true, chapterType: true, coolPointType: true, volume: { select: { title: true, summary: true } } },
+    select: { purpose: true, exclusiveEvent: true, endingState: true, mustAvoid: true, chapterOrder: true, summary: true, loopPhase: true, chapterType: true, coolPointType: true, contentBeat: true, volume: { select: { title: true, summary: true } } },
   });
   const missionParts = [`本章任务：${chapter.expectation ?? "推进主线"}`];
   if (chapterPlan?.purpose) missionParts.push(`核心目的：${chapterPlan.purpose}`);
@@ -281,6 +281,17 @@ export async function assembleChapterBlocks(
     blocks.push(createContextBlock({
       id: "world_rules", group: "story_macro", priority: 90,
       content: worldRules,
+    }));
+  }
+
+  // ── content_beat_mission ──
+  if (chapterPlan?.contentBeat) {
+    const beatGuide = getContentBeatGuide(chapterPlan.contentBeat);
+    blocks.push(createContextBlock({
+      id: "content_beat_mission",
+      group: "chapter_mission",
+      priority: 98,
+      content: `[本章内容节拍]\n类型：${chapterPlan.contentBeat}${beatGuide ? `\n写作指引：${beatGuide}` : ""}`,
     }));
   }
 
@@ -541,4 +552,22 @@ async function buildReferenceCounterpart(novelId: string, chapterOrder: number):
   }
 
   return parts.join("\n");
+}
+
+// ─── Content Beat Writing Guide ──────────────────────────
+
+const CONTENT_BEAT_GUIDES: Record<string, string> = {
+  修炼: "侧重功法领悟的顿悟感、资源消耗的紧张感、突破前后的身体变化描写。避免纯'打坐→升级'的流水账，要写出每次修炼的具体目标和代价。",
+  显圣: "制造信息差——读者知道主角有多强但对手不知道。打脸要有铺垫（对手的轻视）→执行（主角碾压）→反应（众人震惊）三段式。避免直接陈述'他很厉害'，要通过旁观者视角侧写。",
+  赚钱: "每次经济行为要有具体数字和代价。交易要有信息不对称的博弈感。资源的获取应服务于后续修炼/显圣/剧情，不要为赚钱而赚钱。",
+  恋爱: "CP互动要有实质性推进——不是无信息量的'撒糖'。每次互动至少改变一点关系状态（信任+1、误解+1、默契+1）。通过身体反应和行动间接表达情感，避免直接陈述'她心动了'。",
+  日常: "日常章不应纯灌水。要有：角色性格侧面展示、世界观细节渗透、或为后续剧情埋伏笔。用具体生活细节代替抽象'他们度过了愉快的一天'。",
+  过渡: "过渡章的信息量可以降低但必须保持推进感。用场景切换/时间跳跃/对话摘要代替大段说明。章尾必须有钩子让读者期待下一阶段的展开。",
+  说明: "世界观设定通过剧情自然释放，避免'科普段落'。方法：主角在行动中遇到规则→用对话/内心独白/他人反应来间接说明规则。每条新设定都要让读者有'原来如此'的满足感。",
+  调查: "信息揭示要有层次——每步调查获得不完整信息→拼图式渐进。关键线索应通过具体物证/人证/环境细节呈现，而不是角色'突然想到'。红鲱鱼（误导线索）要合理不强行。",
+  推理: "推理过程要让读者参与——在主角得出结论前，读者应能看到所有必要线索。结论应有逻辑链条，避免'直觉式'破案。留有余地让读者自行判断。",
+};
+
+function getContentBeatGuide(beatType: string): string | null {
+  return CONTENT_BEAT_GUIDES[beatType] ?? null;
 }

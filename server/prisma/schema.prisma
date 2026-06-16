@@ -69,6 +69,7 @@ model Novel {
   loopDefinition     String? // JSON: user-customized loop phase definitions
   goldenFinger       String? // JSON: {abilities:string[], limits:string[]}
   expectationProfile String? // JSON: ExpectationProfile
+  contentBeatProfile String?  // JSON: ContentBeatProfile — 内容节拍配方
 
   // Blueprint — volume→chapter structure
   structuredOutline  String? // JSON blueprint
@@ -215,6 +216,7 @@ model VolumeChapterPlan {
   coolPointType   String? // "collect"|"strategy"|"verify"|"face_slap"|"reveal"|"upgrade"
   hookType        String? // "short_term"|"medium_term"
   chapterType     String? // "advance"|"transition"|"cooldown"|"climax"
+  contentBeat     String? // 内容节拍类型，如"修炼"/"显圣"/"赚钱"/"恋爱"/"日常"/"过渡"/"说明"
   chapter         Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   volume          Volume   @relation(fields: [volumeId], references: [id], onDelete: Cascade)
   createdAt       DateTime @default(now())

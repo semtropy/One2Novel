@@ -41,6 +41,14 @@ export interface ExpectationProfile {
   payoffWindow: number;          // 伏笔回收窗口（章数）
 }
 
+export interface ContentBeatDef {
+  pct: number;
+  span: string;
+  label: string;
+}
+
+export type ContentBeatProfile = Record<string, ContentBeatDef>;
+
 export interface ArchitectureTemplate {
   id: ArchitectureType;
   name: string;
@@ -49,6 +57,7 @@ export interface ArchitectureTemplate {
   defaultLoop: LoopDefinition;
   defaultCoolPointRecipe: CoolPointRecipe;
   defaultHookProfile: HookProfile;
+  defaultContentBeats: ContentBeatProfile;
   representativeWorks: string[];
 }
 
@@ -79,6 +88,7 @@ export interface ExpandedChapter {
   coolPointType?: CoolPointType;
   hookType?: "short_term" | "medium_term";
   chapterType: ChapterType;
+  contentBeat?: string;        // 内容节拍类型
   expectation: string;         // 本章目标
   coreEvent: string;           // 核心事件
   endingHook: string;          // 章尾钩子

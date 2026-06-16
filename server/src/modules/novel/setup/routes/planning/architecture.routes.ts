@@ -46,6 +46,7 @@ async function syncExpandedChapters(
       purpose: ch.expectation, exclusiveEvent: ch.coreEvent, endingState: ch.endingHook,
       loopPhase: ch.loopPhase, loopIndex: sortOrder,
       coolPointType: ch.coolPointType, hookType: ch.hookType, chapterType: ch.chapterType,
+      contentBeat: ch.contentBeat,
     };
     if (existingPlan) {
       await prisma.volumeChapterPlan.update({ where: { id: existingPlan.id }, data: planData });

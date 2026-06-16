@@ -50,4 +50,9 @@ export type {
   LoopSkeletonItem,
   ReferenceBookAnnotation,
   CostSummary,
+  // Content Beat
+  ContentBeatDef,
+  ContentBeatProfile,
+  LoopContentBeatPattern,
+  ContentBeatAnnotation,
 } from "./types/novel.js";

@@ -185,6 +185,7 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
                     <span className="w-5 text-center text-slate-400 shrink-0">{ch.chapterOrder}</span>
                     <span className="text-slate-700 truncate flex-1">{ch.title}</span>
                     {ch.loopPhase && <span className={cn("rounded px-1 py-0 text-[10px] shrink-0", LOOP_PHASE_LABELS[ch.loopPhase]?.color ?? "bg-slate-100 text-slate-500")}>{LOOP_PHASE_LABELS[ch.loopPhase]?.label ?? ch.loopPhase}</span>}
+                    {(ch as any).contentBeat && <span className="rounded px-1 py-0 text-[10px] bg-slate-800 text-white shrink-0">{(ch as any).contentBeat}</span>}
                     {ch.chapter?.chapterStatus === "completed" && <Check size={10} className="text-green-500 shrink-0" />}
                   </div>
                 ))}

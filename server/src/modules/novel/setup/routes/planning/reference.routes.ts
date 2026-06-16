@@ -108,6 +108,13 @@ router.post("/:novelId/reference-book/extract-setting-timeline", async (req: Req
   } catch (e) { next(e); }
 });
 
+// Phase: 内容节拍提取
+router.post("/:novelId/reference-book/extract-content-beats", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ data: await createReferenceBookService().extractContentBeats(param(req, "novelId")) });
+  } catch (e) { next(e); }
+});
+
 // Phase: 从写法资产创建风格配置文件
 router.post("/:novelId/reference-book/create-style-profile", async (req: Request, res: Response, next: NextFunction) => {
   try {
