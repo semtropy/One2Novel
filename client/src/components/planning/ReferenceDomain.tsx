@@ -253,21 +253,21 @@ export function ReferenceDomain({ novelId }: Props) {
           </div>}
         </Section>
 
-        {/* Golden Finger + Content Beats side by side */}
-        <div className="grid grid-cols-2 gap-4">
-          <Section title="金手指" icon={Sparkles} done={done.goldenFinger} running={running === "goldenFinger"} onRun={() => run("goldenFinger")} hasFile={!!fileName}>
-            {gfData && <div className="space-y-2 text-sm">
-              <div><span className="font-medium text-slate-600">能力</span><div className="flex flex-wrap gap-1 mt-1">{gfData.abilities.map((a,i) => <span key={i} className="rounded bg-green-50 px-2 py-1 text-xs text-green-700">{a}</span>)}</div></div>
-              <div><span className="font-medium text-slate-600">限制</span><div className="flex flex-wrap gap-1 mt-1">{gfData.limits.map((l,i) => <span key={i} className="rounded bg-red-50 px-2 py-1 text-xs text-red-600">{l}</span>)}</div></div>
-            </div>}
-          </Section>
-          <Section title="内容节拍DNA" icon={BookOpen} done={done.contentBeats} running={running === "contentBeats"} onRun={() => run("contentBeats")} hasFile={!!fileName}>
-            {beatData && <div className="space-y-2">
-              <div className="flex flex-wrap gap-1 text-xs">{beatData.beatTypes.map(bt => { const c = beatData.overallDistribution[bt] ?? 0; const t = beatData.totalChapters; return <span key={bt} className="rounded bg-slate-100 px-2 py-1" title={`${c}章 (${t>0?(c/t*100).toFixed(0):0}%)`}>{bt} <b className="text-slate-700">{c}章</b></span>; })}</div>
-              <button onClick={async () => { try { await api.put(`/novels/${novelId}/architecture`, { contentBeatProfile: JSON.stringify(beatData.overallDistribution) }); } catch {} }} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">应用内容节拍配方</button>
-            </div>}
-          </Section>
-        </div>
+        {/* Golden Finger */}
+        <Section title="金手指" icon={Sparkles} done={done.goldenFinger} running={running === "goldenFinger"} onRun={() => run("goldenFinger")} hasFile={!!fileName}>
+          {gfData && <div className="space-y-2 text-sm">
+            <div><span className="font-medium text-slate-600">能力</span><div className="flex flex-wrap gap-1 mt-1">{gfData.abilities.map((a,i) => <span key={i} className="rounded bg-green-50 px-2 py-1 text-xs text-green-700">{a}</span>)}</div></div>
+            <div><span className="font-medium text-slate-600">限制</span><div className="flex flex-wrap gap-1 mt-1">{gfData.limits.map((l,i) => <span key={i} className="rounded bg-red-50 px-2 py-1 text-xs text-red-600">{l}</span>)}</div></div>
+          </div>}
+        </Section>
+
+        {/* Content Beats */}
+        <Section title="内容节拍DNA" icon={BookOpen} done={done.contentBeats} running={running === "contentBeats"} onRun={() => run("contentBeats")} hasFile={!!fileName}>
+          {beatData && <div className="space-y-2">
+            <div className="flex flex-wrap gap-1 text-xs">{beatData.beatTypes.map(bt => { const c = beatData.overallDistribution[bt] ?? 0; const t = beatData.totalChapters; return <span key={bt} className="rounded bg-slate-100 px-2 py-1" title={`${c}章 (${t>0?(c/t*100).toFixed(0):0}%)`}>{bt} <b className="text-slate-700">{c}章</b></span>; })}</div>
+            <button onClick={async () => { try { await api.put(`/novels/${novelId}/architecture`, { contentBeatProfile: JSON.stringify(beatData.overallDistribution) }); } catch {} }} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700">应用内容节拍配方</button>
+          </div>}
+        </Section>
 
         {/* Cool Points */}
         <Section title="爽点分布" icon={TrendingUp} done={done.coolpoints} running={running === "coolpoints"} onRun={() => run("coolpoints")} hasFile={!!fileName}>
