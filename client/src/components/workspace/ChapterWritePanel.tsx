@@ -239,9 +239,9 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center gap-2 mb-3 shrink-0 flex-wrap">
-        <span className="text-sm font-bold text-slate-900 shrink-0">第{chapter?.order ?? "?"}章</span>
+        <span className="text-sm font-bold text-slate-900 shrink-0 leading-none">第{chapter?.order ?? "?"}章</span>
         <input value={displayTitle} onChange={(e) => setTitle(e.target.value)} onBlur={handleSaveTitle} placeholder="无标题"
-          className="flex-1 min-w-0 text-sm font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-slate-400 focus:outline-none pb-0.5" />
+          className="flex-1 min-w-0 text-sm font-bold text-slate-900 bg-transparent border-0 outline-none focus:outline-none leading-none p-0" />
         <span className="text-xs text-slate-400 shrink-0">{wordCount}字</span>
         {saved && <span className="text-xs text-green-500 shrink-0">已保存</span>}
         <div className="flex items-center gap-1.5">
