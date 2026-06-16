@@ -42,7 +42,7 @@ export async function processChapter(
   const prisma = getPrisma();
 
   // Fetch quality gate params + previous chapter context for coherence check
-  const [novelGenre, chapterExpectation, charProhibitions, prevChapter] = await Promise.all([
+  const [novelGenre, chapterExpectation, charProhibitions, prevChapter, prevCharStates] = await Promise.all([
     prisma.novel.findUnique({ where: { id: novelId }, select: { genre: true } }).then(r => r?.genre ?? null),
     prisma.chapter.findUnique({ where: { id: chapterId }, select: { expectation: true } }).then(r => r?.expectation ?? null),
     buildCharacterProhibitions(novelId).catch(e => { logEventError("pipeline.charProhibitions", { novelId }, e); return undefined; }),
@@ -51,9 +51,17 @@ export async function processChapter(
       orderBy: { order: "desc" },
       select: { content: true, chapterSummary: { select: { summary: true } } },
     }),
+    prisma.novelCharacter.findMany({
+      where: { novelId },
+      select: { name: true, currentStatus: true, currentLocation: true, currentGoal: true },
+    }),
   ]);
   const previousChapterSummary = prevChapter?.chapterSummary?.summary ?? null;
   const previousChapterEnding = prevChapter?.content?.slice(-200) ?? null;
+  const characterStateSnapshot = prevCharStates
+    .filter(c => c.currentStatus || c.currentLocation)
+    .map(c => `${c.name}：${[c.currentStatus, c.currentLocation, c.currentGoal].filter(Boolean).join("；")}`)
+    .join("\n") || null;
 
   let currentContent = generatedContent;
   let finalStatus: "completed" | "needs_repair" = "completed";
@@ -70,6 +78,7 @@ export async function processChapter(
       chapterExpectation,
       previousChapterSummary,
       previousChapterEnding,
+      characterStateSnapshot,
     });
   } catch { qualityResult = null; }
   if (qualityResult) lastQuality = qualityResult;

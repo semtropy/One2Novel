@@ -1,4 +1,4 @@
-/** Phase 5-6: Cross-volume audit + Cost management + Completion guidance */
+/** Cross-volume audit + Character lifecycle + Compression + Completion guidance */
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { getPrisma } from "../../../../../platform/db/client";
 import { param } from "../../../../../platform/express/params";
@@ -74,23 +74,6 @@ router.post("/:novelId/volumes/:sortOrder/cross-audit", async (req: Request, res
   try {
     const { auditVolume } = await import("../../../production/audit/crossVolumeAuditService");
     res.json({ data: await auditVolume(param(req, "novelId"), parseInt(param(req, "sortOrder"))) });
-  } catch (e) { next(e); }
-});
-
-// ── Cost management ────────────────────────────────────
-
-router.get("/:novelId/cost-summary", async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { getCostSummary } = await import("../../../production/costTracker");
-    res.json({ data: await getCostSummary(param(req, "novelId")) });
-  } catch (e) { next(e); }
-});
-
-router.put("/:novelId/budget-limit", async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { setBudgetLimit } = await import("../../../production/costTracker");
-    await setBudgetLimit(param(req, "novelId"), req.body.limit ?? null);
-    res.json({ data: { ok: true, limit: req.body.limit } });
   } catch (e) { next(e); }
 });
 

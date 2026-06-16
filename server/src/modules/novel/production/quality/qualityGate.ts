@@ -49,6 +49,8 @@ export interface QualityGateOptions {
   previousChapterSummary?: string | null;
   /** Previous chapter ending hook (last ~200 chars) for handoff check */
   previousChapterEnding?: string | null;
+  /** Character state snapshot from previous chapter for continuity check */
+  characterStateSnapshot?: string | null;
 }
 
 // ─── Genre-specific check dimensions ──────────────────
@@ -233,7 +235,10 @@ export async function runQualityGate(
   const raw = await aiInvoke({
     assetId: "novel.chapter.review",
     templateVars: { genreCheckDimensions: genreDimensions, previousChapterSummary: opts?.previousChapterSummary ?? "", previousChapterEnding: opts?.previousChapterEnding ?? "", chapterExpectation: opts?.chapterExpectation ?? "", characterProhibitions: charProhibitionText },
-    userPrompt: `请审阅以下章节：\n\n${content.slice(0, 8000)}`,
+    userPrompt: [
+      `请审阅以下章节：\n\n${content.slice(0, 6000)}`,
+      opts?.characterStateSnapshot ? `\n上一章结束时角色状态（请检查本章是否保持一致）：\n${opts.characterStateSnapshot}` : "",
+    ].join("\n"),
     schema: RawQualitySchema, temperature: 0.3,
   });
 

@@ -126,23 +126,23 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
             </div>
 
             {addCharOpen && (
-              <div className="mb-3 flex items-end gap-2 rounded-lg border border-indigo-200 bg-indigo-50/30 p-3">
+              <div className="mb-3 flex items-end gap-2 rounded-lg border border-brand-200 bg-brand-50/30 p-3">
                 <div className="flex-1">
                   <label className="text-xs text-slate-500 block mb-1">角色姓名</label>
-                  <input autoFocus className="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:border-indigo-300 focus:outline-none"
+                  <input autoFocus className="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:border-brand-300 focus:outline-none"
                     value={addCharName} onChange={e => setAddCharName(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter") handleAddChar(); if (e.key === "Escape") setAddCharOpen(false); }}
                     placeholder="2-3字中文名" />
                 </div>
                 <div>
                   <label className="text-xs text-slate-500 block mb-1">角色定位</label>
-                  <select className="rounded border border-slate-200 px-2 py-1 text-sm focus:border-indigo-300 focus:outline-none"
+                  <select className="rounded border border-slate-200 px-2 py-1 text-sm focus:border-brand-300 focus:outline-none"
                     value={addCharRole} onChange={e => setAddCharRole(e.target.value)}>
                     {Object.entries(ROLE_OPTIONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </div>
                 <button onClick={handleAddChar} disabled={!addCharName.trim()}
-                  className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                  className="rounded bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
                   添加
                 </button>
                 <button onClick={() => setAddCharOpen(false)}
@@ -172,12 +172,12 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
                           {["personality","background","appearance","voiceTexture","currentGoal"].map(field => (
                             <div key={field}>
                               <label className="text-[10px] text-slate-400">{field === "personality" ? "性格" : field === "background" ? "背景" : field === "appearance" ? "外貌" : field === "voiceTexture" ? "语气" : "当前目标"}</label>
-                              <input className="w-full rounded border border-slate-200 px-1.5 py-0.5 text-xs focus:border-indigo-300 focus:outline-none"
+                              <input className="w-full rounded border border-slate-200 px-1.5 py-0.5 text-xs focus:border-brand-300 focus:outline-none"
                                 value={editCharFields[field] ?? ""} onChange={e => setEditCharFields(prev => ({ ...prev, [field]: e.target.value }))} />
                             </div>
                           ))}
                           <div className="flex gap-1 pt-1">
-                            <button onClick={() => handleSaveCharField(char.id)} className="flex items-center gap-1 rounded bg-indigo-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-indigo-700"><Save size={10} />保存</button>
+                            <button onClick={() => handleSaveCharField(char.id)} className="flex items-center gap-1 rounded bg-brand-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-brand-700"><Save size={10} />保存</button>
                             <button onClick={() => { setEditCharId(null); setEditCharFields({}); }} className="rounded px-2 py-0.5 text-[10px] text-slate-500 hover:bg-slate-100"><X size={10} /></button>
                           </div>
                         </div>
@@ -186,10 +186,10 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
                           {char.personality && <p className="text-xs text-slate-500 mb-1 line-clamp-2">性格：{char.personality}{char.identityLabel ? ` · ${char.identityLabel}` : ""}</p>}
                           <div className="mt-2 flex items-center justify-between">
                             <select value={char.loopFunctionTag ?? ""} onChange={e => handleTagChange(char.id, e.target.value)} disabled={updatingTag === char.id}
-                              className="rounded border border-slate-200 px-2 py-0.5 text-xs focus:border-indigo-300 focus:outline-none max-w-[160px]">
+                              className="rounded border border-slate-200 px-2 py-0.5 text-xs focus:border-brand-300 focus:outline-none max-w-[160px]">
                               {LOOP_FUNCTION_TAGS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                             </select>
-                            <button onClick={() => startEditChar(char)} className="text-[10px] text-slate-400 hover:text-indigo-600">详情</button>
+                            <button onClick={() => startEditChar(char)} className="text-[10px] text-slate-400 hover:text-brand-600">详情</button>
                             <button onClick={() => handleDeleteChar(char.id, char.name)} className="text-[10px] text-slate-300 hover:text-red-500 ml-1">删除</button>
                           </div>
                         </>
@@ -226,7 +226,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
           {characters.length > 0 && relations.length > 0 && (
             <section className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex items-center gap-2 mb-3">
-                <GitBranch size={14} className="text-indigo-500" />
+                <GitBranch size={14} className="text-brand-500" />
                 <h3 className="text-sm font-medium text-slate-700">角色关系网络</h3>
               </div>
               <RelationshipNetwork
@@ -267,7 +267,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
                       <div key={rel.id} className="flex items-center py-1 border-t border-slate-50">
                         <span className="w-24 shrink-0 text-[10px] text-slate-600 px-2 truncate">{source?.name ?? "?"}↔{target?.name ?? "?"}</span>
                         {volumes.slice(0, 8).map(vol => (
-                          <select key={vol.sortOrder} className="w-16 shrink-0 mx-0.5 rounded border border-slate-100 text-[10px] text-slate-500 focus:border-indigo-300 focus:outline-none py-0.5 text-center"
+                          <select key={vol.sortOrder} className="w-16 shrink-0 mx-0.5 rounded border border-slate-100 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none py-0.5 text-center"
                             value={rel.stage ?? "strangers"}
                             onChange={async (e) => {
                               try {

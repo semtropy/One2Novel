@@ -3,7 +3,6 @@ import { novelRoutes } from "../modules/novel/setup/http";
 import { styleRoutes } from "../modules/style/http";
 import { probeLLM } from "../platform/llm/connectivity";
 import { getPrisma } from "../platform/db/client";
-import { refineChapterDetails } from "../modules/novel/planning/chapterDetail";
 import { getStateSnapshots } from "../modules/novel/production/stateSnapshot";
 import { detectTimelineConflicts, getPreChapterReminders, reExtractChapterTimeline } from "../modules/timeline/timelineService";
 
@@ -49,11 +48,6 @@ export function registerRoutes(app: Express) {
       const result = await reExtractChapterTimeline(req.params.novelId, req.params.chapterId);
       res.json({ data: result });
     } catch (e) { next(e); }
-  });
-
-  // ── Chapter Detail Refinement ──
-  api.post("/novels/:id/volumes/:sortOrder/refine", async (req, res, next) => {
-    try { res.json({ data: await refineChapterDetails(req.params.id, parseInt(req.params.sortOrder)) }); } catch (e) { next(e); }
   });
 
   // ── State Snapshots ──

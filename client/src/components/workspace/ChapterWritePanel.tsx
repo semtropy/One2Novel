@@ -245,10 +245,10 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
         <div className="flex items-center gap-1.5">
           {/* Generate dropdown — single chapter (default click) or batch (dropdown) */}
           <div className="relative">
-            <div className="flex rounded-md border border-purple-300 bg-purple-50 overflow-hidden">
-              <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-50">{generating ? <RefreshCw size={12} className="animate-spin" /> : <Play size={12} />}生成本章</button>
-              <span className="w-px bg-purple-200" />
-              <button onClick={() => setShowGenerateMenu(!showGenerateMenu)} className="px-1.5 py-1.5 text-purple-500 hover:bg-purple-100"><ChevronDown size={10} /></button>
+            <div className="flex rounded-md border border-brand-300 bg-brand-50 overflow-hidden">
+              <button onClick={handleGenerate} disabled={generating} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50">{generating ? <RefreshCw size={12} className="animate-spin" /> : <Play size={12} />}生成本章</button>
+              <span className="w-px bg-brand-200" />
+              <button onClick={() => setShowGenerateMenu(!showGenerateMenu)} className="px-1.5 py-1.5 text-brand-500 hover:bg-brand-100"><ChevronDown size={10} /></button>
             </div>
             {showGenerateMenu && (
               <div className="absolute top-full left-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20" onMouseLeave={() => setShowGenerateMenu(false)}>
@@ -278,13 +278,13 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
 
       {/* Inline Suggestion Floating Card */}
       {(inlineSuggestion || suggestLoading) && suggestPos && (
-        <div className="fixed z-50 rounded-xl border border-indigo-200 bg-white shadow-lg p-3" style={{ top: suggestPos.top, left: suggestPos.left, maxWidth: 280 }}>
+        <div className="fixed z-50 rounded-xl border border-brand-200 bg-white shadow-lg p-3" style={{ top: suggestPos.top, left: suggestPos.left, maxWidth: 280 }}>
           {suggestLoading ? (
             <div className="flex items-center gap-2 text-xs text-slate-400"><RefreshCw size={11} className="animate-spin" />分析中...</div>
           ) : inlineSuggestion ? (
             <div>
               <div className="flex items-center gap-1 mb-1">
-                <span className={`text-[10px] rounded px-1 py-0 ${inlineSuggestion.severity === "medium" ? "bg-amber-50 text-amber-600" : "bg-slate-100 text-slate-500"}`}>
+                <span className={`text-[10px] rounded px-1 py-0 ${inlineSuggestion.severity === "medium" ? "bg-accent-50 text-accent-600" : "bg-slate-100 text-slate-500"}`}>
                   {inlineSuggestion.focus === "pass" ? "✓" : inlineSuggestion.focus}
                 </span>
               </div>
@@ -299,7 +299,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
       {showToolbar && !generating && (
         <div className="fixed z-40" style={{ top: (toolbarPos?.top ?? 100) - 20, left: toolbarPos?.left ?? 100 }}>
           <button onClick={() => { handleInlineSuggest(selectedParagraphs, toolbarPos!); setShowToolbar(false); }}
-            className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs text-indigo-600 hover:bg-indigo-100 shadow-sm">
+            className="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs text-brand-600 hover:bg-brand-100 shadow-sm">
             <Lightbulb size={11} className="inline mr-0.5" />AI建议
           </button>
         </div>

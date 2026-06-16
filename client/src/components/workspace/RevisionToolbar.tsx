@@ -28,18 +28,18 @@ export function RevisionToolbar({ visible, position, onSelectOperation, onClose,
             key={key}
             disabled={loading}
             onClick={() => onSelectOperation(key)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs hover:bg-amber-50 disabled:opacity-50 transition-colors group"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs hover:bg-accent-50 disabled:opacity-50 transition-colors group"
           >
             <span className="text-base">{op.emoji}</span>
             <div className="flex-1">
-              <div className="font-medium text-gray-700 group-hover:text-amber-700">{op.label}</div>
+              <div className="font-medium text-gray-700 group-hover:text-accent-700">{op.label}</div>
               <div className="text-[10px] text-gray-400">{op.desc}</div>
             </div>
           </button>
         ))}
         <button
           onClick={() => onSelectOperation("polish")}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs hover:bg-purple-50 text-purple-500 mt-1 border-t pt-1.5"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs hover:bg-brand-50 text-brand-500 mt-1 border-t pt-1.5"
         >
           <span className="text-base">💬</span>
           <span className="font-medium">自定义指令</span>
@@ -48,7 +48,7 @@ export function RevisionToolbar({ visible, position, onSelectOperation, onClose,
 
       {loading && (
         <div className="absolute inset-0 bg-white/60 rounded-xl flex items-center justify-center">
-          <div className="animate-spin w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full" />
+          <div className="animate-spin w-5 h-5 border-2 border-accent-500 border-t-transparent rounded-full" />
         </div>
       )}
     </div>

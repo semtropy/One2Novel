@@ -95,25 +95,25 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
         <div className="grid grid-cols-3 gap-2.5">
           {ARCH_TEMPLATES.map(arch => (
             <button key={arch.id} onClick={() => handleSelectArch(arch.id)}
-              className={cn("rounded-xl border p-3.5 text-left transition-all", selectedArch === arch.id ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-200" : "border-slate-200 bg-white hover:border-slate-300")}>
-              <div className={cn("text-sm font-semibold mb-1", selectedArch === arch.id ? "text-indigo-800" : "text-slate-700")}>{arch.name}</div>
+              className={cn("rounded-xl border p-3.5 text-left transition-all", selectedArch === arch.id ? "border-brand-400 bg-brand-50 ring-1 ring-brand-200" : "border-slate-200 bg-white hover:border-slate-300")}>
+              <div className={cn("text-sm font-semibold mb-1", selectedArch === arch.id ? "text-brand-800" : "text-slate-700")}>{arch.name}</div>
               <div className="text-xs text-slate-500 leading-relaxed mb-1.5">{arch.desc}</div>
-              <div className="flex items-center gap-2 text-[10px] text-slate-400"><span>{arch.genres}</span><span className="text-indigo-400">·</span><span className="italic">{arch.works}</span></div>
+              <div className="flex items-center gap-2 text-[10px] text-slate-400"><span>{arch.genres}</span><span className="text-brand-400">·</span><span className="italic">{arch.works}</span></div>
             </button>
           ))}
         </div>
-        <button onClick={() => setShowLoopEditor(!showLoopEditor)} className="mt-3 flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800">
+        <button onClick={() => setShowLoopEditor(!showLoopEditor)} className="mt-3 flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800">
           {showLoopEditor ? <ChevronDown size={12} /> : <ChevronRight size={12} />}编辑回环阶段 ({phases.length}个阶段)
         </button>
         {showLoopEditor && phases.length > 0 && (
-          <div className="mt-2 rounded-lg border border-indigo-100 bg-white p-3 space-y-2">
+          <div className="mt-2 rounded-lg border border-brand-100 bg-white p-3 space-y-2">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs text-slate-500">自定义每轮回环的阶段顺序、名称和典型章数。</p>
               <div className="flex gap-2">
                 <button onClick={() => setPhases(prev => [...prev, { phase: `new_${prev.length+1}`, label: "新阶段", description: "描述此阶段", typicalChapterCount: [1,3] }])}
                   className="flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-50"><Plus size={11} />新增</button>
                 <button onClick={async () => { setSavingPhases(true); try { await api.put(`/novels/${novelId}/loop-definition`, { phases }); } catch (e) { setPhaseError(e instanceof Error ? e.message : "保存失败"); } finally { setSavingPhases(false); } }}
-                  disabled={savingPhases} className="flex items-center gap-1 rounded bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                  disabled={savingPhases} className="flex items-center gap-1 rounded bg-brand-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
                   {savingPhases ? <RefreshCw size={11} className="animate-spin" /> : <Save size={11} />}保存</button>
               </div>
             </div>
@@ -125,13 +125,13 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
                     <button onClick={() => { if (idx>0) setPhases(prev => { const n=[...prev]; [n[idx-1],n[idx]]=[n[idx],n[idx-1]]; return n; }); }} disabled={idx===0} className="text-slate-300 hover:text-slate-500 disabled:opacity-30"><ArrowUp size={10} /></button>
                     <button onClick={() => { if (idx<phases.length-1) setPhases(prev => { const n=[...prev]; [n[idx],n[idx+1]]=[n[idx+1],n[idx]]; return n; }); }} disabled={idx===phases.length-1} className="text-slate-300 hover:text-slate-500 disabled:opacity-30"><ArrowDown size={10} /></button>
                   </div>
-                  <input className="w-16 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 focus:border-indigo-300 focus:outline-none" value={p.phase} onChange={e => updatePhase(idx,"phase",e.target.value)} placeholder="key" />
-                  <input className="w-20 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 focus:border-indigo-300 focus:outline-none" value={p.label} onChange={e => updatePhase(idx,"label",e.target.value)} placeholder="阶段名称" />
-                  <input className="flex-1 min-w-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-500 focus:border-indigo-300 focus:outline-none" value={p.description} onChange={e => updatePhase(idx,"description",e.target.value)} placeholder="阶段描述" />
+                  <input className="w-16 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 focus:border-brand-300 focus:outline-none" value={p.phase} onChange={e => updatePhase(idx,"phase",e.target.value)} placeholder="key" />
+                  <input className="w-20 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 focus:border-brand-300 focus:outline-none" value={p.label} onChange={e => updatePhase(idx,"label",e.target.value)} placeholder="阶段名称" />
+                  <input className="flex-1 min-w-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-500 focus:border-brand-300 focus:outline-none" value={p.description} onChange={e => updatePhase(idx,"description",e.target.value)} placeholder="阶段描述" />
                   <div className="flex items-center gap-1 shrink-0">
-                    <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-indigo-300 focus:outline-none text-center" type="number" min={1} max={10} value={p.typicalChapterCount[0]} onChange={e => updatePhase(idx,"typicalChapterCount",[parseInt(e.target.value)||1,p.typicalChapterCount[1]])} />
+                    <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none text-center" type="number" min={1} max={10} value={p.typicalChapterCount[0]} onChange={e => updatePhase(idx,"typicalChapterCount",[parseInt(e.target.value)||1,p.typicalChapterCount[1]])} />
                     <span className="text-[10px] text-slate-300">-</span>
-                    <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-indigo-300 focus:outline-none text-center" type="number" min={1} max={30} value={p.typicalChapterCount[1]} onChange={e => updatePhase(idx,"typicalChapterCount",[p.typicalChapterCount[0],parseInt(e.target.value)||3])} />
+                    <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none text-center" type="number" min={1} max={30} value={p.typicalChapterCount[1]} onChange={e => updatePhase(idx,"typicalChapterCount",[p.typicalChapterCount[0],parseInt(e.target.value)||3])} />
                     <span className="text-[10px] text-slate-400">章</span>
                   </div>
                   <button onClick={() => setPhases(prev => prev.filter((_,i) => i!==idx))} className="shrink-0 text-slate-300 hover:text-red-500 opacity-60 hover:opacity-100 transition-opacity"><X size={12} /></button>
@@ -142,11 +142,11 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
         )}
       </section>
 
-      <section className="rounded-xl border border-purple-200 bg-purple-50/30 p-4">
-        <h3 className="text-sm font-medium text-purple-800 mb-3">金手指设定</h3>
+      <section className="rounded-xl border border-brand-200 bg-brand-50/30 p-4">
+        <h3 className="text-sm font-medium text-brand-800 mb-3">金手指设定</h3>
         <div className="grid grid-cols-2 gap-3">
-          <div><span className="text-xs font-medium text-slate-500">能力清单</span><textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-purple-300 focus:outline-none" rows={5} value={localAbilities} onChange={e => setLocalAbilities(e.target.value)} placeholder={"每行一条能力\n如：\n可以看到物品的隐藏信息\n能在战斗中预判敌人动作"} /></div>
-          <div><span className="text-xs font-medium text-slate-500">限制清单</span><textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-purple-300 focus:outline-none" rows={5} value={localLimits} onChange={e => setLocalLimits(e.target.value)} placeholder={"每行一条限制\n如：\n每天只能使用3次预判\n吞噬能力有30%失败率"} /></div>
+          <div><span className="text-xs font-medium text-slate-500">能力清单</span><textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-brand-300 focus:outline-none" rows={5} value={localAbilities} onChange={e => setLocalAbilities(e.target.value)} placeholder={"每行一条能力\n如：\n可以看到物品的隐藏信息\n能在战斗中预判敌人动作"} /></div>
+          <div><span className="text-xs font-medium text-slate-500">限制清单</span><textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-brand-300 focus:outline-none" rows={5} value={localLimits} onChange={e => setLocalLimits(e.target.value)} placeholder={"每行一条限制\n如：\n每天只能使用3次预判\n吞噬能力有30%失败率"} /></div>
         </div>
       </section>
 
@@ -161,7 +161,7 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
       <button onClick={handleConfirmArchitecture} disabled={saving || saveSuccess}
         className={cn(
           "w-full rounded-xl py-2.5 text-sm font-medium transition-colors disabled:opacity-50",
-          saveSuccess ? "bg-green-600 text-white" : "bg-indigo-600 text-white hover:bg-indigo-700",
+          saveSuccess ? "bg-green-600 text-white" : "bg-brand-600 text-white hover:bg-brand-700",
         )}>
         {saving ? <RefreshCw size={14} className="animate-spin inline mr-1" /> :
          saveSuccess ? <CheckCircle size={14} className="inline mr-1" /> :

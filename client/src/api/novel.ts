@@ -127,32 +127,6 @@ export function useGenerateStoryCore() {
   });
 }
 
-// ─── Blueprint ──────────────────────────────────────────
-
-export interface BlueprintResult {
-  volumes: Array<{
-    sortOrder: number; title: string; summary: string;
-    chapters: Array<{
-      order: number; title: string; summary: string;
-      coreEvent: string; hook: string; characters: string[];
-      conflictLevel: number; revealLevel: number;
-    }>;
-  }>;
-}
-
-export function useGenerateBlueprint() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (novelId: string) => {
-      const { data } = await api.post(`/novels/${novelId}/blueprint`);
-      return data.data as BlueprintResult;
-    },
-    onSuccess: (_, novelId) => {
-      qc.invalidateQueries({ queryKey: ["novel", novelId] });
-    },
-  });
-}
-
 // ─── Confirmation removed — planning writes directly to production tables ───
 
 // ─── Phase 13: Export / Statistics / Cleanup ───────────
@@ -551,15 +525,6 @@ export interface CrossVolumeAuditReport {
   summary: string; overallScore: number;
 }
 
-export interface CostSummaryData {
-  novelId: string;
-  totalInputTokens: number; totalOutputTokens: number;
-  totalEstimatedCost: number; estimatedRemainingCost: number | null;
-  averageCostPerChapter: number; chapterCount: number;
-  budgetLimit: number | null; budgetPercent: number | null;
-  warning: string | null;
-}
-
 export function useCrossVolumeAudit() {
   const qc = useQueryClient();
   return useMutation({
@@ -568,28 +533,6 @@ export function useCrossVolumeAudit() {
       return data.data as CrossVolumeAuditReport;
     },
     onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
-  });
-}
-
-export function useCostSummary(novelId?: string) {
-  return useQuery({
-    queryKey: ["cost-summary", novelId],
-    queryFn: async () => {
-      const { data } = await api.get(`/novels/${novelId}/cost-summary`);
-      return data.data as CostSummaryData;
-    },
-    enabled: !!novelId,
-    staleTime: 30_000,
-  });
-}
-
-export function useSetBudgetLimit() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ novelId, limit }: { novelId: string; limit: number | null }) => {
-      await api.put(`/novels/${novelId}/budget-limit`, { limit });
-    },
-    onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["cost-summary", novelId] }); },
   });
 }
 

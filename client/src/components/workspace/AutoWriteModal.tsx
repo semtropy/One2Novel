@@ -78,10 +78,10 @@ export function AutoWriteModal({ novelId, onClose }: Props) {
         {phase === "config" && (
           <>
             {isBlocked && (
-              <div className="mb-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
+              <div className="mb-3 rounded-lg bg-accent-50 p-3 text-xs text-accent-700">
                 ⚠ 检测到在第{progress?.currentChapter}章中断
                 <button onClick={resume} disabled={resuming}
-                  className="ml-2 text-amber-800 font-medium underline">
+                  className="ml-2 text-accent-800 font-medium underline">
                   {resuming ? "恢复中..." : "恢复"}
                 </button>
               </div>
@@ -93,12 +93,12 @@ export function AutoWriteModal({ novelId, onClose }: Props) {
               <span className="text-sm text-slate-600">写</span>
               <input type="number" min={1} max={50} value={chCount} onFocus={e => e.target.select()}
                 onChange={e => setChCount(parseInt(e.target.value) || 1)}
-                className="w-20 text-center rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none" />
+                className="w-20 text-center rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none" />
               <span className="text-sm text-slate-600">章</span>
             </div>
             <div className="flex gap-2">
               <button onClick={onClose} className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">取消</button>
-              <button onClick={start} className="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700">开始</button>
+              <button onClick={start} className="flex-1 rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700">开始</button>
             </div>
           </>
         )}
@@ -124,11 +124,11 @@ export function AutoWriteModal({ novelId, onClose }: Props) {
               <div className="mb-3 max-h-40 overflow-y-auto space-y-1">
                 {progress.results.map(r => (
                   <div key={r.chapter} className="flex items-center gap-2 text-xs py-1 px-2 rounded bg-slate-50">
-                    <span className={r.status === "completed" ? "text-green-500" : r.status === "needs_repair" ? "text-amber-500" : r.status === "blocked" ? "text-red-500" : "text-blue-500"}>
+                    <span className={r.status === "completed" ? "text-green-500" : r.status === "needs_repair" ? "text-accent-500" : r.status === "blocked" ? "text-red-500" : "text-blue-500"}>
                       {r.status === "completed" ? <CheckCircle size={12} /> : r.status === "needs_repair" ? <AlertTriangle size={12} /> : r.status === "blocked" ? <XCircle size={12} /> : <RefreshCw size={12} className="animate-spin" />}
                     </span>
                     <span className="text-slate-600">第{r.chapter}章</span>
-                    <span className={cn("text-xs", r.status === "completed" ? "text-green-600" : r.status === "needs_repair" ? "text-amber-600" : r.status === "blocked" ? "text-red-500" : "text-blue-500")}>
+                    <span className={cn("text-xs", r.status === "completed" ? "text-green-600" : r.status === "needs_repair" ? "text-accent-600" : r.status === "blocked" ? "text-red-500" : "text-blue-500")}>
                       {r.status === "completed" ? "通过" : r.status === "needs_repair" ? "需修复" : r.status === "blocked" ? "阻塞" : "写作中..."}
                     </span>
                     {r.score != null && <span className="text-slate-400 ml-auto">{r.score}分</span>}

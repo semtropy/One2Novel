@@ -69,7 +69,7 @@ export default function ExportDialog({ novelId, onClose }: Props) {
             <label
               key={f.key}
               className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                format === f.key ? "border-amber-500 bg-amber-50" : "border-gray-200 hover:border-gray-300"
+                format === f.key ? "border-accent-500 bg-accent-50" : "border-gray-200 hover:border-gray-300"
               }`}
             >
               <input
@@ -78,7 +78,7 @@ export default function ExportDialog({ novelId, onClose }: Props) {
                 value={f.key}
                 checked={format === f.key}
                 onChange={() => setFormat(f.key)}
-                className="mt-0.5 accent-amber-500"
+                className="mt-0.5 accent-accent-500"
               />
               <div className="flex-1">
                 <div className="font-medium text-sm flex items-center gap-1.5">
@@ -103,7 +103,7 @@ export default function ExportDialog({ novelId, onClose }: Props) {
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-60"
+            className="flex-1 px-4 py-2 bg-accent-500 text-white rounded-lg text-sm font-medium hover:bg-accent-600 disabled:opacity-60"
           >
             {exporting ? "导出中..." : `导出 ${FORMATS.find(f => f.key === format)?.label}`}
           </button>

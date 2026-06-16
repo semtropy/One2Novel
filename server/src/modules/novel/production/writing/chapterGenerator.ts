@@ -5,9 +5,6 @@ import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { assembleChapterBlocks } from "../context/contextBlockBuilders";
 import { injectSkillRules, getSkillModulesForPosition } from "../../../../platform/llm/skillRules";
 import { detectChapterPosition } from "../../../../platform/llm/promptBudgetProfiles";
-import { logEventError } from "../../../../platform/logging/eventErrorLog";
-import { recordCost } from "../costTracker";
-
 export interface ChapterGenerateOptions {
   /** AbortSignal for client-disconnect scenarios (SSE) */
   signal?: AbortSignal;
@@ -68,16 +65,6 @@ export async function generateChapterContentCore(
       opts?.onToken?.(text);
     }
   }
-
-  // Phase 5: Record cost for streaming chapter generation
-  recordCost({
-    novelId,
-    chapterId,
-    assetId: "novel.chapter.writer",
-    inputTokens: Math.ceil((systemPrompt.length + userPrompt.length) / 4),
-    outputTokens: Math.ceil(fullContent.length / 4),
-    provider: getPreferredProvider(),
-  }).catch(e => logEventError("chapterGenerator.cost", { novelId, chapterId }, e));
 
   return fullContent;
 }

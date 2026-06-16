@@ -131,7 +131,7 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
                   <span className="text-slate-400">{label as string}：</span>
                   {editField === field ? (
                     <span className="inline-flex gap-1">
-                      <input autoFocus className="border border-indigo-300 rounded px-1.5 py-0.5 text-xs flex-1 min-w-[300px]" value={editValue}
+                      <input autoFocus className="border border-brand-300 rounded px-1.5 py-0.5 text-xs flex-1 min-w-[300px]" value={editValue}
                         onChange={e => setEditValue(e.target.value)}
                         onBlur={() => saveField(field as string, editValue)}
                         onKeyDown={e => { if (e.key==="Enter") saveField(field as string, editValue); if (e.key==="Escape") setEditField(null); }} />
@@ -147,7 +147,7 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
               ))}
               <div className="col-span-2">
                 <span className="text-slate-400">架构标签：</span>
-                <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-xs font-medium text-indigo-700">
+                <span className="rounded bg-brand-100 px-1.5 py-0.5 text-xs font-medium text-brand-700">
                   {archTypeLabels[novel?.architectureType ?? ""] ?? novel?.architectureType ?? "未选择"}
                 </span>
                 <span className="text-slate-300 ml-1">（在上一步「架构选择」中修改）</span>
@@ -174,13 +174,13 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
                       {Object.entries(profile.coolPointRecipe as Record<string, number>).map(([type, pct]) => (
                         <div key={type} className="flex items-center gap-2">
                           <span className="w-12 text-slate-500 shrink-0">{({ collect: "收集", strategy: "策略", verify: "验证", reveal: "揭示", upgrade: "升级" } as Record<string, string>)[type] ?? type}</span>
-                          <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-indigo-400" style={{ width: `${pct}%` }} /></div>
+                          <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-brand-400" style={{ width: `${pct}%` }} /></div>
                           <span className="w-10 text-right text-slate-400">{pct}%</span>
                         </div>
                       ))}
                     </div>
                   ) : <p className="text-slate-400">未设置</p>}
-                  {recipeAnalogy && <p className="text-[10px] text-indigo-500 italic mt-1.5 leading-relaxed">{recipeAnalogy}</p>}
+                  {recipeAnalogy && <p className="text-[10px] text-brand-500 italic mt-1.5 leading-relaxed">{recipeAnalogy}</p>}
                 </div>
                 {profile.hookProfile && (
                   <div>
@@ -196,7 +196,7 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
                   <div>
                     <p className="font-medium text-slate-600 mb-1">伏笔回收窗口</p>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-amber-400" style={{ width: "100%" }} /></div>
+                      <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-accent-400" style={{ width: "100%" }} /></div>
                       <span className="text-slate-500">{profile.payoffWindow}章</span>
                     </div>
                   </div>
@@ -211,9 +211,9 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
               <div className="space-y-1">
                 {timelineItems.filter(t => t.category !== "event").slice(0, 12).map((item, i) => (
                   <div key={i} draggable onDragStart={() => handleDragStart(i)} onDragOver={handleDragOver} onDrop={() => handleDrop(i)}
-                    className={`flex items-center gap-2 rounded bg-slate-50 px-3 py-1.5 text-xs cursor-grab ${dragIdx === i ? "bg-indigo-50 border border-indigo-200" : ""}`}>
+                    className={`flex items-center gap-2 rounded bg-slate-50 px-3 py-1.5 text-xs cursor-grab ${dragIdx === i ? "bg-brand-50 border border-brand-200" : ""}`}>
                     <GripVertical size={10} className="text-slate-300 shrink-0" />
-                    <span className={cn("shrink-0 rounded-full w-2 h-2", item.category === "constraint" ? "bg-red-400" : item.category === "milestone" ? "bg-purple-400" : item.category === "deadline" ? "bg-amber-400" : "bg-blue-400")} />
+                    <span className={cn("shrink-0 rounded-full w-2 h-2", item.category === "constraint" ? "bg-red-400" : item.category === "milestone" ? "bg-brand-400" : item.category === "deadline" ? "bg-accent-400" : "bg-blue-400")} />
                     <span className="font-medium text-slate-600 flex-1 truncate">{item.title}</span>
                     <span className="text-slate-400 shrink-0">第{item.sortOrder}章</span>
                     {item.status === "resolved" && <Check size={10} className="text-green-500 shrink-0" />}
@@ -228,7 +228,7 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
           <button onClick={handleCalibrate} disabled={calibrating || calibrated}
             className={cn(
               "w-full rounded-lg py-2.5 text-sm font-medium transition-colors disabled:opacity-50",
-              calibrated ? "bg-green-600 text-white" : "bg-indigo-600 text-white hover:bg-indigo-700",
+              calibrated ? "bg-green-600 text-white" : "bg-brand-600 text-white hover:bg-brand-700",
             )}>
             {calibrating ? <RefreshCw size={14} className="animate-spin inline mr-1" /> :
              calibrated ? <CheckCircle size={14} className="inline mr-1" /> :

@@ -122,8 +122,8 @@ export function StartPage() {
             className={cn(
               "w-full rounded-xl border bg-white px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 transition-all",
               inspiration
-                ? "border-slate-300 focus:ring-indigo-200"
-                : "border-slate-200 focus:ring-indigo-200",
+                ? "border-slate-300 focus:ring-brand-200"
+                : "border-slate-200 focus:ring-brand-200",
             )}
             rows={4}
             placeholder={placeholder}
@@ -170,7 +170,7 @@ export function StartPage() {
               className={cn(
                 "relative rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors cursor-pointer",
                 dragOver
-                  ? "border-indigo-400 bg-indigo-50/30"
+                  ? "border-brand-400 bg-brand-50/30"
                   : "border-slate-300 bg-slate-50/50 hover:border-slate-400",
               )}
               onDragOver={(e) => {
@@ -217,7 +217,7 @@ export function StartPage() {
             className={cn(
               "w-full flex items-center justify-center gap-2 rounded-xl px-6 py-4 text-sm font-medium transition-all",
               inspiration.trim()
-                ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+                ? "bg-brand-600 text-white hover:bg-brand-700 shadow-sm"
                 : "bg-slate-200 text-slate-400 cursor-not-allowed",
               creating && "opacity-60",
             )}

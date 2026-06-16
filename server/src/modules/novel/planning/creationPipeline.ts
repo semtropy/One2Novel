@@ -32,7 +32,6 @@ import type {
   LoopSkeleton,
   ExpandedVolume,
 } from "./architectureEngine/types";
-import { generateBlueprint, applyBlueprint } from "./blueprintService";
 import {
   updateStepState,
   getPipelineState,
@@ -66,6 +65,7 @@ export interface ArchConfirmationResult {
   goldenFinger: { abilities: string[]; limits: string[] };
   centralQuestion: string;
   endingDirection: string;
+  autoDetected?: boolean;
 }
 
 export interface CharacterConfigResult {
@@ -171,7 +171,7 @@ export class CreationPipeline {
     onProgress?: ProgressCallback,
   ): Promise<ArchConfirmationResult> {
     await updateStepState(this.novelId, "architecture", { status: "generating" });
-    onProgress?.({ step: "architecture", detail: "正在确认架构...", percent: 25 });
+    onProgress?.({ step: "architecture", detail: "正在读取参考书分析...", percent: 22 });
 
     const prisma = getPrisma();
     const novel = await prisma.novel.findUnique({
@@ -179,9 +179,27 @@ export class CreationPipeline {
       select: { genre: true, description: true, estimatedChapterCount: true },
     });
 
-    // Determine architecture type
+    // ── Read reference book analysis for auto-configuration ──
+    const rb = await prisma.referenceBook.findUnique({
+      where: { novelId: this.novelId },
+      select: { annotations: true },
+    });
+    let refAnnotations: Record<string, unknown> | null = null;
+    let autoDetected = false;
+    if (rb?.annotations) {
+      try { refAnnotations = JSON.parse(rb.annotations); } catch { /* ignore */ }
+    }
+
+    // Determine architecture type — prefer reference book detection
     let archType: ArchitectureType = params.architectureType ?? "case_driven";
-    if (!params.architectureType && novel?.genre) {
+    if (!params.architectureType && refAnnotations?.detectedArchitecture) {
+      const detected = refAnnotations.detectedArchitecture as { type: string; confidence: number };
+      if (detected.confidence > 0.6) {
+        archType = detected.type as ArchitectureType;
+        autoDetected = true;
+      }
+    }
+    if (!params.architectureType && !autoDetected && novel?.genre) {
       const g = novel.genre;
       if (g.includes("仙侠") || g.includes("修真")) archType = "cultivation_planning";
       else if (g.includes("历史")) archType = "historical_transmigration";
@@ -190,8 +208,16 @@ export class CreationPipeline {
       else if (g.includes("奇幻") || g.includes("西幻")) archType = "hexagon_godhood";
     }
 
-    // Save golden finger
-    const goldenFinger = params.goldenFinger ?? { abilities: [], limits: [] };
+    // Auto-fill golden finger from reference book analysis
+    let goldenFinger = params.goldenFinger ?? { abilities: [], limits: [] };
+    if (!params.goldenFinger && refAnnotations?.goldenFingerBounds) {
+      const bounds = refAnnotations.goldenFingerBounds as { abilities: string[]; limits: string[] };
+      if (bounds.abilities?.length > 0 || bounds.limits?.length > 0) {
+        goldenFinger = bounds;
+        autoDetected = true;
+      }
+    }
+
     const expectationProfile = buildExpectationProfile(archType);
 
     await prisma.novel.update({
@@ -225,6 +251,7 @@ export class CreationPipeline {
       goldenFinger,
       centralQuestion: params.centralQuestion ?? "",
       endingDirection: params.endingDirection ?? "",
+      autoDetected,
     };
 
     await updateStepState(this.novelId, "architecture", {

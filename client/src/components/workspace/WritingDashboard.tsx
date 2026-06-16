@@ -26,7 +26,7 @@ const COOL_POINT_LABELS: Record<string, string> = {
 
 const SEVERITY_STYLE: Record<string, string> = {
   high: "text-red-600 bg-red-50 border-red-200",
-  medium: "text-amber-600 bg-amber-50 border-amber-200",
+  medium: "text-accent-600 bg-accent-50 border-accent-200",
   low: "text-slate-500 bg-slate-50 border-slate-200",
 };
 
@@ -75,7 +75,7 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
             className={cn(
               "flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
               activeTab === tab.key
-                ? "bg-indigo-50 text-indigo-700"
+                ? "bg-brand-50 text-brand-700"
                 : "text-slate-500 hover:bg-slate-50 hover:text-slate-700",
             )}
           >
@@ -97,7 +97,7 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
                   <div key={i} className={cn(
                     "w-4 h-4 rounded-full flex items-center justify-center text-xs",
                     i < loopProgress.completed ? "bg-green-100 text-green-600" :
-                    i === (loopProgress.current ?? -1) - 1 ? "bg-purple-100 text-purple-600 ring-1 ring-purple-300" :
+                    i === (loopProgress.current ?? -1) - 1 ? "bg-brand-100 text-brand-600 ring-1 ring-brand-300" :
                     "bg-slate-100 text-slate-300"
                   )}>
                     {i < loopProgress.completed ? "✓" : i + 1}
@@ -116,7 +116,7 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
                 {coolPointStatus.breakdown.map(b => (
                   <div key={b.type} className="flex items-center justify-between">
                     <span className="text-slate-600">{COOL_POINT_LABELS[b.type] ?? b.type}</span>
-                    <span className={cn("text-xs", b.gap === "✓" ? "text-green-500" : "text-amber-500")}>
+                    <span className={cn("text-xs", b.gap === "✓" ? "text-green-500" : "text-accent-500")}>
                       {b.actual}/{b.target} {b.gap}
                     </span>
                   </div>
@@ -139,7 +139,7 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
               <div className={cn(
                 "rounded px-2 py-1 text-xs font-medium",
                 hookDensity.verdict === "good" ? "bg-green-50 text-green-600" :
-                hookDensity.verdict === "acceptable" ? "bg-amber-50 text-amber-600" :
+                hookDensity.verdict === "acceptable" ? "bg-accent-50 text-accent-600" :
                 "bg-red-50 text-red-600"
               )}>
                 {hookDensity.verdict === "good" ? "✓ 良好" : hookDensity.verdict === "acceptable" ? "⚠ 可接受" : "✗ 需改进"}
@@ -157,7 +157,7 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
                 "rounded px-2 py-1 text-xs font-medium",
                 hookCheck.hookQuality === "strong" ? "bg-green-50 text-green-600" :
                 hookCheck.hookQuality === "adequate" ? "bg-blue-50 text-blue-600" :
-                hookCheck.hookQuality === "weak" ? "bg-amber-50 text-amber-600" :
+                hookCheck.hookQuality === "weak" ? "bg-accent-50 text-accent-600" :
                 "bg-red-50 text-red-600"
               )}>
                 {hookCheck.hookQuality === "strong" ? "✓ 强钩子" :
@@ -196,12 +196,12 @@ export function WritingDashboard({ novelId, chapterId }: Props) {
       {activeTab === "chars" && (
         <div className="space-y-3">
           {longAbsent && longAbsent.length > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-2.5">
-              <div className="flex items-center gap-1 text-xs text-amber-600 mb-1">
+            <div className="rounded-lg border border-accent-200 bg-accent-50/50 p-2.5">
+              <div className="flex items-center gap-1 text-xs text-accent-600 mb-1">
                 <Users size={10} /> 角色缺席提醒
               </div>
               {longAbsent.slice(0, 5).map(c => (
-                <div key={c.characterId} className="text-xs text-amber-700">
+                <div key={c.characterId} className="text-xs text-accent-700">
                    「{c.characterName}」已 {c.chaptersSinceLastAppearance} 章未出场
                 </div>
               ))}

@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import type { ProviderInfo } from "../components/settings/ProviderConfigDialog";
 import { StyleDomain } from "../components/planning/StyleDomain";
 
-const SELECT_STYLE = "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:ring-1 focus:ring-indigo-200 focus:outline-none bg-white";
+const SELECT_STYLE = "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:ring-1 focus:ring-brand-200 focus:outline-none bg-white";
 
 export const MODEL_OPTIONS = [
   { provider: "deepseek", label: "DeepSeek", models: ["deepseek-chat", "deepseek-reasoner"] },
@@ -130,7 +130,7 @@ export function SettingsPage() {
                   <select
                     value={configured?.currentModel || configured?.defaultModel || g.models[0]}
                     onChange={e => { saveProviderConfig(g.provider, undefined, e.target.value); loadProviders(); }}
-                    className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs focus:border-indigo-300 focus:outline-none bg-white"
+                    className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs focus:border-brand-300 focus:outline-none bg-white"
                   >
                     {g.models.map(m => (
                       <option key={m} value={m}>{m}</option>
@@ -143,7 +143,7 @@ export function SettingsPage() {
                       value={keyVal}
                       onChange={e => setEditingKeys(prev => ({ ...prev, [g.provider]: e.target.value }))}
                       onBlur={() => { if (keyVal.trim()) { saveProviderConfig(g.provider, keyVal); loadProviders(); } }}
-                      className="w-full rounded border border-slate-200 px-2 py-1 pr-8 text-xs focus:border-indigo-300 focus:outline-none [&::-ms-reveal]:hidden [&::-webkit-credentials-auto-fill-button]:hidden"
+                      className="w-full rounded border border-slate-200 px-2 py-1 pr-8 text-xs focus:border-brand-300 focus:outline-none [&::-ms-reveal]:hidden [&::-webkit-credentials-auto-fill-button]:hidden"
                     />
                     <button onClick={() => setShowKeys(prev => ({ ...prev, [g.provider]: !prev[g.provider] }))}
                       className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
@@ -200,7 +200,7 @@ export function SettingsPage() {
                   value={(prefs.defaultChapterLength as number) ?? 3000}
                   onChange={e => { setPrefs(p => ({ ...p, defaultChapterLength: parseInt(e.target.value) || 3000 })); }}
                   onBlur={() => savePref("defaultChapterLength", prefs.defaultChapterLength)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none"
                 />
               </div>
             </div>
@@ -212,7 +212,7 @@ export function SettingsPage() {
                   onChange={e => setPrefs(p => ({ ...p, preferredTone: e.target.value }))}
                   onBlur={() => savePref("preferredTone", prefs.preferredTone)}
                   placeholder="如：紧张刺激、轻松幽默"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none"
                 />
               </div>
               <div className="flex-1">
@@ -222,7 +222,7 @@ export function SettingsPage() {
                   onChange={e => { const g = e.target.value.split(/[,，、]/).map(s => s.trim()).filter(Boolean); setPrefs(p => ({ ...p, favoriteGenres: g })); }}
                   onBlur={() => savePref("favoriteGenres", prefs.favoriteGenres)}
                   placeholder="如：悬疑、科幻、言情"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none"
                 />
               </div>
             </div>
@@ -232,7 +232,7 @@ export function SettingsPage() {
                 value={(prefs.estimatedChapterCount as number) ?? 333}
                 onChange={e => { const v = parseInt(e.target.value) || 333; setPrefs(p => ({ ...p, estimatedChapterCount: v })); }}
                 onBlur={() => savePref("estimatedChapterCount", prefs.estimatedChapterCount)}
-                className="w-1/3 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none"
+                className="w-1/3 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none"
               />
               <p className="text-xs text-slate-400 mt-1">长篇网文建议 100-500 章，回环骨架根据此数值自动计算回环数量</p>
             </div>

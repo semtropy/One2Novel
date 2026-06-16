@@ -59,10 +59,10 @@ export interface PromptAssetDef {
   /** Context blocks — used only by invokeAsset / compileAsset */
   contextRequirements?: ContextRequirement[];
   contextPolicy?: {
-    maxTokensBudget: number;
-    requiredGroups: string[];
-    preferredGroups: string[];
-    dropOrder: string[];
+    maxTokensBudget?: number;
+    requiredGroups?: string[];
+    preferredGroups?: string[];
+    dropOrder?: string[];
   };
 }
 
@@ -185,19 +185,6 @@ promptRegistry.register({
     "书名要求：简洁有力(2-8字)、符合网文风格、有辨识度、易于记忆和搜索。",
     "每个书名给出简短推荐理由(15-30字)。",
     "考虑以下书名类型：悬念型(制造好奇)、设定型(点明核心设定)、人物型(突出主角特质)、意境型(营造氛围)。",
-  ].join("\n"),
-});
-
-// ── Planning: Chapter Detail Refinement ──────────────────
-
-promptRegistry.register({
-  id: "novel.chapter.refine",
-  taskType: "planner", version: "v1",
-  systemPrompt: [
-    "你是小说创作规划师。为每章生成详细的创作任务单(taskSheet)。",
-    "任务单应包含3-5条具体创作指令，每条15-30字，如：开场用对话制造紧张感、确保主角的内心挣扎在本章有可见进展、章尾留下悬念等。",
-    "每章还需填写：purpose(目的)、exclusiveEvent(独有事件)、endingState(结束状态)、conflictLevel(冲突1-10)、revealLevel(揭示1-10)、targetWordCount(建议字数)、mustAvoid(必须避免)。",
-    "输出JSON。只输出JSON。",
   ].join("\n"),
 });
 
@@ -401,6 +388,79 @@ promptRegistry.register({
   ].join("\n"),
 });
 
+// ── Reference: Architecture Detection (Phase 4) ──────────
+
+promptRegistry.register({
+  id: "reference.architecture.detect",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是网文架构分析师。根据小说的章节片段，判断它属于哪种网文架构类型。",
+    "",
+    "架构类型定义：",
+    "1. skill_slot（技能栏搭配）：力量体系有固定槽位限制，主角获得更多槽位或自由组合能力",
+    "2. sequence_promotion（序列晋升）：力量体系呈序列/途径树状，晋升需材料+仪式+扮演",
+    "3. case_driven（超凡办案）：主角隶属执法机构，通过办案积累功绩，案件背后有核心阴谋",
+    "4. cultivation_planning（修真规划）：传统修真体系，金手指放大资源获取效率",
+    "5. hexagon_godhood（六边形成神）：主角需在多个维度逐一补全短板，从底层爬上神座",
+    "6. historical_transmigration（穿越历史）：穿越到特定历史时期，用知识+金手指改变进程",
+    "",
+    "输出：architectureType（必须为以上6种之一）、confidence（0-1置信度）、reasoning（判断依据，50-100字）、observedPatterns（观察到的特征模式数组，3-5条）",
+    "只输出JSON。",
+  ].join("\n"),
+});
+
+// ── Reference: Hook Pattern Extraction ────────────────────
+
+promptRegistry.register({
+  id: "reference.hook.extract",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是网文钩子分析师。分析章节结尾的钩子风格并统计分布。",
+    "钩子类型：",
+    "- suspense（悬念型）：留下问题或未知信息",
+    "- reversal（反转型）：出乎意料的事件或信息披露",
+    "- preview（预告型）：暗示下一章会发生什么",
+    "- emotional（情绪型）：以情感余韵收尾",
+    "输出：hookDistribution（4种类型的章节数量）、avgHookStrength（平均钩力0-1）、typicalHookStyle（典型钩子风格一句话描述）",
+    "只输出JSON。",
+  ].join("\n"),
+});
+
+// ── Reference: Golden Finger Extraction ──────────────────
+
+promptRegistry.register({
+  id: "reference.golden-finger.extract",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是网文金手指分析师。从小说章节中提取主角的金手指信息。",
+    "金手指 = 主角特有的超凡能力/系统/传承等，区别于普通人的优势。",
+    "提取要求：",
+    "1. abilities：金手指能做什么（逐条列出具体能力，每条10-30字）",
+    "2. limits：金手指的硬边界（冷却时间/次数/代价/副作用/使用条件，每条10-30字）",
+    "3. goldenFingerName：金手指的名称（2-10字）",
+    "4. acquisitionChapter：金手指首次获得的章节号",
+    "只输出JSON。",
+  ].join("\n"),
+});
+
+// ── Reference: Setting Timeline Extraction ───────────────
+
+promptRegistry.register({
+  id: "reference.setting-timeline.extract",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是网文设定分析师。提取关键世界观设定首次揭示的章节节点。",
+    "关注以下类型的设定：",
+    "- 力量体系：境界/序列/技能系统的规则首次说明",
+    "- 世界历史：重大历史事件或世界起源",
+    "- 角色秘密：主要角色的隐藏身份/过去",
+    "- 势力格局：组织/国家/种族之间的关系",
+    "- 地理环境：重要的地图/区域信息",
+    "每个设定输出：chapterIndex（章节序号）、settingName（设定名称，5-15字）、description（描述，20-100字）、category（力量体系|世界历史|角色秘密|势力格局|地理环境|其他）",
+    "只输出JSON。",
+  ].join("\n"),
+});
+
 // ── Production: Volume Compression (Phase 2) ─────────────
 
 promptRegistry.register({
@@ -460,10 +520,8 @@ promptRegistry.register({
     { group: "character_dynamics", priority: 97 },
   ],
   contextPolicy: {
-    maxTokensBudget: 12000,
     requiredGroups: ["chapter_mission", "character_hard_facts", "style_contract", "volume_window", "book_contract"],
     preferredGroups: ["previous_chapter_hook", "open_conflicts", "recent_chapters", "payoff_directives", "story_macro", "character_dynamics"],
-    dropOrder: ["opening_constraints", "story_macro"],
   },
   systemPrompt: [
     "你是中文长篇网络小说写作助手。",
@@ -1052,23 +1110,6 @@ export async function aiInvoke<T extends z.ZodType>(opts: {
     userPrompt: opts.userPrompt,
     schema: opts.schema,
   });
-
-  // Phase 5: Record cost if novel context is available (uses actual API usage)
-  if (opts.novelId) {
-    import("../../modules/novel/production/costTracker").then(m =>
-      m.recordCost({
-        novelId: opts.novelId!,
-        chapterId: opts.chapterId,
-        assetId: opts.assetId,
-        inputTokens: usage.inputTokens || estimateTokens(systemPrompt + opts.userPrompt),
-        outputTokens: usage.outputTokens || estimateTokens(JSON.stringify(result)),
-        provider: getPreferredProvider(),
-        model: getPreferredModel(),
-      })
-    ).catch(e => {
-      logEventError("cost-tracker", { novelId: opts.novelId, assetId: opts.assetId }, e);
-    });
-  }
 
   return result;
 }

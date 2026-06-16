@@ -42,7 +42,7 @@ export function WorldPanel({ novelId }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400">{activeCount} 条活跃</span>
           <button onClick={() => { setGenError(""); generateMutation.mutate(novelId, { onError: (e) => setGenError(e instanceof Error ? e.message : "生成失败，请重试") }); }} disabled={generateMutation.isPending}
-            className="px-2.5 py-1 text-xs rounded-lg bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 disabled:opacity-50">
+            className="px-2.5 py-1 text-xs rounded-lg bg-brand-50 border border-brand-200 text-brand-700 hover:bg-brand-100 disabled:opacity-50">
             {generateMutation.isPending ? "生成中..." : "AI 生成"}
           </button>
           <button onClick={handleCheckConflicts} disabled={conflictMutation.isPending}
@@ -127,7 +127,7 @@ export function WorldPanel({ novelId }: Props) {
             }`}>
               <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${
                 rule.priority >= 8 ? "bg-red-100 text-red-700" :
-                rule.priority >= 5 ? "bg-amber-100 text-amber-700" :
+                rule.priority >= 5 ? "bg-accent-100 text-accent-700" :
                 "bg-slate-100 text-slate-600"
               }`}>
                 P{rule.priority}

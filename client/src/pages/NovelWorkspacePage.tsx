@@ -5,7 +5,6 @@ import { api } from "../app/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { WritingDashboard } from "../components/workspace/WritingDashboard";
 import { NextChapterPreview } from "../components/workspace/NextChapterPreview";
-import { ContextDebugPanel } from "../components/workspace/ContextDebugPanel";
 import { PlanningQuickDrawer } from "../components/workspace/PlanningQuickDrawer";
 import { ChapterDiffModal } from "../components/workspace/ChapterDiffModal";
 import { ChapterWritePanel } from "../components/workspace/ChapterWritePanel";
@@ -16,8 +15,8 @@ import { ProgressBar } from "../components/novel/ProgressBar";
 import { DirectorPanel } from "../components/workspace/DirectorPanel";
 import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
-import { AlertTriangle, PenLine, Download, BarChart3, Trash2, Plus, ShieldCheck, Coins, Clock, X } from "lucide-react";
-import { useCostSummary, useCompletionReadiness } from "../api/novel";
+import { AlertTriangle, PenLine, Download, BarChart3, Trash2, Plus, ShieldCheck, Clock, X } from "lucide-react";
+import { useCompletionReadiness } from "../api/novel";
 import ExportDialog from "../components/workspace/ExportDialog";
 import { StatisticsDashboard } from "../components/workspace/StatisticsDashboard";
 import { cn } from "../lib/cn";
@@ -68,7 +67,6 @@ export function NovelWorkspacePage() {
   }
 
   // ALL hooks MUST be before any conditional returns (React rule)
-  const { data: costSummary } = useCostSummary(novelId);
   const { data: completionReadiness } = useCompletionReadiness(novelId);
   const allChapters = novel?.chapters ?? [];
 
@@ -114,7 +112,7 @@ export function NovelWorkspacePage() {
   // Early returns AFTER all hooks
   if (isLoading) return <Loading text="加载中..." />;
   if (error || !novel) return (
-    <div className="flex flex-col items-center py-20"><AlertTriangle size={40} className="mb-4 text-amber-500" /><p className="text-sm text-red-500">加载失败</p></div>
+    <div className="flex flex-col items-center py-20"><AlertTriangle size={40} className="mb-4 text-accent-500" /><p className="text-sm text-red-500">加载失败</p></div>
   );
 
   return (
@@ -143,7 +141,7 @@ export function NovelWorkspacePage() {
           </div>
           <div className="flex items-center gap-2 mt-1">
             {novel.genre && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{novel.genre}</span>}
-            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-600 font-medium">长篇</span>
+            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-600 font-medium">长篇</span>
             <span className="text-xs text-slate-400">全书 {totalWords.toLocaleString()} 字</span>
             <span className="text-xs text-slate-300">|</span>
             <span className="text-xs text-slate-400">{allChapters.filter(c => c.chapterStatus === "completed").length}/{allChapters.length} 章</span>
@@ -153,7 +151,7 @@ export function NovelWorkspacePage() {
                 <span className={cn(
                   "text-xs font-medium",
                   completionReadiness.readinessVerdict === "ready" ? "text-green-500" :
-                  completionReadiness.readinessVerdict === "close" ? "text-amber-500" :
+                  completionReadiness.readinessVerdict === "close" ? "text-accent-500" :
                   "text-slate-400",
                 )} title={`待回收伏笔: ${completionReadiness.unrecycledPayoffs} · 角色弧线: ${completionReadiness.characterArcsComplete}/${completionReadiness.totalCharacterArcs} · 预计剩余: ${completionReadiness.estimatedRemainingChapters ?? "?"}章`}>
                   {completionReadiness.readinessVerdict === "ready" ? "可完本" :
@@ -185,16 +183,6 @@ export function NovelWorkspacePage() {
           <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"><Download size={13} />导出</button>
           {selectedChapterId && <button onClick={() => setShowDashboard(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50"><BarChart3 size={11} />仪表盘</button>}
           {selectedChapterId && <button onClick={() => setShowDiff(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50"><Clock size={11} />历史</button>}
-          {costSummary && (
-            <div className="flex items-center gap-1 text-xs text-slate-400" title={`已消费 ¥${costSummary.totalEstimatedCost.toFixed(2)}`}>
-              <Coins size={11} />
-              ¥{costSummary.totalEstimatedCost.toFixed(1)}
-              {costSummary.budgetPercent && costSummary.budgetPercent > 80 && (
-                <span className="text-amber-500 font-medium">{costSummary.budgetPercent.toFixed(0)}%</span>
-              )}
-            </div>
-          )}
-          {selectedChapterId && <ContextDebugPanel novelId={novel.id} chapterId={selectedChapterId} />}
         </div>
       </div>
 

@@ -68,7 +68,7 @@ export function ProviderConfigDialog({ provider, onClose, onSaved }: Props) {
                 value={key}
                 onChange={e => setKey(e.target.value)}
                 placeholder={provider.maskedKey ? `当前: ${provider.maskedKey}` : "输入 API Key"}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-10 text-sm focus:border-indigo-300 focus:outline-none"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-10 text-sm focus:border-brand-300 focus:outline-none"
               />
               <button onClick={() => setShowKey(!showKey)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
@@ -82,7 +82,7 @@ export function ProviderConfigDialog({ provider, onClose, onSaved }: Props) {
           <div>
             <div className="text-xs text-slate-500 font-medium mb-1.5">模型</div>
             <select value={model} onChange={e => setModel(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-300 focus:outline-none bg-white h-10">
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none bg-white h-10">
               {(MODEL_OPTIONS.find(g => g.provider === provider.provider)?.models ?? [provider.defaultModel]).map(m => (
                 <option key={m} value={m}>{m}</option>
               ))}

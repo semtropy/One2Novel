@@ -106,14 +106,14 @@ function TreeNode({ node, depth, index, onAddChild, onUpdate, onRemove, readonly
         )}
 
         {/* Level number */}
-        <span className="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 mt-0.5">
+        <span className="shrink-0 rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-600 mt-0.5">
           {index + 1}
         </span>
 
         {/* Editable fields */}
         <div className="flex-1 min-w-0 space-y-1.5">
           <input
-            className="w-full rounded border border-transparent hover:border-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 focus:border-indigo-300 focus:outline-none"
+            className="w-full rounded border border-transparent hover:border-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 focus:border-brand-300 focus:outline-none"
             value={node.name}
             onChange={e => onUpdate(node.id, "name", e.target.value)}
             placeholder="境界/序列名称"
@@ -121,14 +121,14 @@ function TreeNode({ node, depth, index, onAddChild, onUpdate, onRemove, readonly
           />
           <div className="grid grid-cols-2 gap-1.5">
             <input
-              className="w-full rounded border border-transparent hover:border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500 focus:border-indigo-300 focus:outline-none"
+              className="w-full rounded border border-transparent hover:border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none"
               value={node.breakthroughCondition}
               onChange={e => onUpdate(node.id, "breakthroughCondition", e.target.value)}
               placeholder="突破条件"
               readOnly={readonly}
             />
             <input
-              className="w-full rounded border border-transparent hover:border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500 focus:border-indigo-300 focus:outline-none"
+              className="w-full rounded border border-transparent hover:border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none"
               value={node.abilityUpgrade}
               onChange={e => onUpdate(node.id, "abilityUpgrade", e.target.value)}
               placeholder="能力跃迁"
@@ -141,7 +141,7 @@ function TreeNode({ node, depth, index, onAddChild, onUpdate, onRemove, readonly
         {!readonly && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 hover:opacity-100 transition-opacity">
             <button onClick={() => onAddChild(node.id)}
-              className="rounded p-0.5 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50"
+              className="rounded p-0.5 text-slate-300 hover:text-brand-500 hover:bg-brand-50"
               title="添加子层级">
               <Plus size={10} />
             </button>

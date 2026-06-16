@@ -83,13 +83,12 @@ export async function assembleChapterBlocks(
   // ── chapter_mission ──
   const chapterPlan = await prisma.volumeChapterPlan.findFirst({
     where: { chapterId: chapter.id },
-    select: { purpose: true, exclusiveEvent: true, endingState: true, taskSheet: true, mustAvoid: true, chapterOrder: true, summary: true, loopPhase: true, chapterType: true, coolPointType: true, volume: { select: { title: true, summary: true } } },
+    select: { purpose: true, exclusiveEvent: true, endingState: true, mustAvoid: true, chapterOrder: true, summary: true, loopPhase: true, chapterType: true, coolPointType: true, volume: { select: { title: true, summary: true } } },
   });
   const missionParts = [`本章任务：${chapter.expectation ?? "推进主线"}`];
   if (chapterPlan?.purpose) missionParts.push(`核心目的：${chapterPlan.purpose}`);
   if (chapterPlan?.exclusiveEvent) missionParts.push(`独占事件：${chapterPlan.exclusiveEvent}`);
   if (chapterPlan?.endingState) missionParts.push(`结束状态：${chapterPlan.endingState}`);
-  if (chapterPlan?.taskSheet) missionParts.push(`任务书：${chapterPlan.taskSheet}`);
   if (chapterPlan?.mustAvoid) missionParts.push(`必须避免：${chapterPlan.mustAvoid}`);
   // Phase 2: Loop-phase specific instruction for long-form
   if (chapterPlan?.loopPhase) {
@@ -145,6 +144,20 @@ export async function assembleChapterBlocks(
     }));
   }
 
+  // ── reference_counterpart — reference book chapter at similar position ──
+  try {
+    const refCounterpart = await buildReferenceCounterpart(novelId, chapter.order);
+    if (refCounterpart) {
+      blocks.push(createContextBlock({
+        id: "reference_counterpart",
+        group: "style_contract",
+        priority: 85,
+        required: false,
+        content: refCounterpart,
+      }));
+    }
+  } catch { /* best-effort */ }
+
   // ── reference_style_hints — writing assets from reference book ──
   try {
     const refStyleHints = await buildReferenceStyleHints(novelId);
@@ -157,7 +170,6 @@ export async function assembleChapterBlocks(
         content: refStyleHints,
         conflictGroup: "style_contract",
         freshness: 1,
-        allowSummary: true,
       }));
     }
   } catch { /* reference style hints is best-effort */ }
@@ -462,4 +474,71 @@ async function buildReferenceStyleHints(novelId: string): Promise<string | null>
 
   if (parts.length <= 1) return null; // Only the header, no techniques
   return parts.join("\n\n");
+}
+
+// ─── Reference Counterpart — maps current chapter to similar position in reference book ──
+
+async function buildReferenceCounterpart(novelId: string, chapterOrder: number): Promise<string | null> {
+  const prisma = getPrisma();
+  const rb = await prisma.referenceBook.findUnique({
+    where: { novelId },
+    select: { annotations: true, totalChapters: true, content: true },
+  });
+  if (!rb?.annotations || !rb?.totalChapters) return null;
+
+  let annotations: {
+    loopBoundaries?: Array<{ chapterIndex: number; type: "start" | "end" }>;
+    highCoolChapters?: number[];
+    coolPointDensity?: Array<{ chapterIndex: number; level: string }>;
+  };
+  try { annotations = JSON.parse(rb.annotations); } catch { return null; }
+
+  // Find total chapters in current novel for proportional mapping
+  const novel = await prisma.novel.findUnique({
+    where: { id: novelId },
+    select: { estimatedChapterCount: true, chapters: { select: { id: true } } },
+  });
+  const totalNovelChapters = novel?.estimatedChapterCount ?? novel?.chapters.length ?? 333;
+
+  // Map current chapter order to reference book chapter index proportionally
+  const refTotal = rb.totalChapters;
+  const refChapterIndex = Math.max(1, Math.min(refTotal, Math.round((chapterOrder / totalNovelChapters) * refTotal)));
+
+  // Find the loop this reference chapter belongs to
+  const loops = annotations.loopBoundaries ?? [];
+  const currentLoop = loops
+    .filter(b => b.chapterIndex <= refChapterIndex && b.type === "start")
+    .sort((a, b) => b.chapterIndex - a.chapterIndex)[0];
+
+  const coolDensity = annotations.coolPointDensity ?? [];
+  const nearbyCool = coolDensity.filter(
+    c => c.chapterIndex >= refChapterIndex - 3 && c.chapterIndex <= refChapterIndex + 3
+  );
+
+  const parts: string[] = [];
+  parts.push(`对标书位置映射：第${refChapterIndex}章/${refTotal}章`);
+
+  if (currentLoop) {
+    parts.push(`所在回环起点：第${currentLoop.chapterIndex}章`);
+  }
+
+  if (nearbyCool.length > 0) {
+    const highCount = nearbyCool.filter(c => c.level === "high").length;
+    const lowCount = nearbyCool.filter(c => c.level === "low").length;
+    parts.push(`附近±3章爽点密度：${highCount}高/${nearbyCool.length - highCount - lowCount}中/${lowCount}低`);
+  }
+
+  // Get actual chapter snippet if content available
+  if (rb.content) {
+    const chapterHeadingMatch = rb.content.match(
+      new RegExp(`(?:^|\\n)\\s*(?:第${refChapterIndex}[章節节]|Chapter\\s+${refChapterIndex})`, 'im')
+    );
+    if (chapterHeadingMatch) {
+      const start = chapterHeadingMatch.index!;
+      const snippet = rb.content.slice(start, start + 500).replace(/\n/g, " ");
+      parts.push(`对标书同位置章节开头：${snippet}...`);
+    }
+  }
+
+  return parts.join("\n");
 }

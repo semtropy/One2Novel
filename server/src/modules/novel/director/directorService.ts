@@ -5,7 +5,6 @@ import { logEventError } from "../../../platform/logging/eventErrorLog";
 import { processChapter } from "../production/writing/chapterPipeline";
 import { generateChapterContentCore } from "../production/writing/chapterGenerator";
 import { saveCheckpoint, clearCheckpoint, loadCheckpoint } from "./checkpointService";
-import { checkBudget } from "../production/costTracker";
 
 export const directorEmitter = new EventEmitter();
 directorEmitter.setMaxListeners(50);
@@ -155,18 +154,6 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
           progress.message = `第${chapterPlan.loopIndex ?? "?"}轮回环已完成（结算阶段），暂停等待确认。点击「继续」开始下一轮回环。`;
           stopFlags.set(novelId, true);
           await saveCp("paused");
-          return progress;
-        }
-
-        // Check budget limit
-        const budgetWarning = await checkBudget(novelId).catch(e => {
-          logEventError("director.budget", { novelId }, e);
-          return null;
-        });
-        if (budgetWarning?.includes("已达到预算上限")) {
-          progress.stage = "paused";
-          progress.message = budgetWarning;
-          stopFlags.set(novelId, true);
           return progress;
         }
 

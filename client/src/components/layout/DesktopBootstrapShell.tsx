@@ -199,7 +199,7 @@ function DesktopBootstrapUpdatePanel({ snapshot }: { snapshot: DesktopBootstrapS
       className={cn(
         "rounded-3xl border p-5",
         isPromptingUpdate
-          ? "border-amber-300/70 bg-amber-300/10"
+          ? "border-accent-300/70 bg-accent-300/10"
           : "border-slate-800 bg-slate-900/70",
       )}
     >
@@ -209,7 +209,7 @@ function DesktopBootstrapUpdatePanel({ snapshot }: { snapshot: DesktopBootstrapS
           variant="outline"
           className={cn(
             "border-slate-600 bg-slate-950/60 text-slate-100",
-            isPromptingUpdate ? "border-amber-300/80 bg-amber-300/15 text-amber-100" : null,
+            isPromptingUpdate ? "border-accent-300/80 bg-accent-300/15 text-accent-100" : null,
           )}
         >
           {resolveUpdaterStatusLabel(updater.status)}
@@ -254,7 +254,7 @@ function DesktopBootstrapUpdatePanel({ snapshot }: { snapshot: DesktopBootstrapS
           <Button
             type="button"
             size="sm"
-            className="bg-amber-300 text-slate-950 hover:bg-amber-200"
+            className="bg-accent-300 text-slate-950 hover:bg-accent-200"
             disabled={isBusy || isCheckingOrDownloading}
             onClick={() => void runUpdaterAction("check")}
           >

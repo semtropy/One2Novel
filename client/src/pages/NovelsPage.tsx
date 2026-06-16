@@ -71,7 +71,7 @@ export function NovelsPage() {
                   </div>
                   {tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {tags.map((t: string, i: number) => (<span key={i} className="rounded-full bg-purple-50 px-2 py-0.5 text-xs text-purple-600">{t}</span>))}
+                      {tags.map((t: string, i: number) => (<span key={i} className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-600">{t}</span>))}
                     </div>
                   )}
                 </div>

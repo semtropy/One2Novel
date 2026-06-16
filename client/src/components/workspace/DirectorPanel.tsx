@@ -43,12 +43,12 @@ export function DirectorPanel({ novelId, compact }: Props) {
         {isBlocked && (
           <div className="space-y-1">
             <button onClick={handleResume} disabled={resuming}
-              className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 font-medium">
+              className="flex items-center gap-1.5 text-xs text-accent-600 hover:text-accent-700 font-medium">
               <RotateCcw size={14} className={resuming ? "animate-spin" : ""} />
               {resuming ? "恢复中..." : `⚠ 在第${progress.currentChapter}章中断，点击恢复`}
             </button>
             {progress.message && (
-              <p className="text-xs text-amber-500">{progress.message}</p>
+              <p className="text-xs text-accent-500">{progress.message}</p>
             )}
           </div>
         )}
@@ -65,7 +65,7 @@ export function DirectorPanel({ novelId, compact }: Props) {
           {isRunning && <button onClick={pollProgress} className="text-xs text-slate-500"><RefreshCw size={12} className="inline mr-1" />刷新</button>}
           {isBlocked && (
             <button onClick={handleResume} disabled={resuming}
-              className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200">
+              className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium bg-accent-50 text-accent-700 hover:bg-accent-100 border border-accent-200">
               <RotateCcw size={12} className={resuming ? "animate-spin" : ""} /> 恢复
             </button>
           )}
@@ -92,7 +92,7 @@ export function DirectorPanel({ novelId, compact }: Props) {
             <div className="rounded-lg border border-slate-200 bg-white max-h-60 overflow-y-auto divide-y divide-slate-50">
               {progress.results.map((r) => (
                 <div key={r.chapter} className="flex items-center gap-3 px-3 py-2 text-xs">
-                  <span className={r.status === "completed" ? "text-green-500" : r.status === "needs_repair" ? "text-amber-500" : "text-red-500"}>
+                  <span className={r.status === "completed" ? "text-green-500" : r.status === "needs_repair" ? "text-accent-500" : "text-red-500"}>
                     {r.status === "completed" ? <CheckCircle size={14} /> : r.status === "needs_repair" ? <AlertTriangle size={14} /> : <XCircle size={14} />}
                   </span>
                   <span className="text-slate-600">第{r.chapter}章</span>

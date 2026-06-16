@@ -133,7 +133,7 @@ export function SceneCardPanel({ novelId, chapterId }: Props) {
               </div>
               <div className="flex items-center gap-1.5">
                 <button onClick={handleGenerate} disabled={generate.isPending}
-                  className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100 disabled:opacity-50 flex items-center gap-0.5">
+                  className="text-xs px-2 py-1 rounded bg-brand-50 text-brand-600 hover:bg-brand-100 disabled:opacity-50 flex items-center gap-0.5">
                   <Wand2 size={10} />{generate.isPending ? "生成中..." : scenes.length > 0 ? "重新生成" : "AI 生成"}
                 </button>
                 <button onClick={() => {
@@ -160,7 +160,7 @@ export function SceneCardPanel({ novelId, chapterId }: Props) {
                 </p>
                 <div className="flex items-center justify-center gap-2">
                   <button onClick={handleGenerate} disabled={generate.isPending}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-700">
+                    className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white hover:bg-brand-700">
                     {generate.isPending ? "AI 生成中..." : "AI 生成"}
                   </button>
                   <button onClick={handleAdd}
@@ -176,20 +176,20 @@ export function SceneCardPanel({ novelId, chapterId }: Props) {
                     onDragStart={() => handleDragStart(idx)}
                     onDragOver={(e) => handleDragOver(e, idx)}
                     onDragEnd={handleDragEnd}
-                    className={`rounded-lg border bg-white p-4 text-xs cursor-default ${dragIdx === idx ? "border-indigo-400 bg-indigo-50/30" : "border-slate-200"}`}>
+                    className={`rounded-lg border bg-white p-4 text-xs cursor-default ${dragIdx === idx ? "border-brand-400 bg-brand-50/30" : "border-slate-200"}`}>
                     {/* Header row */}
                     <div className="flex items-center gap-2 mb-3">
                       <GripVertical size={14} className="text-slate-300 cursor-grab shrink-0" />
                       <span className="text-slate-300 font-mono text-sm w-6">#{idx + 1}</span>
                       <input
-                        className="flex-1 text-sm font-medium border-b border-transparent hover:border-slate-200 focus:border-indigo-300 px-1 py-0.5 outline-none"
+                        className="flex-1 text-sm font-medium border-b border-transparent hover:border-slate-200 focus:border-brand-300 px-1 py-0.5 outline-none"
                         value={s.title} onChange={e => handleEdit(s.id, "title", e.target.value)}
                         onBlur={() => setDirty(true)} placeholder="场景标题"
                       />
                       <div className="flex items-center gap-1 shrink-0">
                         <span className="text-slate-400">约</span>
                         <input type="number" min={100} max={3000}
-                          className="w-14 text-center border-b border-transparent hover:border-slate-200 focus:border-indigo-300 px-1 py-0.5 text-sm outline-none text-slate-600"
+                          className="w-14 text-center border-b border-transparent hover:border-slate-200 focus:border-brand-300 px-1 py-0.5 text-sm outline-none text-slate-600"
                           value={s.estimatedWords ?? ""} onChange={e => handleEdit(s.id, "estimatedWords", parseInt(e.target.value) || 0)}
                           onBlur={() => setDirty(true)} placeholder="500"
                         />
@@ -201,7 +201,7 @@ export function SceneCardPanel({ novelId, chapterId }: Props) {
 
                     {/* Summary */}
                     <textarea
-                      className="w-full border border-slate-100 rounded px-2.5 py-2 text-xs resize-none focus:border-indigo-200 focus:outline-none mb-3"
+                      className="w-full border border-slate-100 rounded px-2.5 py-2 text-xs resize-none focus:border-brand-200 focus:outline-none mb-3"
                       rows={2} value={s.summary} onChange={e => handleEdit(s.id, "summary", e.target.value)}
                       onBlur={() => setDirty(true)} placeholder="场景摘要"
                     />
@@ -234,7 +234,7 @@ export function SceneCardPanel({ novelId, chapterId }: Props) {
                 ))}
                 {scenes.length < 8 && (
                   <button onClick={handleAdd}
-                    className="w-full text-xs text-slate-400 hover:text-indigo-500 border border-dashed border-slate-200 rounded-lg py-2 flex items-center justify-center gap-1">
+                    className="w-full text-xs text-slate-400 hover:text-brand-500 border border-dashed border-slate-200 rounded-lg py-2 flex items-center justify-center gap-1">
                     <Plus size={10} />添加场景
                   </button>
                 )}
@@ -251,7 +251,7 @@ function Field({ label, children, fullWidth }: { label: string; children: React.
   return (
     <div className={`flex items-center gap-2 ${fullWidth ? "col-span-2" : ""}`}>
       <span className="text-slate-400 text-[10px] w-8 shrink-0 text-right">{label}</span>
-      <div className="flex-1 [&_input]:w-full [&_input]:border [&_input]:border-slate-100 [&_input]:rounded [&_input]:px-2 [&_input]:py-1 [&_input]:text-xs [&_input]:focus:border-indigo-200 [&_input]:focus:outline-none">
+      <div className="flex-1 [&_input]:w-full [&_input]:border [&_input]:border-slate-100 [&_input]:rounded [&_input]:px-2 [&_input]:py-1 [&_input]:text-xs [&_input]:focus:border-brand-200 [&_input]:focus:outline-none">
         {children}
       </div>
     </div>

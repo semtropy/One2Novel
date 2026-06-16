@@ -78,9 +78,6 @@ model Novel {
   // Progress
   projectStatus ProjectProgressStatus @default(not_started)
 
-  // Budget
-  budgetLimit Float? // USD cost ceiling — null = no limit
-
   // Style
   postGenerationStyleReviewEnabled Boolean @default(true)
 
@@ -97,7 +94,6 @@ model Novel {
   infoProfiles       CharacterInfoProfile[]
   volumePresences    CharacterVolumePresence[]
   referenceBook      ReferenceBook?
-  costRecords        CostRecord[]
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
 }
@@ -213,7 +209,6 @@ model VolumeChapterPlan {
   revealLevel     Int?
   targetWordCount Int?
   mustAvoid       String?
-  taskSheet       String? // JSON scene card array
   // Phase 0: Long-form loop + rhythm tracking
   loopPhase       String? // "trigger"|"enter"|"explore"|"setback"|"turn"|"climax"|"settlement"
   loopIndex       Int? // 属于第几轮回环
@@ -331,25 +326,6 @@ model ReferenceBook {
   updatedAt       DateTime @updatedAt
 
   @@unique([novelId])
-}
-
-// ─── Phase 0: Cost Tracking ────────────────────────
-
-model CostRecord {
-  id            String   @id @default(cuid())
-  novelId       String
-  chapterId     String?
-  assetId       String // 哪个 Prompt Asset 产生的调用
-  inputTokens   Int
-  outputTokens  Int
-  estimatedCost Float?
-  provider      String?
-  model         String?
-  novel         Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
-  createdAt     DateTime @default(now())
-
-  @@index([novelId])
-  @@index([novelId, createdAt])
 }
 
 // ─── Phase 12: Character Depth ─────────────────────────

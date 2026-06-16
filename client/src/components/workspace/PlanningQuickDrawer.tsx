@@ -56,7 +56,7 @@ export function PlanningQuickDrawer({ novelId, onSwitchToPlanning }: Props) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 rounded-l-lg border border-r-0 border-indigo-200 bg-indigo-50 px-1.5 py-4 text-indigo-500 hover:bg-indigo-100 transition-colors shadow-sm"
+        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 rounded-l-lg border border-r-0 border-brand-200 bg-brand-50 px-1.5 py-4 text-brand-500 hover:bg-brand-100 transition-colors shadow-sm"
         title="查看创作规划"
       >
         <ChevronLeft size={14} />
@@ -69,7 +69,7 @@ export function PlanningQuickDrawer({ novelId, onSwitchToPlanning }: Props) {
       {/* Header */}
       <div className="shrink-0 border-b border-slate-100 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BookOpen size={14} className="text-indigo-500" />
+          <BookOpen size={14} className="text-brand-500" />
           <h3 className="text-sm font-semibold text-slate-800">创作规划</h3>
         </div>
         <button onClick={() => setOpen(false)}
@@ -91,7 +91,7 @@ export function PlanningQuickDrawer({ novelId, onSwitchToPlanning }: Props) {
               <p className="text-slate-600 leading-relaxed line-clamp-3">{novel.storySummary}</p>
               {novel.centralQuestion && (
                 <p className="text-slate-500 leading-relaxed text-[11px]">
-                  <span className="font-medium text-purple-500">悬念：</span>{novel.centralQuestion.slice(0, 80)}...
+                  <span className="font-medium text-brand-500">悬念：</span>{novel.centralQuestion.slice(0, 80)}...
                 </p>
               )}
             </div>
@@ -102,13 +102,13 @@ export function PlanningQuickDrawer({ novelId, onSwitchToPlanning }: Props) {
         {skeleton && (
           <section>
             <div className="flex items-center gap-1.5 mb-2">
-              <Sparkles size={12} className="text-purple-400" />
+              <Sparkles size={12} className="text-brand-400" />
               <span className="font-medium text-slate-600">回环进度</span>
             </div>
             <div className="space-y-1">
               {skeleton.loops?.slice(0, 5).map((loop: { loopIndex: number; dungeonName: string }) => (
                 <div key={loop.loopIndex} className="flex items-center gap-2 rounded bg-slate-50 px-2 py-1">
-                  <span className="rounded bg-purple-100 px-1 py-0 text-[10px] font-medium text-purple-600 shrink-0">
+                  <span className="rounded bg-brand-100 px-1 py-0 text-[10px] font-medium text-brand-600 shrink-0">
                     #{loop.loopIndex}
                   </span>
                   <span className="text-slate-600 truncate">{loop.dungeonName}</span>
@@ -149,7 +149,7 @@ export function PlanningQuickDrawer({ novelId, onSwitchToPlanning }: Props) {
         {/* Progress */}
         <section>
           <div className="flex items-center gap-1.5 mb-2">
-            <AlertCircle size={12} className="text-amber-400" />
+            <AlertCircle size={12} className="text-accent-400" />
             <span className="font-medium text-slate-600">写作进度</span>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
@@ -170,7 +170,7 @@ export function PlanningQuickDrawer({ novelId, onSwitchToPlanning }: Props) {
 
         {/* Architecture + Golden Finger */}
         <section>
-          <div className="rounded-lg bg-indigo-50/30 border border-indigo-100 p-2.5 space-y-1">
+          <div className="rounded-lg bg-brand-50/30 border border-brand-100 p-2.5 space-y-1">
             <p className="text-slate-600">
               <span className="text-slate-400">架构：</span>
               <span className="font-medium">{archLabels[novel?.architectureType ?? ""] ?? novel?.architectureType ?? "未选择"}</span>

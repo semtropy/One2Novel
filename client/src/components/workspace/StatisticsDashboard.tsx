@@ -1,4 +1,6 @@
-import { useNovelStatistics, useDailyOutput, useQualityTrend, usePayoffStats } from "../../api/novel";
+import { useState } from "react";
+import { RefreshCw, AlertTriangle } from "lucide-react";
+import { useNovelStatistics, useDailyOutput, useQualityTrend, usePayoffStats, useCrossVolumeAudit, useNovel, type CrossVolumeAuditReport } from "../../api/novel";
 
 interface Props {
   novelId: string;
@@ -10,10 +12,20 @@ export function StatisticsDashboard({ novelId, onClose }: Props) {
   const daily = useDailyOutput(novelId, 30);
   const quality = useQualityTrend(novelId);
   const payoffs = usePayoffStats(novelId);
+  const { data: novel } = useNovel(novelId);
+  const crossAudit = useCrossVolumeAudit();
+  const [auditVol, setAuditVol] = useState<number>(1);
+  const [auditResult, setAuditResult] = useState<CrossVolumeAuditReport | null>(null);
 
   const s = stats.data;
   const maxDaily = Math.max(1, ...(daily.data ?? []).map(d => d.chars));
   const maxScore = Math.max(1, ...(quality.data ?? []).map(q => q.totalScore), 100);
+  const volumes = novel?.volumes ?? [];
+
+  async function handleAudit() {
+    const result = await crossAudit.mutateAsync({ novelId, sortOrder: auditVol });
+    setAuditResult(result);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
@@ -27,6 +39,36 @@ export function StatisticsDashboard({ novelId, onClose }: Props) {
 
         {s && (
           <>
+            {/* Cross-volume audit */}
+            {volumes.length > 0 && (
+              <div className="mb-4 p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">跨卷审计</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <select value={auditVol} onChange={e => setAuditVol(parseInt(e.target.value))}
+                    className="rounded border border-slate-200 px-2 py-1 text-xs">
+                    {volumes.map(v => <option key={v.sortOrder} value={v.sortOrder}>第{v.sortOrder}卷 · {v.title}</option>)}
+                  </select>
+                  <button onClick={handleAudit} disabled={crossAudit.isPending}
+                    className="flex items-center gap-1 rounded bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                    {crossAudit.isPending ? <RefreshCw size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                    审计
+                  </button>
+                </div>
+                {auditResult && (
+                  <div className="text-xs space-y-1">
+                    <p className="text-slate-600">{auditResult.summary}</p>
+                    <p className="text-slate-400">评分: {auditResult.overallScore}</p>
+                    {(auditResult.findings ?? []).slice(0, 5).map((f, i) => (
+                      <div key={i} className="flex items-start gap-1 text-slate-600">
+                        <AlertTriangle size={10} className={f.severity === "high" ? "text-red-500" : "text-accent-500"} />
+                        <span>[{f.category}] {f.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Overview cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
               <StatCard label="总字数" value={`${(s.totalChars / 1000).toFixed(1)}k`} />
@@ -43,7 +85,7 @@ export function StatisticsDashboard({ novelId, onClose }: Props) {
                   {daily.data.map((d, i) => (
                     <div
                       key={i}
-                      className="flex-1 bg-amber-400 hover:bg-amber-500 rounded-t transition-colors relative group"
+                      className="flex-1 bg-accent-400 hover:bg-accent-500 rounded-t transition-colors relative group"
                       style={{ height: `${Math.max(4, (d.chars / maxDaily) * 100)}%` }}
                     >
                       <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-400 opacity-60 hover:opacity-100 whitespace-nowrap">
@@ -62,7 +104,7 @@ export function StatisticsDashboard({ novelId, onClose }: Props) {
                 <div className="flex items-end gap-0.5 h-16 bg-slate-50 rounded-lg p-2">
                   {quality.data.map((q, i) => {
                     const pct = Math.max(8, (q.totalScore / maxScore) * 100);
-                    const color = q.totalScore >= 60 ? "bg-green-400" : q.totalScore >= 45 ? "bg-amber-400" : "bg-red-400";
+                    const color = q.totalScore >= 60 ? "bg-green-400" : q.totalScore >= 45 ? "bg-accent-400" : "bg-red-400";
                     return (
                       <div
                         key={i}

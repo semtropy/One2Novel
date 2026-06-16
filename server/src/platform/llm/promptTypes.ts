@@ -19,7 +19,7 @@ export interface PromptContextBlock {
 }
 
 export interface ContextPolicy {
-  maxTokensBudget: number;
+  maxTokensBudget?: number;
   requiredGroups?: string[];
   preferredGroups?: string[];
   dropOrder?: string[];

@@ -80,7 +80,7 @@ export function TitleEditor({ novelId, currentTitle }: Props) {
             onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "Escape") { setTitle(currentTitle); setEditing(false); } }}
             className="text-lg font-bold text-slate-900 bg-white border border-slate-300 rounded px-2 py-0.5 w-64 focus:border-slate-400 focus:outline-none" />
           <button onMouseDown={(e) => { e.preventDefault(); handleGenerate(); }} disabled={genning}
-            className="rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs text-purple-600 hover:bg-purple-100 flex items-center gap-1">
+            className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs text-brand-600 hover:bg-brand-100 flex items-center gap-1">
             <Sparkles size={12} />{genning ? "..." : "AI 起名"}
           </button>
         </div>
@@ -92,7 +92,7 @@ export function TitleEditor({ novelId, currentTitle }: Props) {
             <Pencil size={12} />
           </button>
           <button onMouseDown={(e) => { e.preventDefault(); handleGenerate(); }} disabled={genning}
-            className="rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs text-purple-600 hover:bg-purple-100 flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
+            className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs text-brand-600 hover:bg-brand-100 flex items-center gap-1 opacity-60 hover:opacity-100 transition-opacity">
             <Sparkles size={12} />{genning ? "..." : "AI 起名"}
           </button>
         </h1>
@@ -106,7 +106,7 @@ export function TitleEditor({ novelId, currentTitle }: Props) {
               <h4 className="text-xs font-semibold text-slate-500">AI 建议书名</h4>
               <div className="flex items-center gap-1">
                 <button onClick={handleRegenerate} disabled={genning}
-                  className="rounded border border-purple-200 px-2 py-0.5 text-xs text-purple-600 hover:bg-purple-50 flex items-center gap-1">
+                  className="rounded border border-brand-200 px-2 py-0.5 text-xs text-brand-600 hover:bg-brand-50 flex items-center gap-1">
                   {genning ? <RefreshCw size={10} className="animate-spin" /> : <RefreshCw size={10} />}重新生成
                 </button>
                 <button onClick={() => setShowSuggest(false)} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
@@ -115,7 +115,7 @@ export function TitleEditor({ novelId, currentTitle }: Props) {
             <div className="space-y-1.5">
             {suggestions.map((s, i) => (
               <button key={i} onClick={() => pickTitle(s.title)}
-                className="w-full text-left rounded-lg border border-slate-100 p-2 hover:border-purple-200 hover:bg-purple-50 transition-colors">
+                className="w-full text-left rounded-lg border border-slate-100 p-2 hover:border-brand-200 hover:bg-brand-50 transition-colors">
                 <div className="text-sm font-medium text-slate-800">{s.title}</div>
                 <div className="text-xs text-slate-400">{s.reason}</div>
               </button>

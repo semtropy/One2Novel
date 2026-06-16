@@ -26,12 +26,12 @@ export function NextChapterPreview({ novelId, chapterId }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-indigo-200 bg-white p-3 space-y-2">
+    <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-2">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-semibold text-indigo-700 flex items-center gap-1"><Sparkles size={11} />下一章预览</h4>
+        <h4 className="text-xs font-semibold text-brand-700 flex items-center gap-1"><Sparkles size={11} />下一章预览</h4>
         {!preview && (
           <button onClick={generate} disabled={loading}
-            className="rounded border border-indigo-200 px-2 py-0.5 text-xs text-indigo-500 hover:bg-indigo-50">
+            className="rounded border border-brand-200 px-2 py-0.5 text-xs text-brand-500 hover:bg-brand-50">
             {loading ? <RefreshCw size={10} className="animate-spin" /> : "生成"}
           </button>
         )}
@@ -43,12 +43,12 @@ export function NextChapterPreview({ novelId, chapterId }: Props) {
           <div><span className="text-slate-400">核心事件：</span><span className="text-slate-600">{preview.coreEvent}</span></div>
           <div><span className="text-slate-400">钩子：</span><span className="text-slate-600">{preview.endingHook}</span></div>
           {preview.coolPointType && (
-            <span className="inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-600">
+            <span className="inline-block rounded bg-brand-50 px-1.5 py-0.5 text-[10px] text-brand-600">
               {TYPE_LABELS[preview.coolPointType] ?? preview.coolPointType}
             </span>
           )}
           {preview.sceneCount && <span className="inline-block ml-1 text-[10px] text-slate-400">{preview.sceneCount}个场景</span>}
-          <button onClick={() => setPreview(null)} className="block text-slate-400 hover:text-indigo-500 mt-1">重新生成</button>
+          <button onClick={() => setPreview(null)} className="block text-slate-400 hover:text-brand-500 mt-1">重新生成</button>
         </div>
       )}
     </div>

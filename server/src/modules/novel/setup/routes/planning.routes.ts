@@ -3,8 +3,6 @@ import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
 import { generateStoryCore } from "../../planning/storyCoreService";
 import { generateCharacters, persistCharacters } from "../../planning/characterPrep/characterService";
-import { generateBlueprint } from "../../planning/blueprintService";
-import { rebuildBlueprintFromOutline, restoreBlueprintFromWriting } from "../blueprintRebuild";
 import { generateChapterDynamics, compileDynamicsContext } from "../../planning/characterPrep/characterDynamicsService";
 import { generateChapterExecutionContract } from "../../planning/storyMacro/chapterDetailService";
 import { generateWorldRulesFromReference } from "../../world/worldReferenceService";
@@ -22,7 +20,7 @@ import architectureRoutes from "./planning/architecture.routes";
 import rhythmRoutes from "./planning/rhythm.routes";
 import referenceRoutes from "./planning/reference.routes";
 import beatSheetRoutes from "./planning/beat-sheet.routes";
-import auditCostRoutes from "./planning/audit-cost.routes";
+import auditRoutes from "./planning/audit.routes";
 
 const router = Router();
 
@@ -31,7 +29,7 @@ router.use("/", architectureRoutes);
 router.use("/", beatSheetRoutes);
 router.use("/", rhythmRoutes);
 router.use("/", referenceRoutes);
-router.use("/", auditCostRoutes);
+router.use("/", auditRoutes);
 
 // ─── Story Core ──────────────────────────────────────
 
@@ -156,27 +154,6 @@ router.post("/:novelId/characters/generate", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// ─── Blueprint ───────────────────────────────────────
-
-router.post("/:novelId/blueprint/restore", async (req, res, next) => {
-  try {
-    await restoreBlueprintFromWriting(req.params.novelId);
-    res.json({ data: { ok: true } });
-  } catch (e) { next(e); }
-});
-
-router.post("/:novelId/blueprint", async (req, res, next) => {
-  try {
-    const { result, validation, needsRegeneration } = await generateBlueprint(req.params.novelId, req.body?.volumes);
-    const prisma = getPrisma();
-    const novel = await prisma.novel.findUnique({ where: { id: req.params.novelId }, select: { structuredOutline: true } });
-    if (novel?.structuredOutline) {
-      await rebuildBlueprintFromOutline(req.params.novelId, novel.structuredOutline);
-    }
-    res.json({ data: { blueprint: result, validation, needsRegeneration } });
-  } catch (e) { next(e); }
-});
-
 // ─── Character Dynamics (Phase 2.1) ──────────────────
 
 router.get("/:novelId/character-dynamics", async (req, res, next) => {
@@ -213,7 +190,6 @@ router.post("/:novelId/volumes/:volumeId/chapters/:chapterOrder/contract", async
           purpose: result.purpose,
           exclusiveEvent: result.boundary,
           endingState: result.conflictType,
-          taskSheet: JSON.stringify(result.obligationContract),
           mustAvoid: result.obligationContract.mustAvoid.join("；"),
         },
       });

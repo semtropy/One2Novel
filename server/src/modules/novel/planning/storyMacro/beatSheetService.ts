@@ -114,11 +114,6 @@ export async function generateBeatSheet(
             : beat.beatType === "cooldown" ? 3 : 5,
           revealLevel: beat.beatType === "turn" || beat.beatType === "payoff" ? 8
             : beat.beatType === "setup" ? 3 : 5,
-          taskSheet: JSON.stringify({
-            conflict: beat.conflict,
-            reveal: beat.reveal,
-            emotionBeat: beat.emotionBeat,
-          }),
         },
       });
     }

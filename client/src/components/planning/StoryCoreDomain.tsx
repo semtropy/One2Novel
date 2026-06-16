@@ -79,10 +79,10 @@ export function StoryCoreDomain({ novelId, onComplete }: Props) {
   return (
     <div className="space-y-5">
       {/* 灵感输入 */}
-      <section className="rounded-xl border border-amber-200 bg-amber-50/30 p-4">
-        <h3 className="text-sm font-medium text-amber-800 mb-2">灵感描述</h3>
+      <section className="rounded-xl border border-accent-200 bg-accent-50/30 p-4">
+        <h3 className="text-sm font-medium text-accent-800 mb-2">灵感描述</h3>
         <textarea
-          className="w-full bg-white rounded-lg border border-amber-200 p-3 text-sm resize-none focus:outline-none focus:border-amber-400 placeholder:text-slate-300"
+          className="w-full bg-white rounded-lg border border-accent-200 p-3 text-sm resize-none focus:outline-none focus:border-accent-400 placeholder:text-slate-300"
           rows={4}
           placeholder="一句话描述你的作品…"
           value={inspiration}
@@ -111,7 +111,7 @@ export function StoryCoreDomain({ novelId, onComplete }: Props) {
                     <div className="mt-0.5">
                       <textarea
                         autoFocus
-                        className="w-full rounded border border-indigo-300 p-2 text-sm resize-none focus:outline-none"
+                        className="w-full rounded border border-brand-300 p-2 text-sm resize-none focus:outline-none"
                         rows={3}
                         value={editingValue}
                         onChange={e => setEditingValue(e.target.value)}
@@ -215,7 +215,7 @@ export function StoryCoreDomain({ novelId, onComplete }: Props) {
           "w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium transition-colors",
           hasCore
             ? "border border-slate-200 text-slate-600 hover:bg-slate-50"
-            : "bg-indigo-600 text-white hover:bg-indigo-700",
+            : "bg-brand-600 text-white hover:bg-brand-700",
         )}
       >
         {genStoryCore.isPending ? (

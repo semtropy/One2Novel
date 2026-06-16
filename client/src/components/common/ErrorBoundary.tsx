@@ -20,7 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center gap-4 py-20">
-          <AlertTriangle size={40} className="text-amber-500" />
+          <AlertTriangle size={40} className="text-accent-500" />
           <h2 className="text-lg font-semibold text-slate-800">出错了</h2>
           <p className="text-sm text-slate-500">{this.state.error?.message ?? "未知错误"}</p>
           <button

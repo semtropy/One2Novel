@@ -181,7 +181,7 @@ export function StyleDomain({ novelId: _novelId }: { novelId?: string }) {
                     {editNameId === p.id ? (
                       <input
                         autoFocus
-                        className="text-sm font-semibold text-slate-800 border-b border-indigo-300 px-1 py-0 outline-none"
+                        className="text-sm font-semibold text-slate-800 border-b border-brand-300 px-1 py-0 outline-none"
                         value={editNameVal}
                         onChange={(e) => setEditNameVal(e.target.value)}
                         onBlur={async () => {
@@ -198,7 +198,7 @@ export function StyleDomain({ novelId: _novelId }: { novelId?: string }) {
                       />
                     ) : (
                       <span
-                        className="text-sm font-semibold text-slate-800 cursor-pointer hover:text-indigo-600"
+                        className="text-sm font-semibold text-slate-800 cursor-pointer hover:text-brand-600"
                         onClick={() => {
                           setEditNameId(p.id);
                           setEditNameVal(p.name);
@@ -273,7 +273,7 @@ export function StyleDomain({ novelId: _novelId }: { novelId?: string }) {
                                 setAddField(field);
                                 setAddVal("");
                               }}
-                              className="text-slate-300 hover:text-indigo-500"
+                              className="text-slate-300 hover:text-brand-500"
                             >
                               <Plus size={10} />
                             </button>
@@ -285,7 +285,7 @@ export function StyleDomain({ novelId: _novelId }: { novelId?: string }) {
                                   {editKey === `${field}:${i}` ? (
                                     <input
                                       autoFocus
-                                      className="flex-1 rounded border border-indigo-200 px-1.5 py-0.5 text-xs"
+                                      className="flex-1 rounded border border-brand-200 px-1.5 py-0.5 text-xs"
                                       value={editVal}
                                       onChange={(e) => setEditVal(e.target.value)}
                                       onBlur={() => handleSaveRule(p.id, field, i, editVal)}
@@ -325,7 +325,7 @@ export function StyleDomain({ novelId: _novelId }: { novelId?: string }) {
                             <div className="flex gap-1 ml-8 mt-1">
                               <input
                                 autoFocus
-                                className="flex-1 rounded border border-indigo-200 px-1.5 py-0.5 text-xs"
+                                className="flex-1 rounded border border-brand-200 px-1.5 py-0.5 text-xs"
                                 value={addVal}
                                 onChange={(e) => setAddVal(e.target.value)}
                                 onKeyDown={(e) => {
@@ -336,7 +336,7 @@ export function StyleDomain({ novelId: _novelId }: { novelId?: string }) {
                               />
                               <button
                                 onClick={() => handleAddRule(p.id, field)}
-                                className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                                className="text-xs px-2 py-0.5 rounded bg-brand-50 text-brand-600 hover:bg-brand-100"
                               >
                                 添加
                               </button>

@@ -130,7 +130,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
                 </div>
               ))}
             </div>
-            <button onClick={() => setShowCharDetail(true)} className="w-full text-xs text-indigo-500 hover:text-indigo-700 text-left mt-1">
+            <button onClick={() => setShowCharDetail(true)} className="w-full text-xs text-brand-500 hover:text-brand-700 text-left mt-1">
               查看详情
             </button>
           </div>
@@ -164,7 +164,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
                   finally { setCheckingConflicts(false); }
                 }}
                 disabled={checkingConflicts}
-                className="text-xs text-slate-400 hover:text-amber-500 disabled:opacity-50 flex items-center gap-0.5"
+                className="text-xs text-slate-400 hover:text-accent-500 disabled:opacity-50 flex items-center gap-0.5"
                 title="检查时间线冲突"
               ><Search size={10} />{checkingConflicts ? "检查中..." : "检查"}</button>
             )}
@@ -175,13 +175,13 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
         {timelines.length > 0 && (
           <div className="flex items-center gap-2 mb-2 text-[10px] text-slate-400">
             <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" />事件</span>
-            <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-purple-400" />里程碑</span>
+            <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-brand-400" />里程碑</span>
             <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400" />截止日</span>
-            <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />约束</span>
+            <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-accent-400" />约束</span>
           </div>
         )}
         {conflicts.length > 0 && (
-          <div className="mb-2 rounded bg-amber-50 p-1.5 text-[10px] text-amber-700 space-y-0.5">
+          <div className="mb-2 rounded bg-accent-50 p-1.5 text-[10px] text-accent-700 space-y-0.5">
             {conflicts.slice(0, 3).map((c, i) => (
               <div key={i} className="flex items-start gap-1">
                 <AlertTriangle size={10} className="shrink-0 mt-0.5" />
@@ -222,9 +222,9 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
                 <span className={cn(
                   "shrink-0 w-1.5 h-1.5 rounded-full",
                   t.status === "violated" ? "bg-red-500"
-                  : t.category === "milestone" ? "bg-purple-400"
+                  : t.category === "milestone" ? "bg-brand-400"
                   : t.category === "deadline" ? "bg-red-400"
-                  : t.category === "constraint" ? "bg-amber-400"
+                  : t.category === "constraint" ? "bg-accent-400"
                   : "bg-blue-400"
                 )} />
                 <span className={cn("truncate", t.status === "violated" && "text-red-500 font-medium")}>{t.title}</span>
@@ -250,7 +250,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
             </div>
             <button
               onClick={() => setShowDetail(true)}
-              className="w-full text-xs text-indigo-500 hover:text-indigo-700 text-left"
+              className="w-full text-xs text-brand-500 hover:text-brand-700 text-left"
             >
               查看详情
             </button>
@@ -279,7 +279,7 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
                     <div key={l as string} className="flex items-center gap-2">
                       <span className="text-xs text-slate-600 w-[4.5rem] shrink-0 text-right">{l as string}</span>
                       <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full", (s as number) >= 7 ? "bg-green-400" : (s as number) >= 5 ? "bg-amber-400" : "bg-red-400")} style={{ width: `${(s as number) * 10}%` }} />
+                        <div className={cn("h-full rounded-full", (s as number) >= 7 ? "bg-green-400" : (s as number) >= 5 ? "bg-accent-400" : "bg-red-400")} style={{ width: `${(s as number) * 10}%` }} />
                       </div>
                       <span className="text-xs font-medium w-3 text-right">{s as number}</span>
                     </div>
@@ -298,10 +298,10 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
                   {scores.issues.length > 0 ? (
                     <div className="space-y-1">
                       {scores.issues.map((iss, i) => (
-                        <div key={i} className="rounded border border-amber-100 bg-amber-50/50 p-1.5 text-xs">
-                          <span className={cn("px-1 py-0.5 rounded mr-1", iss.severity === "high" ? "bg-red-100 text-red-700" : iss.severity === "medium" ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-600")}>{SEVERITY_LABEL[iss.severity as keyof typeof SEVERITY_LABEL] ?? iss.severity}</span>
-                          <span className="text-amber-800">{iss.description}</span>
-                          <div className="text-amber-600 mt-0.5 text-[10px] italic">{iss.fixSuggestion}</div>
+                        <div key={i} className="rounded border border-accent-100 bg-accent-50/50 p-1.5 text-xs">
+                          <span className={cn("px-1 py-0.5 rounded mr-1", iss.severity === "high" ? "bg-red-100 text-red-700" : iss.severity === "medium" ? "bg-accent-100 text-accent-700" : "bg-slate-200 text-slate-600")}>{SEVERITY_LABEL[iss.severity as keyof typeof SEVERITY_LABEL] ?? iss.severity}</span>
+                          <span className="text-accent-800">{iss.description}</span>
+                          <div className="text-accent-600 mt-0.5 text-[10px] italic">{iss.fixSuggestion}</div>
                         </div>
                       ))}
                     </div>
@@ -317,23 +317,23 @@ export function ContextPanel({ novelId, chapterId, chapterOrder, quality, diagno
                 {displayDiagnosis ? (
                   <div className="space-y-1.5">
                     {displayDiagnosis.recommendedTask && (
-                      <div className="p-2 bg-amber-50 border border-amber-200 rounded text-xs">
-                        <span className="font-medium text-amber-800">优先修复</span>
-                        <div className="text-amber-700 mt-0.5">{displayDiagnosis.recommendedTask.title}</div>
-                        <div className="text-amber-600 mt-0.5">{displayDiagnosis.recommendedTask.summary}</div>
+                      <div className="p-2 bg-accent-50 border border-accent-200 rounded text-xs">
+                        <span className="font-medium text-accent-800">优先修复</span>
+                        <div className="text-accent-700 mt-0.5">{displayDiagnosis.recommendedTask.title}</div>
+                        <div className="text-accent-600 mt-0.5">{displayDiagnosis.recommendedTask.summary}</div>
                       </div>
                     )}
                     {displayDiagnosis.cards.length > 0 ? (
                       displayDiagnosis.cards.map((card, i) => (
                         <div key={i} className={`p-2 rounded border text-xs ${card.severity === "critical" ? "border-red-300 bg-red-50" : card.severity === "high" ? "border-orange-200 bg-orange-50" : "border-slate-200 bg-slate-50"}`}>
                           <div className="flex items-center gap-1 mb-1">
-                            <span className={`px-1 py-0 rounded text-[10px] font-medium ${card.severity === "critical" ? "bg-red-200 text-red-800" : card.severity === "high" ? "bg-orange-200 text-orange-800" : card.severity === "medium" ? "bg-amber-200 text-amber-800" : "bg-slate-200 text-slate-600"}`}>{SEVERITY_LABEL[card.severity] ?? card.severity}</span>
+                            <span className={`px-1 py-0 rounded text-[10px] font-medium ${card.severity === "critical" ? "bg-red-200 text-red-800" : card.severity === "high" ? "bg-orange-200 text-orange-800" : card.severity === "medium" ? "bg-accent-200 text-accent-800" : "bg-slate-200 text-slate-600"}`}>{SEVERITY_LABEL[card.severity] ?? card.severity}</span>
                             <span className="font-semibold truncate">{card.title}</span>
                           </div>
                           <div className="text-slate-500 mb-1 leading-relaxed">{card.problemSummary}</div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {card.paragraphStart && <span className="text-slate-400 text-[10px]">第{card.paragraphStart}{card.paragraphEnd && card.paragraphEnd !== card.paragraphStart ? `–${card.paragraphEnd}` : ""}段</span>}
-                            <span className="text-indigo-600 bg-indigo-50 px-1.5 py-0 rounded text-[10px]">{OPERATION_LABELS[card.recommendedAction]?.label ?? card.recommendedAction}</span>
+                            <span className="text-brand-600 bg-brand-50 px-1.5 py-0 rounded text-[10px]">{OPERATION_LABELS[card.recommendedAction]?.label ?? card.recommendedAction}</span>
                           </div>
                         </div>
                       ))

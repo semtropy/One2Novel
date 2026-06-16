@@ -12,7 +12,7 @@ export function RelationshipTimeline({ novelId }: Props) {
 
   const sevColors: Record<string, string> = {
     friend: "border-emerald-400", enemy: "border-red-400", lover: "border-pink-400",
-    rival: "border-amber-400", mentor: "border-blue-400", family: "border-purple-400",
+    rival: "border-accent-400", mentor: "border-blue-400", family: "border-brand-400",
   };
   const sevLabels: Record<string, string> = {
     friend: "盟友", enemy: "敌对", lover: "恋人", rival: "竞争", mentor: "师徒", family: "家人",
@@ -20,7 +20,7 @@ export function RelationshipTimeline({ novelId }: Props) {
   const stageColors: Record<string, string> = {
     strangers: "bg-slate-100 text-slate-500", acquainted: "bg-blue-50 text-blue-600",
     allied: "bg-green-50 text-green-600", conflicted: "bg-red-50 text-red-600",
-    estranged: "bg-slate-200 text-slate-500", reconciled: "bg-amber-50 text-amber-600",
+    estranged: "bg-slate-200 text-slate-500", reconciled: "bg-accent-50 text-accent-600",
   };
   const stageLabels: Record<string, string> = {
     strangers: "陌生", acquainted: "相识", allied: "结盟", conflicted: "冲突", estranged: "疏远", reconciled: "和解",

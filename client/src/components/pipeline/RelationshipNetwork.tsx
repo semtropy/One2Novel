@@ -25,14 +25,14 @@ const ROLE_COLORS: Record<string, string> = {
 const TAG_COLORS: Record<string, string> = {
   "副本触发器": "bg-yellow-100 border-yellow-400",
   "奖励来源": "bg-emerald-100 border-emerald-400",
-  "伏笔载体": "bg-purple-100 border-purple-400",
+  "伏笔载体": "bg-brand-100 border-brand-400",
   "长期威胁": "bg-red-100 border-red-400",
   "情感锚点": "bg-pink-100 border-pink-400",
 };
 
 const REL_COLORS: Record<string, string> = {
   friend: "text-green-600", enemy: "text-red-600", lover: "text-pink-600",
-  rival: "text-orange-600", mentor: "text-purple-600", family: "text-amber-600",
+  rival: "text-orange-600", mentor: "text-brand-600", family: "text-accent-600",
 };
 
 interface Props {
@@ -98,7 +98,7 @@ export function RelationshipNetwork({ characters, relations, onEditRelation }: P
         return (
           <div key={char.id}
             className={cn("absolute rounded-xl border-2 px-2 py-1.5 text-center cursor-pointer transition-all shadow-sm",
-              roleColor, tagColor, isSelected ? "ring-2 ring-indigo-300 scale-110 z-10" : "hover:scale-105 z-0",
+              roleColor, tagColor, isSelected ? "ring-2 ring-brand-300 scale-110 z-10" : "hover:scale-105 z-0",
             )}
             style={{ left: pos.x - 40, top: pos.y - 16, width: 80 }}
             onClick={() => setSelectedNode(isSelected ? null : char.id)}

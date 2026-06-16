@@ -83,14 +83,14 @@ export function RevisionWorkbench({ novelId, chapterId, initialOperation, select
             {ALL_OPS.map(op => (
               <button key={op} onClick={() => switchOp(op)}
                 className={cn("px-2.5 py-1 rounded text-xs font-medium transition-colors",
-                  op === operation ? "bg-amber-100 text-amber-800" : "text-slate-500 hover:bg-slate-100")}>
+                  op === operation ? "bg-accent-100 text-accent-800" : "text-slate-500 hover:bg-slate-100")}>
                 {OPERATION_LABELS[op].emoji} {OPERATION_LABELS[op].label}
               </button>
             ))}
             <span className="w-px h-4 bg-slate-200 mx-0.5" />
             <button onClick={() => { switchOp("polish"); setShowCustomInput(true); setCustomInstruction(""); }}
               className={cn("px-2.5 py-1 rounded text-xs font-medium transition-colors",
-                showCustomInput ? "bg-purple-100 text-purple-800" : "text-slate-500 hover:bg-slate-100")}>
+                showCustomInput ? "bg-brand-100 text-brand-800" : "text-slate-500 hover:bg-slate-100")}>
               💬 自定义
             </button>
           </div>
@@ -99,10 +99,10 @@ export function RevisionWorkbench({ novelId, chapterId, initialOperation, select
 
         {/* Custom instruction input */}
         {showCustomInput && (
-          <div className="shrink-0 px-5 py-2 border-b border-purple-100 bg-purple-50/30">
+          <div className="shrink-0 px-5 py-2 border-b border-brand-100 bg-brand-50/30">
             <textarea value={customInstruction} onChange={e => setCustomInstruction(e.target.value)}
               placeholder="描述你想要的改写效果，例如：用更口语化的方式改写、加入一个反转、加快节奏..."
-              className="w-full h-14 text-xs border border-purple-200 rounded-lg p-2 resize-none focus:outline-none focus:border-purple-400"
+              className="w-full h-14 text-xs border border-brand-200 rounded-lg p-2 resize-none focus:outline-none focus:border-brand-400"
               autoFocus />
           </div>
         )}
@@ -125,8 +125,8 @@ export function RevisionWorkbench({ novelId, chapterId, initialOperation, select
 
             {/* Result / Placeholder / Loading / Error */}
             <div className="flex-1 flex flex-col min-w-0">
-              <div className="shrink-0 px-4 py-2 border-b border-slate-100 bg-amber-50">
-                <span className="text-xs font-medium text-amber-700">
+              <div className="shrink-0 px-4 py-2 border-b border-slate-100 bg-accent-50">
+                <span className="text-xs font-medium text-accent-700">
                   {phase === "loading" ? `正在${opConfig.label}...` :
                    phase === "done" ? "改写结果" :
                    phase === "error" ? "生成失败" :
@@ -141,7 +141,7 @@ export function RevisionWorkbench({ novelId, chapterId, initialOperation, select
                 )}
                 {phase === "loading" && (
                   <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
-                    <RefreshCw size={24} className="animate-spin text-amber-500" />
+                    <RefreshCw size={24} className="animate-spin text-accent-500" />
                     <p className="text-sm">AI 正在生成{opConfig.label}版本...</p>
                     <p className="text-xs">保留原文核心信息，优化表达方式</p>
                   </div>
@@ -167,7 +167,7 @@ export function RevisionWorkbench({ novelId, chapterId, initialOperation, select
                       <div><span className="font-medium text-slate-600">摘要：</span>{candidate.summary}</div>
                       <div><span className="font-medium text-slate-600">理由：</span>{candidate.rationale}</div>
                       {candidate.riskNotes.length > 0 && (
-                        <div className="text-amber-600"><span className="font-medium">注意：</span>{candidate.riskNotes.join("；")}</div>
+                        <div className="text-accent-600"><span className="font-medium">注意：</span>{candidate.riskNotes.join("；")}</div>
                       )}
                       <div className="text-slate-400">
                         变化：<span className="text-green-600">+{candidate.diffStats.added}</span> / <span className="text-red-500">-{candidate.diffStats.removed}</span>
@@ -184,7 +184,7 @@ export function RevisionWorkbench({ novelId, chapterId, initialOperation, select
             {phase === "ready" && (
               <>
                 <button onClick={onClose} className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">取消</button>
-                <button onClick={run} className="flex-1 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 flex items-center justify-center gap-1.5">
+                <button onClick={run} className="flex-1 rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white hover:bg-accent-600 flex items-center justify-center gap-1.5">
                   <Play size={14} />执行{showCustomInput ? "自定义" : opConfig.label}
                 </button>
               </>
@@ -196,7 +196,7 @@ export function RevisionWorkbench({ novelId, chapterId, initialOperation, select
             {phase === "error" && (
               <>
                 <button onClick={onClose} className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">关闭</button>
-                <button onClick={run} className="flex-1 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600">重试</button>
+                <button onClick={run} className="flex-1 rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white hover:bg-accent-600">重试</button>
               </>
             )}
             {phase === "done" && (
@@ -204,7 +204,7 @@ export function RevisionWorkbench({ novelId, chapterId, initialOperation, select
                 <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">取消</button>
                 <button onClick={run} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-500 hover:bg-slate-50">重新生成</button>
                 <button onClick={handleApply} disabled={applying}
-                  className="flex-1 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">
+                  className="flex-1 rounded-lg bg-accent-500 px-4 py-2 text-sm font-medium text-white hover:bg-accent-600 disabled:opacity-50">
                   {applying ? "应用中..." : "应用此版本"}
                 </button>
               </>

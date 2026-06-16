@@ -13,9 +13,9 @@ router.get("/:novelId/volumes/:sortOrder/beats", async (req, res, next) => {
     const beats = await getPrisma().volumeChapterPlan.findMany({
       where: { volume: { novelId, sortOrder } },
       orderBy: { chapterOrder: "asc" },
-      select: { chapterOrder: true, purpose: true, conflictLevel: true, revealLevel: true, exclusiveEvent: true, endingState: true, taskSheet: true, mustAvoid: true, targetWordCount: true },
+      select: { chapterOrder: true, purpose: true, conflictLevel: true, revealLevel: true, exclusiveEvent: true, endingState: true, mustAvoid: true, targetWordCount: true },
     });
-    if (beats.length > 0 && beats.some(b => b.purpose || b.taskSheet)) {
+    if (beats.length > 0 && beats.some(b => b.purpose)) {
       res.json({ data: beats });
       return;
     }
@@ -32,7 +32,6 @@ router.get("/:novelId/volumes/:sortOrder/beats", async (req, res, next) => {
             purpose: ch.coreEvent || ch.summary || "",
             conflictLevel: ch.conflictLevel ?? 5,
             revealLevel: ch.revealLevel ?? 5,
-            taskSheet: null,
             exclusiveEvent: null,
             endingState: null,
             mustAvoid: null,
