@@ -622,13 +622,13 @@ export function useTimelineReminders(novelId?: string, chapterOrder?: number) {
 
 export interface CompletionReadiness {
   totalChapters: number;
-  completedChapters: number;
-  completionPercent: number;
-  unrecycledPayoffs: number;
-  characterArcsComplete: number;
-  totalCharacterArcs: number;
-  estimatedRemainingChapters: number | null;
-  readinessVerdict: "ready" | "close" | "early";
+  estimatedTotal: number | null;
+  progressPercent: number | null;
+  unresolvedCount: number;
+  unresolvedPayoffs: Array<{ title: string; firstSeen: number | null; chaptersStale: number }>;
+  endingComparison: { plannedEnding: string | null; actualDirection: string | null; needsReview: boolean };
+  recommendations: string[];
+  readyToComplete: boolean;
 }
 
 export function useCompletionReadiness(novelId?: string) {

@@ -11,12 +11,12 @@ import { cn } from "../../lib/cn";
 interface Props { novelId: string; onComplete?: () => void }
 
 const ARCH_TEMPLATES = [
-  { id: "skill_slot", name: "技能栏搭配", desc: "收集技能→搭配策略→验证战斗。固定槽位制造稀缺感，每次'开奖'都让读者兴奋。", genres: "御兽/游戏/竞技", works: "《不科学御兽》" },
-  { id: "sequence_promotion", name: "序列晋升", desc: "收集材料→完成仪式→解锁能力。晋升不是数值提升而是行为艺术，隐藏职业带来极致优越感。", genres: "克苏鲁/诡秘/超凡", works: "《诡秘之主》" },
-  { id: "case_driven", name: "超凡办案", desc: "接任务→查案→遭遇超凡→收网。案件是天然的单元剧容器，体制内身份解决动机问题。", genres: "悬疑/探案/都市", works: "《大奉打更人》" },
-  { id: "cultivation_planning", name: "修真规划", desc: "资源收集→完美突破→底牌碾压。在每一境界都把能点满的技能点满，同阶无敌的极致满足。", genres: "仙侠/修真/古典", works: "《凡人修仙传》" },
-  { id: "hexagon_godhood", name: "六边形成神", desc: "逐维度补全短板→吞噬强者→降维打击。从泥泞中一步步爬上神座，反差感贯穿全书。", genres: "西幻/史诗/黑暗", works: "《亵渎》" },
-  { id: "historical_transmigration", name: "穿越历史", desc: "知识差→势力崛起→改变历史→文明重建。五级递进舞台，从个人到家国再到文明方向。", genres: "历史/都市/科幻", works: "《庆余年》" },
+  { id: "skill_slot", name: "技能栏搭配", desc: "力量体系有固定槽位限制，主角获得更多槽位或自由组合能力。每次解锁新槽位或合成新技能都是一次'开奖'，持续制造稀缺感和期待感。", genres: "御兽/游戏/竞技", works: "《不科学御兽》", phases: "触发→解锁槽位→收集技能→搭配验证→战斗→结算", coolPoints: "策略搭配(40%) > 验证战(30%) > 收集(20%) > 升级(10%)", hookStyle: "以'下一个槽位解锁什么'为长期钩子，每章以战斗悬念或新技能线索收尾" },
+  { id: "sequence_promotion", name: "序列晋升", desc: "力量体系呈序列/途径树状。晋升需要材料+仪式+扮演，每个序列有独特能力和隐藏职业。晋升不是数值提升而是行为艺术。", genres: "克苏鲁/诡秘/超凡", works: "《诡秘之主》", phases: "触发→收集材料→完成仪式→扮演消化→新能力探索→结算", coolPoints: "揭示(35%) > 策略(25%) > 收集(20%) > 升级(20%)", hookStyle: "以'下一个序列是什么'为核心驱动，章尾常用信息揭示或世界观扩展收尾" },
+  { id: "case_driven", name: "超凡办案", desc: "主角隶属于超凡执法机构，通过办案积累功绩和资源。案件背后有核心阴谋串联，单元剧结构天然适配网文追读。", genres: "悬疑/探案/都市", works: "《大奉打更人》", phases: "接案→调查→遭遇超凡→推理→收网→论功行赏", coolPoints: "策略(35%) > 打脸(25%) > 揭示(20%) > 收集(20%)", hookStyle: "案件谜题+体制内晋升双线驱动，章尾以新线索或权力博弈收尾" },
+  { id: "cultivation_planning", name: "修真规划", desc: "传统修真体系，金手指放大资源获取效率。主角在每个境界完美规划/补齐辅修，同阶无敌+越级挑战的极致满足感。", genres: "仙侠/修真/古典", works: "《凡人修仙传》", phases: "触发→资源收集→闭关突破→出关验证→碾压对手→结算收获", coolPoints: "升级(35%) > 收集(30%) > 打脸(20%) > 策略(15%)", hookStyle: "以'下一个境界是什么'为长期钩子，章尾以突破预兆或敌人逼近收尾" },
+  { id: "hexagon_godhood", name: "六边形成神", desc: "主角需在武力/精神/势力/财富/知识/声望六维度逐一补全短板。每一步都从泥泞中爬起，反差感贯穿全书，最终登临神座。", genres: "西幻/史诗/黑暗", works: "《亵渎》", phases: "触发→受挫暴露短板→补全某维度→新能力形成→验证→结算", coolPoints: "策略(30%) > 升级(25%) > 揭示(20%) > 打脸(15%) > 收集(10%)", hookStyle: "以'下一个要补全的维度是什么'为驱动，章尾常用反转或代价揭示收尾" },
+  { id: "historical_transmigration", name: "穿越历史", desc: "穿越到特定历史时期，用前世知识+金手指改变历史进程、进行社会实验。五级递进舞台：个人→家族→地区→国家→文明方向。", genres: "历史/都市/科幻", works: "《庆余年》", phases: "触发→知识变现→势力崛起→改变格局→文明重建→结算", coolPoints: "策略(35%) > 打脸(25%) > 揭示(20%) > 升级(20%)", hookStyle: "以'主角的身世秘密'为长期钩子，章尾以政治博弈或身份揭示收尾" },
 ];
 
 interface PhaseDef {
@@ -93,14 +93,25 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-medium text-slate-700 mb-3">选择长篇架构</h3>
         <div className="grid grid-cols-3 gap-2.5">
-          {ARCH_TEMPLATES.map(arch => (
+          {ARCH_TEMPLATES.map(arch => {
+            const isSelected = selectedArch === arch.id;
+            return (
             <button key={arch.id} onClick={() => handleSelectArch(arch.id)}
-              className={cn("rounded-xl border p-3.5 text-left transition-all", selectedArch === arch.id ? "border-brand-400 bg-brand-50 ring-1 ring-brand-200" : "border-slate-200 bg-white hover:border-slate-300")}>
-              <div className={cn("text-sm font-semibold mb-1", selectedArch === arch.id ? "text-brand-800" : "text-slate-700")}>{arch.name}</div>
-              <div className="text-xs text-slate-500 leading-relaxed mb-1.5">{arch.desc}</div>
-              <div className="flex items-center gap-2 text-[10px] text-slate-400"><span>{arch.genres}</span><span className="text-brand-400">·</span><span className="italic">{arch.works}</span></div>
+              className={cn("rounded-xl border text-left transition-all", isSelected ? "border-slate-900 bg-slate-50 ring-1 ring-slate-300" : "border-slate-200 bg-white hover:border-slate-300")}>
+              <div className="p-3.5">
+                <div className={cn("text-sm font-semibold mb-1", isSelected ? "text-slate-900" : "text-slate-700")}>{arch.name}</div>
+                <div className="text-xs text-slate-500 leading-relaxed mb-1.5">{arch.desc}</div>
+                <div className="flex items-center gap-2 text-[10px] text-slate-400"><span>{arch.genres}</span><span className="text-slate-400">·</span><span className="italic">{arch.works}</span></div>
+              </div>
+              {isSelected && (
+                <div className="border-t border-slate-200 p-3 space-y-2 text-xs bg-white">
+                  <div><span className="font-medium text-slate-600">回环阶段：</span><span className="text-slate-500">{arch.phases}</span></div>
+                  <div><span className="font-medium text-slate-600">爽点配比：</span><span className="text-slate-500">{arch.coolPoints}</span></div>
+                  <div><span className="font-medium text-slate-600">钩子策略：</span><span className="text-slate-500">{arch.hookStyle}</span></div>
+                </div>
+              )}
             </button>
-          ))}
+          )})}
         </div>
         <button onClick={() => setShowLoopEditor(!showLoopEditor)} className="mt-3 flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800">
           {showLoopEditor ? <ChevronDown size={12} /> : <ChevronRight size={12} />}编辑回环阶段 ({phases.length}个阶段)

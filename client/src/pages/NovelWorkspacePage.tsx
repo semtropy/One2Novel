@@ -150,13 +150,13 @@ export function NovelWorkspacePage() {
                 <span className="text-xs text-slate-300">|</span>
                 <span className={cn(
                   "text-xs font-medium",
-                  completionReadiness.readinessVerdict === "ready" ? "text-green-500" :
-                  completionReadiness.readinessVerdict === "close" ? "text-accent-500" :
+                  completionReadiness.readyToComplete ? "text-green-500" :
+                  (completionReadiness.progressPercent ?? 0) >= 80 ? "text-accent-500" :
                   "text-slate-400",
-                )} title={`待回收伏笔: ${completionReadiness.unrecycledPayoffs} · 角色弧线: ${completionReadiness.characterArcsComplete}/${completionReadiness.totalCharacterArcs} · 预计剩余: ${completionReadiness.estimatedRemainingChapters ?? "?"}章`}>
-                  {completionReadiness.readinessVerdict === "ready" ? "可完本" :
-                   completionReadiness.readinessVerdict === "close" ? "接近完本" :
-                   `完本度 ${completionReadiness.completionPercent.toFixed(0)}%`}
+                )} title={`待回收伏笔: ${completionReadiness.unresolvedCount} · ${completionReadiness.recommendations?.join("；") ?? ""}`}>
+                  {completionReadiness.readyToComplete ? "可完本" :
+                   (completionReadiness.progressPercent ?? 0) >= 80 ? "接近完本" :
+                   `${completionReadiness.totalChapters}章已完成`}
                 </span>
               </>
             )}

@@ -126,7 +126,7 @@ export function PositioningDomain({ novelId, onComplete }: Props) {
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <h3 className="text-sm font-medium text-slate-700 mb-3">商业定位（点击字段可编辑）</h3>
             <div className="grid grid-cols-2 gap-3 text-xs">
-              {[["genre","题材",novel?.genre ?? ""],["targetAudience","目标读者",novel?.targetAudience ?? ""],["bookSellingPoint","核心卖点",novel?.bookSellingPoint ?? ""],["first30ChapterPromise","前30章承诺书",novel?.first30ChapterPromise ?? ""]].map(([field,label,value]) => (
+              {[["targetAudience","目标读者",novel?.targetAudience ?? ""],["bookSellingPoint","核心卖点",novel?.bookSellingPoint ?? ""],["first30ChapterPromise","前30章承诺书",novel?.first30ChapterPromise ?? ""]].map(([field,label,value]) => (
                 <div key={field as string} className="col-span-2">
                   <span className="text-slate-400">{label as string}：</span>
                   {editField === field ? (
