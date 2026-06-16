@@ -115,7 +115,7 @@ export function PlanningHubPage() {
         <div className="flex items-center gap-3">
           <TitleEditor novelId={novel.id} currentTitle={novel.title} />
           {novel.genre && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{novel.genre}</span>}
-          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-600 font-medium">长篇</span>
+          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700 font-medium">长篇</span>
         </div>
         <button
           onClick={handleEnterWriting}
@@ -142,10 +142,10 @@ export function PlanningHubPage() {
                     disabled={!isClickable}
                     className={cn(
                       "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-all",
-                      isActive && "bg-brand-600 text-white shadow-sm",
-                      isDone && "bg-green-50 text-green-700 border border-green-200",
-                      !isActive && !isDone && isClickable && "bg-white text-slate-500 border border-slate-200 hover:border-slate-300",
-                      !isClickable && "bg-white text-slate-300 border border-slate-100 cursor-not-allowed",
+                      isActive && "bg-slate-900 text-white shadow-sm",
+                      isDone && "bg-slate-700 text-white",
+                      !isActive && !isDone && isClickable && "bg-white text-slate-700 border border-slate-300 hover:border-slate-400",
+                      !isClickable && "bg-white text-slate-400 border border-slate-200 cursor-not-allowed",
                     )}
                     title={step.hint}
                   >
@@ -329,7 +329,7 @@ export function PlanningHubPage() {
               ) : (
                 <button
                   onClick={handleEnterWriting}
-                  className="flex items-center gap-1 rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+                  className="flex items-center gap-1 rounded-lg bg-slate-900 px-5 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors"
                 >
                   开始写作
                   <PenLine size={14} />
