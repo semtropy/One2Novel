@@ -45,11 +45,11 @@ export function ContextPanel(p: Props) {
   return (
     <div className="flex flex-col h-full">
       <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2 px-1">工具箱</h4>
-      <div className="grid grid-cols-3 gap-1">
+      <div className="flex flex-col gap-1.5">
         {PANELS.map(panel => (
           <button key={panel.key} onClick={() => setActive(panel.key)} disabled={!p.chapterId}
-            className="flex flex-col items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white p-2 transition-all hover:border-slate-400 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-            <panel.icon size={14} className="text-slate-500" />
+            className="flex flex-col items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white p-2.5 transition-all hover:border-slate-400 hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+            <panel.icon size={16} className="text-slate-600" />
             <span className="text-[10px] font-medium text-slate-500">{panel.label}</span>
           </button>
         ))}
