@@ -55,4 +55,5 @@ export type {
   ContentBeatProfile,
   LoopContentBeatPattern,
   ContentBeatAnnotation,
+  ReferenceProfileDetail,
 } from "./types/novel.js";

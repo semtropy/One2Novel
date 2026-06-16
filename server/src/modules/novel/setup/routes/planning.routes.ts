@@ -19,6 +19,7 @@ import {
 import architectureRoutes from "./planning/architecture.routes";
 import rhythmRoutes from "./planning/rhythm.routes";
 import referenceRoutes from "./planning/reference.routes";
+import referenceProfileRoutes from "./planning/reference-profile.routes";
 import beatSheetRoutes from "./planning/beat-sheet.routes";
 import auditRoutes from "./planning/audit.routes";
 
@@ -29,6 +30,7 @@ router.use("/", architectureRoutes);
 router.use("/", beatSheetRoutes);
 router.use("/", rhythmRoutes);
 router.use("/", referenceRoutes);
+router.use("/", referenceProfileRoutes);
 router.use("/", auditRoutes);
 
 // ─── Story Core ──────────────────────────────────────

@@ -375,6 +375,21 @@ export interface ContentBeatAnnotation {
   totalChapters: number;
 }
 
+export interface ReferenceProfileDetail {
+  id: string;
+  name: string;
+  architectureType?: string | null;
+  totalChapters?: number | null;
+  loopBoundaries?: string | null;
+  coolPointDensity?: string | null;
+  hookPatterns?: string | null;
+  goldenFingerBounds?: string | null;
+  contentBeatPatterns?: string | null;
+  writingAssets?: string | null;
+  settingTimeline?: string | null;
+  createdAt: string;
+}
+
 export interface CostSummary {
   totalInputTokens: number;
   totalOutputTokens: number;

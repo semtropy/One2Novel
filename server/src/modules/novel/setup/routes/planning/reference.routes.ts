@@ -33,6 +33,20 @@ router.delete("/:novelId/reference-book", async (req: Request, res: Response, ne
   } catch (e) { next(e); }
 });
 
+// Clear only file content, keep analysis results
+router.patch("/:novelId/reference-book", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const prisma = (await import("../../../../../platform/db/client")).getPrisma();
+    if (req.body.clearContent) {
+      await prisma.referenceBook.update({
+        where: { novelId: param(req, "novelId") },
+        data: { fileName: "", content: null, totalChapters: null },
+      });
+    }
+    res.json({ data: { ok: true } });
+  } catch (e) { next(e); }
+});
+
 router.put("/:novelId/reference-book/annotations", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const service = createReferenceBookService();

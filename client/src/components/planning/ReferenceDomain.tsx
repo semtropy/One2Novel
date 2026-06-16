@@ -43,8 +43,8 @@ export function ReferenceDomain({ novelId }: Props) {
   async function loadState() {
     try {
       const { data } = await api.get(`/novels/${novelId}/reference-book`);
-      if (!data.data?.fileName) return;
-      setFileName(data.data.fileName);
+      if (!data.data) return;
+      setFileName(data.data.fileName ?? "");
       const annot = typeof data.data.annotations === "string" ? JSON.parse(data.data.annotations) : (data.data.annotations ?? {});
       const nd: AnalysisState = {};
       if (annot.loopBoundaries?.length > 0) nd.loops = true;
@@ -85,7 +85,12 @@ export function ReferenceDomain({ novelId }: Props) {
   }
 
   async function handleRemove() {
-    try { await api.delete(`/novels/${novelId}/reference-book`); setFileName(""); setDone({}); setStats(null); setAnnotData({}); qc.invalidateQueries({ queryKey: ["novel", novelId] }); } catch {}
+    if (!window.confirm("移除参考书文本？分析结果将保留。")) return;
+    try {
+      await api.patch(`/novels/${novelId}/reference-book`, { clearContent: true });
+      setFileName("");
+      qc.invalidateQueries({ queryKey: ["novel", novelId] });
+    } catch {}
   }
 
   async function handleApplyArchitecture() {
