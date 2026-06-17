@@ -35,7 +35,7 @@ router.post("/", async (req, res, next) => {
     if (!data.genre && prefs.favoriteGenre) data.genre = prefs.favoriteGenre;
     if (!data.defaultChapterLength && prefs.defaultChapterLength) data.defaultChapterLength = prefs.defaultChapterLength;
     if (!data.estimatedChapterCount && prefs.estimatedChapterCount) data.estimatedChapterCount = prefs.estimatedChapterCount;
-    const novel = await repo.create({ title: input.title, description: input.description, genre: data.genre as string | undefined, writingScale: (data.writingScale as string) ?? "long", narrativePov: data.narrativePov as "first_person" | "third_person" | "mixed" | undefined, pacePreference: data.pacePreference as string | undefined, styleTone: data.styleTone as string | undefined, defaultChapterLength: data.defaultChapterLength as number | undefined, estimatedChapterCount: data.estimatedChapterCount as number | undefined });
+    const novel = await repo.create({ title: input.title, description: input.description, genre: data.genre as string | undefined, writingScale: (data.writingScale as string) ?? "long", narrativePov: data.narrativePov as "first_person" | "third_person" | "mixed" | undefined, pacePreference: data.pacePreference as string | undefined, tonePitch: data.styleTone as string | undefined, defaultChapterLength: data.defaultChapterLength as number | undefined, estimatedChapterCount: data.estimatedChapterCount as number | undefined });
     recordCreation({ title: novel.title, genre: novel.genre ?? undefined, createdAt: novel.createdAt });
     res.status(201).json({ data: novel });
   } catch (e) { next(e); }

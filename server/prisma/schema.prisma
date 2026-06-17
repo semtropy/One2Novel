@@ -57,7 +57,7 @@ model Novel {
   // Creative parameters
   narrativePov          NarrativePov?
   pacePreference        String? // slow | balanced | fast
-  styleTone             String?
+  tonePitch             String?  @map("styleTone")  // renamed: "tone" describes prose register, not StyleProfile engine
   emotionIntensity      String? // low | medium | high
   defaultChapterLength  Int?
   estimatedChapterCount Int?

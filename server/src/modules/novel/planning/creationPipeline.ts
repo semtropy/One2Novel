@@ -94,7 +94,7 @@ export class CreationPipeline {
       select: {
         storySummary: true, centralQuestion: true, endingDirection: true,
         genre: true, narrativePov: true, pacePreference: true,
-        styleTone: true, emotionIntensity: true,
+        tonePitch: true, emotionIntensity: true,
         targetAudience: true, bookSellingPoint: true, commercialTags: true,
         competingFeel: true, first30ChapterPromise: true,
         goldenFinger: true, architectureType: true, loopSkeleton: true,

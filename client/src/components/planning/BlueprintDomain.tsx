@@ -2,8 +2,8 @@
  * BlueprintDomain — 章节蓝图决策域
  * 回环泳道 → 卷展开 → 生成模式切换
  */
-import { useState } from "react";
-import { Sparkles, RefreshCw, Zap, Check, Loader2, CheckCircle, Scale } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Sparkles, RefreshCw, Zap, Check, Loader2, CheckCircle, Scale, GripVertical } from "lucide-react";
 import { useNovel, useRebalanceVolume } from "../../api/novel";
 import { api } from "../../app/api";
 import { cn } from "../../lib/cn";
@@ -60,6 +60,24 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
 
   const [expandError, setExpandError] = useState("");
   const rebalance = useRebalanceVolume();
+
+  // Timeline (moved from PositioningDomain)
+  const [timelineItems, setTimelineItems] = useState<Array<{ title: string; category: string; sortOrder: number; status?: string }>>([]);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  useEffect(() => {
+    if (novel?.timelineItems) setTimelineItems([...novel.timelineItems].sort((a, b) => a.sortOrder - b.sortOrder));
+  }, [novel?.timelineItems]);
+  const handleDragStart = (idx: number) => setDragIdx(idx);
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+  const handleDrop = (targetIdx: number) => {
+    if (dragIdx === null || dragIdx === targetIdx) return;
+    const reordered = [...timelineItems];
+    const [moved] = reordered.splice(dragIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+    const updated = reordered.map((item, i) => ({ ...item, sortOrder: i + 1 }));
+    setTimelineItems(updated); setDragIdx(null);
+    updated.forEach(item => { api.patch(`/novels/${novelId}/timeline/${item.title}`, { sortOrder: item.sortOrder }).catch(() => {}); });
+  };
 
   const handleExpandVolume = async (volumeOrder: number) => {
     setExpandingLoop(volumeOrder);
@@ -212,6 +230,24 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
             </div>
           ))}
         </section>
+      )}
+
+      {/* ── Setting Release Plan (moved from PositioningDomain) ── */}
+      {timelineItems.length > 0 && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 mt-4">
+          <h3 className="text-sm font-medium text-slate-700 mb-3">设定释放计划</h3>
+          <div className="space-y-1">
+            {timelineItems.filter(t => t.category !== "event").slice(0, 12).map((item, i) => (
+              <div key={i} draggable onDragStart={() => handleDragStart(i)} onDragOver={handleDragOver} onDrop={() => handleDrop(i)}
+                className={`flex items-center gap-2 rounded bg-slate-50 px-3 py-1.5 text-xs cursor-grab ${dragIdx === i ? "bg-brand-50 border border-brand-200" : ""}`}>
+                <GripVertical size={10} className="text-slate-300 shrink-0" />
+                <span className={cn("shrink-0 rounded-full w-2 h-2", item.category === "constraint" ? "bg-red-400" : item.category === "milestone" ? "bg-brand-400" : item.category === "deadline" ? "bg-accent-400" : "bg-blue-400")} />
+                <span className="font-medium text-slate-600 flex-1 truncate">{item.title}</span>
+                <span className="text-slate-400 shrink-0">第{item.sortOrder}章</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

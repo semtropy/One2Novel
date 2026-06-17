@@ -1,6 +1,6 @@
 /**
- * StoryCoreDomain — 故事核心决策域
- * 灵感输入 + AI 生成故事核心 + 编辑题材/视角/节奏/情感强度
+ * @deprecated Use FoundationDomain instead — it consolidates story core + golden finger + commercial positioning.
+ * This component is kept for backward compatibility but is no longer rendered in the 4-step pipeline.
  */
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Sparkles } from "lucide-react";
