@@ -121,6 +121,21 @@ export const SKILL_LITERARY = `
 
 export type ChapterPosition = "first" | "early" | "climax" | "transition" | "normal";
 
+/**
+ * Detect chapter position from its order and total count.
+ * Used to select appropriate skill modules for each chapter type.
+ */
+export function detectChapterPosition(
+  chapterOrder: number,
+  totalChapters: number,
+): ChapterPosition {
+  if (chapterOrder <= 1) return "first";
+  if (chapterOrder <= 10) return "early";
+  if (chapterOrder >= totalChapters * 0.8) return "climax";
+  if (chapterOrder > 10 && chapterOrder < totalChapters * 0.5 && chapterOrder % 5 === 0) return "transition";
+  return "normal";
+}
+
 /** Select Skill modules based on chapter position to optimize token budget */
 export function getSkillModulesForPosition(position: ChapterPosition): string[] {
   switch (position) {

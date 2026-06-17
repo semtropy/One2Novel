@@ -8,9 +8,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   BookOpen, GitBranch, Users, Map, Target,
-  PenLine, ChevronRight, ChevronLeft, CheckCircle, Upload, Sparkles,
+  PenLine, ChevronRight, ChevronLeft, CheckCircle, Sparkles,
 } from "lucide-react";
-import { useNovel } from "../api/novel";
+import { useNovel, useGenerateGoldenFinger } from "../api/novel";
 import { api } from "../app/api";
 import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
@@ -18,7 +18,6 @@ import { cn } from "../lib/cn";
 
 // Domain panels
 import { StoryCoreDomain } from "../components/planning/StoryCoreDomain";
-import { ReferenceDomain } from "../components/planning/ReferenceDomain";
 import { ArchitectureDomain } from "../components/planning/ArchitectureDomain";
 import { WorldPanel } from "../components/planning/WorldPanel";
 import { CharactersDomain } from "../components/planning/CharactersDomain";
@@ -27,7 +26,7 @@ import { PositioningDomain } from "../components/planning/PositioningDomain";
 
 const STEPS = [
   { id: "input",        label: "创作起点", icon: BookOpen,    hint: "故事核心 · 世界规则 · 金手指设定" },
-  { id: "architecture", label: "架构选择", icon: GitBranch,   hint: "内置架构模板 · 参考书分析" },
+  { id: "architecture", label: "架构选择", icon: GitBranch,   hint: "内置模板 + 参考书定制架构 · 回环阶段编辑" },
   { id: "characters",   label: "角色阵容", icon: Users,       hint: "AI 生成角色 · 设置功能标签 · 编辑关系网络" },
   { id: "blueprint",    label: "章节蓝图", icon: Map,         hint: "生成回环骨架 · 逐卷展开 · 章节分配" },
   { id: "calibration",  label: "发布定位", icon: Target,      hint: "商业定位 · 爽点配方 · 期待管理" },
@@ -185,27 +184,9 @@ export function PlanningHubPage() {
                 </div>
               )}
 
-              {/* Step 1: 架构选择 — 内置架构 | 参考书分析 */}
+              {/* Step 1: 架构选择 — 统一视图（内置模板 + 参考书定制架构）*/}
               {currentStep === 1 && (
-                <div className="space-y-4">
-                  <div className="flex gap-1 border-b border-slate-100 pb-2">
-                    <button onClick={() => setSubTab("arch")}
-                      className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        subTab === "arch" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
-                      <GitBranch size={12} />内置架构
-                    </button>
-                    <button onClick={() => setSubTab("reference")}
-                      className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        subTab === "reference" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
-                      <Upload size={12} />参考书分析
-                    </button>
-                  </div>
-                  {subTab === "arch" ? (
-                    <ArchitectureDomain novelId={novel.id} onComplete={() => onStepComplete(1)} />
-                  ) : (
-                    <ReferenceDomain novelId={novel.id} />
-                  )}
-                </div>
+                <ArchitectureDomain novelId={novel.id} onComplete={() => onStepComplete(1)} />
               )}
 
               {/* Step 2: 角色阵容 */}
@@ -284,13 +265,16 @@ export function PlanningHubPage() {
 
 function GoldenFingerPanel({ novelId }: { novelId: string }) {
   const { data: novel } = useNovel(novelId);
+  const generate = useGenerateGoldenFinger();
   const [abilities, setAbilities] = useState("");
   const [limits, setLimits] = useState("");
+  const [gfName, setGfName] = useState("");
 
   useEffect(() => {
     if (novel?.goldenFinger) {
       try {
         const gf = JSON.parse(novel.goldenFinger);
+        if (gf.goldenFingerName) setGfName(gf.goldenFingerName);
         if (Array.isArray(gf.abilities)) setAbilities(gf.abilities.join("\n"));
         if (Array.isArray(gf.limits)) setLimits(gf.limits.join("\n"));
       } catch {}
@@ -300,12 +284,28 @@ function GoldenFingerPanel({ novelId }: { novelId: string }) {
   async function handleSave() {
     const abilityList = abilities.split("\n").filter(Boolean);
     const limitList = limits.split("\n").filter(Boolean);
-    await api.patch(`/novels/${novelId}`, { goldenFinger: JSON.stringify({ abilities: abilityList, limits: limitList }) });
+    await api.patch(`/novels/${novelId}`, { goldenFinger: JSON.stringify({ goldenFingerName: gfName, abilities: abilityList, limits: limitList }) });
+  }
+
+  async function handleGenerate() {
+    const result = await generate.mutateAsync(novelId);
+    setGfName(result.goldenFingerName);
+    setAbilities(result.abilities.join("\n"));
+    setLimits(result.limits.join("\n"));
+    // Auto-save after generation
+    await api.patch(`/novels/${novelId}`, { goldenFinger: JSON.stringify(result) });
   }
 
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-500">设定主角的独特能力及其边界——网文最核心的爽点引擎。能力的稀缺感和代价感比能力本身更重要。</p>
+      <div className="flex items-center gap-2">
+        <button onClick={handleGenerate} disabled={generate.isPending}
+          className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50">
+          <Sparkles size={12} />{generate.isPending ? "AI 生成中..." : "AI 生成金手指"}
+        </button>
+        {gfName && <span className="text-xs font-medium text-slate-700">名称：{gfName}</span>}
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <span className="text-xs font-medium text-slate-500">能力清单</span>

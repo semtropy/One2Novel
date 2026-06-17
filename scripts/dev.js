@@ -35,7 +35,6 @@ process.on("exit", cleanup);
 console.log("Starting One2Novel...\n");
 
 // Find pnpm location and run
-const whichPnpm = (await import("node:child_process")).execSync;
 let pnpmCmd = "pnpm";
 try {
   // Prefer local pnpm

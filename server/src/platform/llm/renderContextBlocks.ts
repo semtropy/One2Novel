@@ -1,10 +1,11 @@
-import type { PromptRenderContext } from "./promptTypes";
+import type { PromptContextBlock } from "./promptTypes";
 
-export function renderSelectedContextBlocks(context: PromptRenderContext, emptyLabel = "none"): string {
-  if (context.blocks.length === 0) {
+/** Join selected context blocks into a single user-prompt string */
+export function renderSelectedContextBlocks(blocks: PromptContextBlock[], emptyLabel = "none"): string {
+  if (blocks.length === 0) {
     return emptyLabel;
   }
-  return context.blocks
+  return blocks
     .map((block) => block.content.trim())
     .filter(Boolean)
     .join("\n\n");

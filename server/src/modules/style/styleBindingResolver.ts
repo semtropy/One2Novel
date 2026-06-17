@@ -33,6 +33,8 @@ export interface ResolvedStyleRules {
   maturity: "summary_only" | "partial" | "full";
   /** Dedup stats */
   dedupStats: { total: number; kept: number; dropped: number };
+  /** Resolved bindings (for UI display, avoids double DB query) */
+  bindings: ResolvedBinding[];
 }
 
 /**
@@ -130,7 +132,8 @@ export async function mergeStyleRules(
 
     for (const field of RULE_FIELDS) {
       try {
-        const arr: string[] = JSON.parse((profile as Record<string, string>)[field] ?? "[]");
+        const raw: string | null = profile[field] ?? null;
+        const arr: unknown = raw ? JSON.parse(raw) : [];
         if (!Array.isArray(arr)) continue;
 
         for (const ruleText of arr) {
@@ -182,5 +185,6 @@ export async function mergeStyleRules(
     primaryProfileName,
     maturity: compiled.maturity,
     dedupStats: compiled.dedupStats,
+    bindings,  // Return already-fetched bindings to avoid double DB query
   };
 }

@@ -11,7 +11,7 @@ import { type WorkspaceDiagnosis } from "../api/revision";
 import { DirectorPanel } from "../components/workspace/DirectorPanel";
 import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
-import { AlertTriangle, PenLine, Trash2, Plus, ShieldCheck } from "lucide-react";
+import { AlertTriangle, PenLine, Trash2, Plus } from "lucide-react";
 import { cn } from "../lib/cn";
 
 export function NovelWorkspacePage() {

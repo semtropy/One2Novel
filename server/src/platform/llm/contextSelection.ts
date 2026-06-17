@@ -1,9 +1,8 @@
-import type { ContextPolicy, PromptContextBlock } from "./promptTypes";
+import type { PromptContextBlock } from "./promptTypes";
 
 export interface ContextSelectionResult {
   selectedBlocks: PromptContextBlock[];
   droppedBlockIds: string[];
-  summarizedBlockIds: string[];
   estimatedTokens: number;
 }
 
@@ -11,8 +10,11 @@ export interface ContextSelectionResult {
  * Select context blocks: deduplicate by conflictGroup, sort by priority,
  * and return ALL blocks (no token budget trimming).
  * Quality over token savings — modern models have large context windows.
+ *
+ * Long-novel context management is handled by tieredCompressionService,
+ * not by token-level trimming here.
  */
-export function selectContextBlocks(blocks: PromptContextBlock[], _policy: ContextPolicy): ContextSelectionResult {
+export function selectContextBlocks(blocks: PromptContextBlock[]): ContextSelectionResult {
   const normalizedBlocks = blocks.filter((block) => block.content.trim().length > 0 && block.estimatedTokens > 0);
   const deduped = dedupeConflictBlocks(normalizedBlocks);
 
@@ -22,7 +24,6 @@ export function selectContextBlocks(blocks: PromptContextBlock[], _policy: Conte
   return {
     selectedBlocks,
     droppedBlockIds: deduped.droppedIds,
-    summarizedBlockIds: [],
     estimatedTokens,
   };
 }
@@ -66,4 +67,33 @@ function dedupeConflictBlocks(blocks: PromptContextBlock[]): { kept: PromptConte
   }
 
   return { kept: [...kept, ...byConflictGroup.values()], droppedIds };
+}
+
+/** Simple character-based token estimate: Chinese chars ~1.5 tokens, English ~4 chars/token */
+function estimateTextTokens(text: string): number {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return 0;
+  return Math.max(1, Math.ceil(normalized.length / 4));
+}
+
+/** Factory for creating a PromptContextBlock with auto-estimated tokens */
+export function createContextBlock(input: {
+  id: string;
+  group: string;
+  priority: number;
+  required?: boolean;
+  content: string;
+  conflictGroup?: string;
+  freshness?: number;
+}): PromptContextBlock {
+  return {
+    id: input.id,
+    group: input.group,
+    priority: input.priority,
+    required: input.required ?? false,
+    content: input.content.trim(),
+    estimatedTokens: estimateTextTokens(input.content),
+    conflictGroup: input.conflictGroup,
+    freshness: input.freshness,
+  };
 }

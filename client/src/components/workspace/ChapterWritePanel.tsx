@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { RefreshCw, XCircle, Play, Save, Download, X, ChevronDown, Lightbulb } from "lucide-react";
 import { api } from "../../app/api";
-import { useNovel } from "../../api/novel";
+import { useNovel, useOptimizeChapter } from "../../api/novel";
 import { type RevisionOperation } from "../../api/revision";
 import { ChapterEditor } from "./ChapterEditor";
 import { RevisionToolbar } from "./RevisionToolbar";
@@ -43,6 +43,8 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
   const [inlineSuggestion, setInlineSuggestion] = useState<{ suggestion: string; severity: string; focus: string } | null>(null);
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestPos, setSuggestPos] = useState<{ top: number; left: number } | null>(null);
+  const optimize = useOptimizeChapter();
+  const [optimizeResult, setOptimizeResult] = useState<string | null>(null);
 
   async function handleInlineSuggest(paragraphs: string[], pos: { top: number; left: number }) {
     if (!paragraphs.length) return;
@@ -258,6 +260,15 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
             )}
           </div>
           <button onClick={handleSave} disabled={generating || !isDirty} className={cn("flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium", !isDirty ? "bg-slate-200 text-slate-400" : "bg-slate-800 text-white hover:bg-slate-700")}><Save size={12} />保存</button>
+          {hasContent && chapter?.chapterStatus !== "completed" && (
+            <button onClick={async () => { const r = await optimize.mutateAsync({ novelId, chapterId }); setContent(r.optimizedContent); setOptimizeResult(r.changesSummary); }}
+              disabled={optimize.isPending}
+              className="flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              title="AI优化当前草稿（保留钩子、伏笔和角色状态）">
+              <Lightbulb size={12} />{optimize.isPending ? "优化中..." : "草稿优化"}
+            </button>
+          )}
+          {optimizeResult && <span className="text-[10px] text-green-600 max-w-[120px] truncate">{optimizeResult}</span>}
           <button onClick={() => setShowExport(true)} className="flex items-center gap-1 rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-slate-700"><Download size={12} />导出</button>
         </div>
       </div>

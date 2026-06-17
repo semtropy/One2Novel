@@ -198,6 +198,57 @@ router.post("/:novelId/volumes/:volumeId/chapters/:chapterOrder/contract", async
   } catch (e) { next(e); }
 });
 
+// ─── Golden Finger AI Generation ──────────────────────
+
+router.post("/:novelId/golden-finger/generate", async (req, res, next) => {
+  try {
+    const novelId = req.params.novelId;
+    const prisma = getPrisma();
+    const novel = await prisma.novel.findUnique({
+      where: { id: novelId },
+      select: {
+        storySummary: true, centralQuestion: true, endingDirection: true,
+        genre: true, architectureType: true, description: true,
+        worldRules: { select: { category: true, title: true, content: true }, where: { status: "active" } },
+      },
+    });
+    if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Novel not found" } }); return; }
+
+    const { aiInvoke } = await import("../../../../platform/llm/aiService");
+    const { z } = await import("zod");
+
+    const GoldenFingerOutput = z.object({
+      goldenFingerName: z.string(),
+      abilities: z.array(z.string()),
+      limits: z.array(z.string()),
+    });
+
+    const result = await aiInvoke({
+      assetId: "novel.golden-finger.generate",
+      userPrompt: [
+        novel.storySummary ? `故事简介：${novel.storySummary}` : "",
+        novel.centralQuestion ? `核心悬念：${novel.centralQuestion}` : "",
+        novel.endingDirection ? `结局方向：${novel.endingDirection}` : "",
+        novel.genre ? `题材：${novel.genre}` : "",
+        novel.architectureType ? `架构类型：${novel.architectureType}` : "",
+        novel.description ? `灵感描述：${novel.description}` : "",
+        novel.worldRules.length > 0 ? `世界规则：${novel.worldRules.map(r => `[${r.category}] ${r.title}: ${r.content}`).join("\n")}` : "",
+      ].filter(Boolean).join("\n"),
+      schema: GoldenFingerOutput,
+      temperature: 0.8,
+      novelId,
+    });
+
+    // Persist to DB
+    await prisma.novel.update({
+      where: { id: novelId },
+      data: { goldenFinger: JSON.stringify(result) },
+    });
+
+    res.json({ data: result });
+  } catch (e) { next(e); }
+});
+
 // ─── World Reference (Phase 2.7) ─────────────────────
 
 router.post("/:novelId/world-rules/reference", async (req, res, next) => {

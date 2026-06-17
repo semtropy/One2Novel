@@ -1,5 +1,5 @@
 import { getPrisma } from "../../platform/db/client";
-import { mergeStyleRules, resolveBindings } from "./styleBindingResolver";
+import { mergeStyleRules } from "./styleBindingResolver";
 import type { ResolvedStyleRules } from "./styleBindingResolver";
 
 /**
@@ -42,17 +42,15 @@ export async function resolveStyleContext(
   novelId: string,
   chapterId?: string,
 ) {
-  const [rules, bindings] = await Promise.all([
-    mergeStyleRules(novelId, chapterId ?? undefined),
-    resolveBindings(novelId, chapterId ?? undefined),
-  ]);
+  // mergeStyleRules internally fetches bindings — reuse to avoid double DB query
+  const rules = await mergeStyleRules(novelId, chapterId ?? undefined);
 
   // Extract overallDescription from primary binding's profile
   let summary = "";
+  const bindings = rules.bindings;
   if (bindings.length > 0) {
-    const primary = bindings[0];
     const prisma = getPrisma();
-    const profile = await prisma.styleProfile.findUnique({ where: { id: primary.styleProfileId }, select: { extractedFeatures: true } });
+    const profile = await prisma.styleProfile.findUnique({ where: { id: bindings[0].styleProfileId }, select: { extractedFeatures: true } });
     if (profile?.extractedFeatures) {
       try { summary = JSON.parse(profile.extractedFeatures).overallDescription ?? ""; } catch {}
     }

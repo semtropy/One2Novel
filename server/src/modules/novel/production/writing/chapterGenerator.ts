@@ -3,8 +3,7 @@ import { createLLM } from "../../../../platform/llm/provider";
 import { getPreferredProvider, compileAsset } from "../../../../platform/llm/aiService";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { assembleChapterBlocks } from "../context/contextBlockBuilders";
-import { injectSkillRules, getSkillModulesForPosition } from "../../../../platform/llm/skillRules";
-import { detectChapterPosition } from "../../../../platform/llm/promptBudgetProfiles";
+import { injectSkillRules, getSkillModulesForPosition, detectChapterPosition } from "../../../../platform/llm/skillRules";
 export interface ChapterGenerateOptions {
   /** AbortSignal for client-disconnect scenarios (SSE) */
   signal?: AbortSignal;

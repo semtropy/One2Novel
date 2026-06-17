@@ -190,11 +190,11 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
                 <span className="text-sm font-medium text-slate-700">第{vol.sortOrder}卷 · {vol.title}</span>
                 <span className="text-xs text-slate-400">{vol.chapterPlans.length}章</span>
                 <div className="flex-1" />
-                <button onClick={async () => { try { await rebalance.mutateAsync({ novelId, sortOrder: vol.sortOrder }); refetch(); } catch {} }}
+                <button onClick={async () => { try { const r = await rebalance.mutateAsync({ novelId, sortOrder: vol.sortOrder }); refetch(); } catch {} }}
                   disabled={rebalance.isPending}
                   className="flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-[10px] text-slate-400 hover:text-brand-600 hover:border-brand-300 disabled:opacity-50"
-                  title="根据已写章节重新平衡后续章节">
-                  <Scale size={10} />重平衡
+                  title="根据已写章节重新平衡后续章节（自动应用调整）">
+                  <Scale size={10} />{rebalance.isPending ? "重平衡中..." : "重平衡"}
                 </button>
               </div>
               <div className="p-2">

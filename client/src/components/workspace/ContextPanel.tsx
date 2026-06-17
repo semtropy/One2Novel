@@ -266,7 +266,7 @@ function PayoffPanel({ novelId, chapterId }: { novelId: string; chapterId: strin
 
 function CharacterPanel({ novelId, chapterId }: { novelId: string; chapterId: string }) {
   const { data: novel } = useNovel(novelId);
-  const chars: Array<{ id: string; name: string; role: string; currentGoal?: string; currentStatus?: string; currentLocation?: string; voiceTexture?: string; identityLabel?: string; factionLabel?: string }> = (novel as any)?.characters ?? [];
+  const chars = novel?.characters ?? [];
   const active = chars.filter(c => c.currentStatus || c.currentGoal);
   const [detailCharId, setDetailCharId] = useState<string | null>(null);
   const { data: resources } = useCharacterResources(novelId, detailCharId ?? undefined);
@@ -308,12 +308,12 @@ function CharacterPanel({ novelId, chapterId }: { novelId: string; chapterId: st
 function TimelinePanel({ novelId, chapterId, chapterOrder }: { novelId: string; chapterId: string; chapterOrder?: number }) {
   const { data: novel, refetch } = useNovel(novelId);
   const qc = useQueryClient();
-  const timelines: Array<{ title: string; category: string; sortOrder: number; status?: string }> = (novel as any)?.timelineItems ?? [];
+  const timelines = novel?.timelineItems ?? [];
   const { data: reminders } = useTimelineReminders(novelId, chapterOrder);
   const [conflicts, setConflicts] = useState<Array<{ description: string }>>([]);
   const [checking, setChecking] = useState(false);
   const [reExtracting, setReExtracting] = useState(false);
-  const hasContent = !!((novel as any)?.chapters?.find((c: any) => c.id === chapterId)?.content?.length > 100);
+  const hasContent = !!(novel?.chapters?.find(c => c.id === chapterId)?.content && (novel.chapters.find(c => c.id === chapterId)!.content!.length > 100));
 
   async function handleReExtract() {
     if (reExtracting || !chapterId) return; setReExtracting(true);
@@ -357,9 +357,9 @@ function ReviewPanel({ novelId, chapterId, quality, diagnosis, reviewing, onRevi
   novelId: string; chapterId: string; quality: Record<string, unknown> | null; diagnosis: WorkspaceDiagnosis | null; reviewing: boolean; onReview: () => void;
 }) {
   const { data: novel } = useNovel(novelId);
-  const chapter = (novel as any)?.chapters?.find((c: any) => c.id === chapterId);
-  const scores = quality ?? (chapter?.qualityScore > 0 ? { openingScore: chapter.openingScore, plotScore: chapter.plotScore, characterScore: chapter.characterScore, dialogueScore: chapter.dialogueScore, suspenseScore: chapter.suspenseScore, pacingScore: chapter.pacingScore, showNotTellScore: chapter.showNotTellScore, languageScore: chapter.languageScore, genreScore: chapter.genreScore, coherenceScore: chapter.coherenceScore } : null);
-  const total = scores ? Object.values(scores as Record<string,number>).reduce((a,b) => a+(b||0), 0) : 0;
+  const chapter = novel?.chapters?.find(c => c.id === chapterId);
+  const scores = quality ?? (chapter?.qualityScore && chapter.qualityScore > 0 ? { openingScore: chapter.openingScore, plotScore: chapter.plotScore, characterScore: chapter.characterScore, dialogueScore: chapter.dialogueScore, suspenseScore: chapter.suspenseScore, pacingScore: chapter.pacingScore, showNotTellScore: chapter.showNotTellScore, languageScore: chapter.languageScore, genreScore: chapter.genreScore, coherenceScore: chapter.coherenceScore } : null);
+  const total = scores ? Object.values(scores).reduce((a: number, b) => a + (typeof b === 'number' ? b : 0), 0) : 0;
   const displayDiagnosis = diagnosis ?? (() => { try { return chapter?.diagnosis ? JSON.parse(chapter.diagnosis) : null; } catch { return null; } })();
 
   return (
@@ -371,9 +371,11 @@ function ReviewPanel({ novelId, chapterId, quality, diagnosis, reviewing, onRevi
         <>
           <div className="text-slate-600">总分 <span className="font-bold text-slate-800">{total}</span>/100</div>
           <div className="space-y-0.5">
-            {[["开头吸引力","openingScore"],["情节推进","plotScore"],["人物塑造","characterScore"],["对话质量","dialogueScore"],["悬念设置","suspenseScore"],["节奏控制","pacingScore"],["展示而非讲述","showNotTellScore"],["语言质量","languageScore"],["题材适应度","genreScore"],["跨章连贯性","coherenceScore"]].map(([l,k]) => (
-              <div key={l} className="flex items-center gap-2"><span className="w-16 text-right text-slate-500 shrink-0">{l}</span><div className="flex-1 h-1.5 bg-slate-100 rounded-full"><div className={cn("h-full rounded-full", (scores as any)[k]>=7?"bg-green-400":(scores as any)[k]>=5?"bg-accent-400":"bg-red-400")} style={{width:`${(scores as any)[k]*10}%`}}/></div><span className="w-3 text-right font-medium">{(scores as any)[k]}</span></div>
-            ))}
+            {[["开头吸引力","openingScore"],["情节推进","plotScore"],["人物塑造","characterScore"],["对话质量","dialogueScore"],["悬念设置","suspenseScore"],["节奏控制","pacingScore"],["展示而非讲述","showNotTellScore"],["语言质量","languageScore"],["题材适应度","genreScore"],["跨章连贯性","coherenceScore"]].map(([l,k]) => {
+              const v = typeof scores?.[k] === 'number' ? scores[k] as number : 0;
+              return (
+              <div key={l} className="flex items-center gap-2"><span className="w-16 text-right text-slate-500 shrink-0">{l}</span><div className="flex-1 h-1.5 bg-slate-100 rounded-full"><div className={cn("h-full rounded-full", v>=7?"bg-green-400":v>=5?"bg-accent-400":"bg-red-400")} style={{width:`${v*10}%`}}/></div><span className="w-3 text-right font-medium">{v}</span></div>
+            )})}
           </div>
           {displayDiagnosis?.cards?.length > 0 && (
             <div className="space-y-1">

@@ -1,9 +1,10 @@
 /**
- * ArchitectureDomain — 长篇架构决策域
- * 架构模板选择 → 回环阶段编辑器 → 金手指设定 → 终局悬念
+ * ArchitectureDomain — 长篇架构决策域（统一视图）
+ * 内置架构模板 + 参考书分析结果 → 同一组可选架构卡片 → 回环阶段编辑器（默认展开）
  */
 import { useState, useEffect } from "react";
-import { Sparkles, ChevronDown, ChevronRight, ArrowUp, ArrowDown, Plus, X, Save, RefreshCw, CheckCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Sparkles, ArrowUp, ArrowDown, Plus, X, Save, RefreshCw, CheckCircle, GitBranch, BookOpen, ArrowRight } from "lucide-react";
 import { useNovel, useUpdateNovel } from "../../api/novel";
 import { api } from "../../app/api";
 import { cn } from "../../lib/cn";
@@ -19,25 +20,47 @@ const ARCH_TEMPLATES = [
   { id: "historical_transmigration", name: "穿越历史", desc: "穿越到特定历史时期，用前世知识+金手指改变历史进程、进行社会实验。五级递进舞台：个人→家族→地区→国家→文明方向。", genres: "历史/都市/科幻", works: "《庆余年》", phases: "触发→知识变现→势力崛起→改变格局→文明重建→结算", coolPoints: "策略(35%) > 打脸(25%) > 揭示(20%) > 升级(20%)", hookStyle: "以'主角的身世秘密'为长期钩子，章尾以政治博弈或身份揭示收尾" },
 ];
 
+const ARCH_LABELS: Record<string, string> = {
+  skill_slot:"技能栏搭配", sequence_promotion:"序列晋升", case_driven:"超凡办案",
+  cultivation_planning:"修真规划", hexagon_godhood:"六边形成神", historical_transmigration:"穿越历史",
+};
+
 interface PhaseDef {
   phase: string; label: string; description: string; typicalChapterCount: [number, number];
 }
 
+interface ProfileItem {
+  id: string; name: string; architectureType?: string | null; totalChapters?: number | null;
+  loopBoundaries?: string | null; coolPointDensity?: string | null; hookPatterns?: string | null; createdAt: string;
+}
+
 export function ArchitectureDomain({ novelId, onComplete }: Props) {
+  const navigate = useNavigate();
   const { data: novel, refetch } = useNovel(novelId);
   const updateNovel = useUpdateNovel();
+
   const [selectedArch, setSelectedArch] = useState(novel?.architectureType ?? "");
-  const [showLoopEditor, setShowLoopEditor] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState(novel?.activeProfileId ?? "");
+
+  // Loop phase editor
   const [phases, setPhases] = useState<PhaseDef[]>([]);
   const [phasesLoaded, setPhasesLoaded] = useState(false);
   const [savingPhases, setSavingPhases] = useState(false);
   const [phaseError, setPhaseError] = useState("");
+
+  // Reference profiles
+  const [profiles, setProfiles] = useState<ProfileItem[]>([]);
+
+  // Confirm button state
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Init from novel
   useEffect(() => { if (novel?.architectureType && !selectedArch) setSelectedArch(novel.architectureType); }, [novel?.architectureType]);
+  useEffect(() => { if (novel?.activeProfileId) setSelectedProfileId(novel.activeProfileId); }, [novel?.activeProfileId]);
 
+  // Load loop definition
   useEffect(() => {
     if (!novelId || phasesLoaded) return;
     api.get(`/novels/${novelId}/loop-definition`).then(({ data }) => {
@@ -46,13 +69,32 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
     }).catch(() => setPhasesLoaded(true));
   }, [novelId, phasesLoaded]);
 
-  const handleSelectArch = async (archId: string) => {
+  // Load reference profiles
+  useEffect(() => {
+    api.get("/profiles").then(({ data }) => setProfiles(data.data ?? [])).catch(() => {});
+  }, []);
+
+  // ── Handlers ─────────────────────────────────────
+
+  const handleSelectBuiltin = async (archId: string) => {
     setSelectedArch(archId);
+    setSelectedProfileId("");
+    // Clear reference profile binding
+    if (novel?.activeProfileId) {
+      await api.put(`/novels/${novelId}/active-profile`, { profileId: null }).catch(() => {});
+    }
     try {
       const { data } = await api.get(`/novels/${novelId}/architecture/templates`);
       const tmpl = (data.data ?? []).find((t: { id: string }) => t.id === archId);
       if (tmpl?.defaultLoop?.phases) setPhases(tmpl.defaultLoop.phases.map((p: PhaseDef) => ({ ...p })));
     } catch {}
+  };
+
+  const handleSelectProfile = async (profile: ProfileItem) => {
+    setSelectedProfileId(profile.id);
+    if (profile.architectureType) setSelectedArch(profile.architectureType);
+    await api.put(`/novels/${novelId}/active-profile`, { profileId: profile.id }).catch(() => {});
+    refetch();
   };
 
   const updatePhase = (idx: number, field: keyof PhaseDef, value: unknown) =>
@@ -75,18 +117,29 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
     finally { setSaving(false); }
   };
 
+  // ── Render ───────────────────────────────────────
+
+  const hasProfileArchs = profiles.length > 0;
+  const selectedTemplate = ARCH_TEMPLATES.find(t => t.id === selectedArch && !selectedProfileId);
+
   return (
     <div className="space-y-5">
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-medium text-slate-700 mb-3">选择长篇架构</h3>
-        <div className="grid grid-cols-3 gap-2.5">
+        <p className="text-xs text-slate-400 mb-4">选择一种架构模板作为小说的结构骨架。内置模板覆盖主流网文类型，参考书分析结果则为你的对标书提供定制架构。</p>
+
+        {/* Built-in templates */}
+        <div className="grid grid-cols-3 gap-2.5 mb-4">
           {ARCH_TEMPLATES.map(arch => {
-            const isSelected = selectedArch === arch.id;
+            const isSelected = selectedArch === arch.id && !selectedProfileId;
             return (
-            <button key={arch.id} onClick={() => handleSelectArch(arch.id)}
+            <button key={arch.id} onClick={() => handleSelectBuiltin(arch.id)}
               className={cn("rounded-xl border text-left transition-all", isSelected ? "border-slate-900 bg-slate-50 ring-1 ring-slate-300" : "border-slate-200 bg-white hover:border-slate-300")}>
               <div className="p-3.5">
-                <div className={cn("text-sm font-semibold mb-1", isSelected ? "text-slate-900" : "text-slate-700")}>{arch.name}</div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] rounded bg-slate-200 px-1 py-0 text-slate-500">内置</span>
+                  <span className={cn("text-sm font-semibold", isSelected ? "text-slate-900" : "text-slate-700")}>{arch.name}</span>
+                </div>
                 <div className="text-xs text-slate-500 leading-relaxed mb-1.5">{arch.desc}</div>
                 <div className="flex items-center gap-2 text-[10px] text-slate-400"><span>{arch.genres}</span><span className="text-slate-400">·</span><span className="italic">{arch.works}</span></div>
               </div>
@@ -100,55 +153,105 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
             </button>
           )})}
         </div>
-        {phases.length > 0 && (
-          <div className="mt-3">
-            <button onClick={() => setShowLoopEditor(!showLoopEditor)} className="flex items-center gap-1 text-xs text-slate-700 hover:text-slate-900 font-medium">
-              {showLoopEditor ? <ChevronDown size={12} /> : <ChevronRight size={12} />}编辑回环阶段 ({phases.length}个阶段)
-            </button>
-            {!showLoopEditor && (
-              <div className="mt-1.5 flex flex-wrap gap-1 text-[10px] text-slate-400">
-                {phases.map((p, i) => <span key={i} className="rounded bg-slate-100 px-1.5 py-0.5">{p.label}{i < phases.length - 1 ? " →" : ""}</span>)}
-              </div>
-            )}
-          </div>
-        )}
-        {showLoopEditor && phases.length > 0 && (
-          <div className="mt-2 rounded-lg border border-brand-100 bg-white p-3 space-y-2">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-slate-500">自定义每轮回环的阶段顺序、名称和典型章数。</p>
-              <div className="flex gap-2">
-                <button onClick={() => setPhases(prev => [...prev, { phase: `new_${prev.length+1}`, label: "新阶段", description: "描述此阶段", typicalChapterCount: [1,3] }])}
-                  className="flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-50"><Plus size={11} />新增</button>
-                <button onClick={async () => { setSavingPhases(true); try { await api.put(`/novels/${novelId}/loop-definition`, { phases }); } catch (e) { setPhaseError(e instanceof Error ? e.message : "保存失败"); } finally { setSavingPhases(false); } }}
-                  disabled={savingPhases} className="flex items-center gap-1 rounded bg-brand-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
-                  {savingPhases ? <RefreshCw size={11} className="animate-spin" /> : <Save size={11} />}保存</button>
-              </div>
+
+        {/* Reference profiles as architecture cards */}
+        {hasProfileArchs && (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 h-px bg-slate-100" />
+              <span className="text-[10px] text-slate-400 shrink-0">参考书分析结果</span>
+              <div className="flex-1 h-px bg-slate-100" />
             </div>
-            {phaseError && <p className="text-xs text-red-500">{phaseError}</p>}
-            <div className="space-y-2">
-              {phases.map((p, idx) => (
-                <div key={idx} className="flex items-center gap-2 rounded border border-slate-100 bg-slate-50 p-2 group">
-                  <div className="flex flex-col shrink-0">
-                    <button onClick={() => { if (idx>0) setPhases(prev => { const n=[...prev]; [n[idx-1],n[idx]]=[n[idx],n[idx-1]]; return n; }); }} disabled={idx===0} className="text-slate-300 hover:text-slate-500 disabled:opacity-30"><ArrowUp size={10} /></button>
-                    <button onClick={() => { if (idx<phases.length-1) setPhases(prev => { const n=[...prev]; [n[idx],n[idx+1]]=[n[idx+1],n[idx]]; return n; }); }} disabled={idx===phases.length-1} className="text-slate-300 hover:text-slate-500 disabled:opacity-30"><ArrowDown size={10} /></button>
+            <div className="grid grid-cols-3 gap-2.5 mb-4">
+              {profiles.map(profile => {
+                const isSelected = selectedProfileId === profile.id;
+                const archLabel = profile.architectureType ? (ARCH_LABELS[profile.architectureType] ?? profile.architectureType) : "未检测";
+                return (
+                <button key={profile.id} onClick={() => handleSelectProfile(profile)}
+                  className={cn("rounded-xl border text-left transition-all", isSelected ? "border-brand-600 bg-brand-50/30 ring-1 ring-brand-300" : "border-slate-200 bg-white hover:border-slate-300")}>
+                  <div className="p-3.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[10px] rounded bg-brand-100 px-1 py-0 text-brand-700">参考书</span>
+                      <span className={cn("text-sm font-semibold truncate", isSelected ? "text-brand-900" : "text-slate-700")}>{profile.name}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 mb-1.5">检测架构：{archLabel}{profile.totalChapters ? ` · ${profile.totalChapters}章` : ""}</div>
+                    <div className="text-[10px] text-slate-400">{new Date(profile.createdAt).toLocaleDateString("zh-CN")} 分析</div>
                   </div>
-                  <input className="w-16 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 focus:border-brand-300 focus:outline-none" value={p.phase} onChange={e => updatePhase(idx,"phase",e.target.value)} placeholder="key" />
-                  <input className="w-20 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 focus:border-brand-300 focus:outline-none" value={p.label} onChange={e => updatePhase(idx,"label",e.target.value)} placeholder="阶段名称" />
-                  <input className="flex-1 min-w-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-500 focus:border-brand-300 focus:outline-none" value={p.description} onChange={e => updatePhase(idx,"description",e.target.value)} placeholder="阶段描述" />
-                  <div className="flex items-center gap-1 shrink-0">
-                    <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none text-center" type="number" min={1} max={10} value={p.typicalChapterCount[0]} onChange={e => updatePhase(idx,"typicalChapterCount",[parseInt(e.target.value)||1,p.typicalChapterCount[1]])} />
-                    <span className="text-[10px] text-slate-300">-</span>
-                    <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none text-center" type="number" min={1} max={30} value={p.typicalChapterCount[1]} onChange={e => updatePhase(idx,"typicalChapterCount",[p.typicalChapterCount[0],parseInt(e.target.value)||3])} />
-                    <span className="text-[10px] text-slate-400">章</span>
-                  </div>
-                  <button onClick={() => setPhases(prev => prev.filter((_,i) => i!==idx))} className="shrink-0 text-slate-300 hover:text-red-500 opacity-60 hover:opacity-100 transition-opacity"><X size={12} /></button>
-                </div>
-              ))}
+                  {isSelected && (
+                    <div className="border-t border-brand-100 p-3 space-y-1.5 text-xs bg-white">
+                      {profile.architectureType && <div><span className="font-medium text-slate-600">架构类型：</span><span className="text-slate-500">{ARCH_LABELS[profile.architectureType] ?? profile.architectureType}</span></div>}
+                      {profile.loopBoundaries && <div><span className="font-medium text-slate-600">回环边界：</span><span className="text-slate-500">已提取</span></div>}
+                      {profile.coolPointDensity && <div><span className="font-medium text-slate-600">爽点分布：</span><span className="text-slate-500">已分析</span></div>}
+                      {profile.hookPatterns && <div><span className="font-medium text-slate-600">钩子模式：</span><span className="text-slate-500">已提取</span></div>}
+                    </div>
+                  )}
+                </button>
+              )})}
             </div>
-          </div>
+          </>
         )}
+
+        {/* CTA: analyze new reference book */}
+        <button onClick={() => navigate("/reference-profiles")}
+          className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500 hover:border-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors w-full justify-center">
+          <BookOpen size={12} />分析新的参考书，提取定制架构 <ArrowRight size={10} />
+        </button>
       </section>
 
+      {/* Loop Phase Editor — always visible when phases exist */}
+      {phases.length > 0 && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-medium text-slate-700">回环阶段</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">每轮回环按此阶段顺序推进。调整阶段名、描述和章数范围来自定义你的故事节奏。</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setPhases(prev => [...prev, { phase: `new_${prev.length+1}`, label: "新阶段", description: "描述此阶段", typicalChapterCount: [1,3] }])}
+                className="flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-50"><Plus size={11} />新增</button>
+              <button onClick={async () => { setSavingPhases(true); try { await api.put(`/novels/${novelId}/loop-definition`, { phases }); } catch (e) { setPhaseError(e instanceof Error ? e.message : "保存失败"); } finally { setSavingPhases(false); } }}
+                disabled={savingPhases} className="flex items-center gap-1 rounded bg-brand-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+                {savingPhases ? <RefreshCw size={11} className="animate-spin" /> : <Save size={11} />}保存阶段</button>
+            </div>
+          </div>
+          {phaseError && <p className="text-xs text-red-500 mb-2">{phaseError}</p>}
+
+          {/* Quick overview — phase flow */}
+          <div className="mb-3 flex flex-wrap items-center gap-1 text-[10px] text-slate-400">
+            {phases.map((p, i) => (
+              <span key={i} className="flex items-center gap-1">
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">{p.label}</span>
+                <span className="text-slate-300">({p.typicalChapterCount[0]}-{p.typicalChapterCount[1]}章)</span>
+                {i < phases.length - 1 && <span className="text-slate-300">→</span>}
+              </span>
+            ))}
+          </div>
+
+          {/* Editable phase list */}
+          <div className="space-y-1.5">
+            {phases.map((p, idx) => (
+              <div key={idx} className="flex items-center gap-2 rounded border border-slate-100 bg-slate-50 p-2 group">
+                <div className="flex flex-col shrink-0">
+                  <button onClick={() => { if (idx>0) setPhases(prev => { const n=[...prev]; [n[idx-1],n[idx]]=[n[idx],n[idx-1]]; return n; }); }} disabled={idx===0} className="text-slate-300 hover:text-slate-500 disabled:opacity-30"><ArrowUp size={10} /></button>
+                  <button onClick={() => { if (idx<phases.length-1) setPhases(prev => { const n=[...prev]; [n[idx],n[idx+1]]=[n[idx+1],n[idx]]; return n; }); }} disabled={idx===phases.length-1} className="text-slate-300 hover:text-slate-500 disabled:opacity-30"><ArrowDown size={10} /></button>
+                </div>
+                <input className="w-16 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 focus:border-brand-300 focus:outline-none" value={p.phase} onChange={e => updatePhase(idx,"phase",e.target.value)} placeholder="key" />
+                <input className="w-20 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 focus:border-brand-300 focus:outline-none" value={p.label} onChange={e => updatePhase(idx,"label",e.target.value)} placeholder="阶段名称" />
+                <input className="flex-1 min-w-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-500 focus:border-brand-300 focus:outline-none" value={p.description} onChange={e => updatePhase(idx,"description",e.target.value)} placeholder="阶段描述" />
+                <div className="flex items-center gap-1 shrink-0">
+                  <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none text-center" type="number" min={1} max={10} value={p.typicalChapterCount[0]} onChange={e => updatePhase(idx,"typicalChapterCount",[parseInt(e.target.value)||1,p.typicalChapterCount[1]])} />
+                  <span className="text-[10px] text-slate-300">-</span>
+                  <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none text-center" type="number" min={1} max={30} value={p.typicalChapterCount[1]} onChange={e => updatePhase(idx,"typicalChapterCount",[p.typicalChapterCount[0],parseInt(e.target.value)||3])} />
+                  <span className="text-[10px] text-slate-400">章</span>
+                </div>
+                <button onClick={() => setPhases(prev => prev.filter((_,i) => i!==idx))} className="shrink-0 text-slate-300 hover:text-red-500 opacity-60 hover:opacity-100 transition-opacity"><X size={12} /></button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Confirm button */}
       <button onClick={handleConfirmArchitecture} disabled={saving || saveSuccess}
         className={cn(
           "w-full rounded-xl py-2.5 text-sm font-medium transition-colors disabled:opacity-50",

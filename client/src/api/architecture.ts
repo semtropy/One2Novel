@@ -1,6 +1,7 @@
 /** Phase 1: Architecture templates, loop skeleton, volume expansion */
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../app/api";
+import { createQueryHook, createMutationHook } from "./factory";
 
 export interface ArchitectureTemplateSummary {
   id: string; name: string; description: string;
@@ -29,6 +30,7 @@ export interface ExpandedVolume {
   totalChapters: number;
 }
 
+// Special case: long staleTime (10 min) — kept inline
 export function useArchitectureTemplates(novelId?: string) {
   return useQuery({
     queryKey: ["architecture-templates", novelId],
@@ -40,52 +42,39 @@ export function useArchitectureTemplates(novelId?: string) {
   });
 }
 
-export function useGenerateLoopSkeleton() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ novelId, architectureType, totalLoops }: {
-      novelId: string; architectureType: string; totalLoops?: number;
-    }) => {
-      const { data } = await api.post(`/novels/${novelId}/loops/generate-skeleton`, { architectureType, totalLoops });
-      return data.data as LoopSkeleton;
-    },
-    onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
-  });
-}
+export const useGenerateLoopSkeleton = createMutationHook<
+  { novelId: string; architectureType: string; totalLoops?: number },
+  LoopSkeleton
+>({
+  method: "post",
+  url: (input) => `/novels/${input.novelId}/loops/generate-skeleton`,
+  body: (input) => ({ architectureType: input.architectureType, totalLoops: input.totalLoops }),
+  invalidateKeys: (input) => [["novel", input.novelId]],
+});
 
-export function useLoopSkeleton(novelId?: string) {
-  return useQuery({
-    queryKey: ["loop-skeleton", novelId],
-    queryFn: async () => {
-      const { data } = await api.get(`/novels/${novelId}/loops`);
-      return data.data as LoopSkeleton | null;
-    },
-    enabled: !!novelId,
-  });
-}
+export const useLoopSkeleton = createQueryHook<LoopSkeleton | null, string>({
+  queryKey: ["loop-skeleton"],
+  url: (novelId) => `/novels/${novelId}/loops`,
+});
 
-export function useExpandLoopToVolume() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ novelId, sortOrder }: { novelId: string; sortOrder: number }) => {
-      const { data } = await api.post(`/novels/${novelId}/volumes/${sortOrder}/expand`);
-      return data.data as ExpandedVolume;
-    },
-    onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
-  });
-}
+export const useExpandLoopToVolume = createMutationHook<
+  { novelId: string; sortOrder: number },
+  ExpandedVolume
+>({
+  method: "post",
+  url: (input) => `/novels/${input.novelId}/volumes/${input.sortOrder}/expand`,
+  body: () => undefined,
+  invalidateKeys: (input) => [["novel", input.novelId]],
+});
 
-export function useGenerateNextVolume() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (novelId: string) => {
-      const { data } = await api.post(`/novels/${novelId}/volumes/generate-next`);
-      return data.data as ExpandedVolume;
-    },
-    onSuccess: (_, novelId) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
-  });
-}
+export const useGenerateNextVolume = createMutationHook<string, ExpandedVolume>({
+  method: "post",
+  url: (novelId) => `/novels/${novelId}/volumes/generate-next`,
+  body: () => undefined,
+  invalidateKeys: (novelId) => [["novel", novelId]],
+});
 
+// Kept inline: api.put with void return + complex input type
 export function useSaveArchitecture() {
   const qc = useQueryClient();
   return useMutation({

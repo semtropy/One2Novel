@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { getPrisma } from "../../platform/db/client";
 import { aiInvoke } from "../../platform/llm/aiService";
+import { logEventError } from "../../platform/logging/eventErrorLog";
 
 // ═══════════════════════════════════════════════════════════
 // Types
@@ -119,7 +120,8 @@ async function extractTimelineEvents(
       created++;
     }
     return created;
-  } catch {
+  } catch (e) {
+    logEventError("timeline.extract", { novelId, chapterId }, e);
     return 0;
   }
 }
@@ -180,7 +182,8 @@ async function detectAndStoreConflicts(
     }
 
     return conflicts;
-  } catch {
+  } catch (e) {
+    logEventError("timeline.conflict", { novelId }, e);
     return [];
   }
 }

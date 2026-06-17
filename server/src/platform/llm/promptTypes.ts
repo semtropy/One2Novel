@@ -63,7 +63,8 @@ export interface PromptRenderContext {
   blocks: PromptContextBlock[];
   selectedBlockIds: string[];
   droppedBlockIds: string[];
-  summarizedBlockIds: string[];
+  /** @deprecated Summarization is not currently implemented; always empty */
+  summarizedBlockIds?: string[];
   estimatedInputTokens: number;
 }
 

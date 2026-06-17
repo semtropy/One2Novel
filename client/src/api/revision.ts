@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../app/api";
+import { createMutationHook } from "./factory";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -37,6 +38,7 @@ export const OPERATION_LABELS: Record<RevisionOperation, { label: string; emoji:
 
 // ─── Hooks ─────────────────────────────────────────────
 
+// Kept inline: complex body structure with 5 fields, no invalidation
 export function useRevisionCandidates() {
   return useMutation({
     mutationFn: async (input: {
@@ -52,27 +54,21 @@ export function useRevisionCandidates() {
   });
 }
 
-export function useApplyRevision() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: { novelId: string; chapterId: string; selectedText: string; replacementText: string }) => {
-      const { data } = await api.post(
-        `/novels/${input.novelId}/chapters/${input.chapterId}/revision/apply`,
-        { selectedText: input.selectedText, replacementText: input.replacementText },
-      );
-      return data.data as { success: boolean; wordCount: number };
-    },
-    onSuccess: (_, { novelId }) => { qc.invalidateQueries({ queryKey: ["novel", novelId] }); },
-  });
-}
+export const useApplyRevision = createMutationHook<
+  { novelId: string; chapterId: string; selectedText: string; replacementText: string },
+  { success: boolean; wordCount: number }
+>({
+  method: "post",
+  url: (input) => `/novels/${input.novelId}/chapters/${input.chapterId}/revision/apply`,
+  body: (input) => ({ selectedText: input.selectedText, replacementText: input.replacementText }),
+  invalidateKeys: (input) => [["novel", input.novelId]],
+});
 
-export function useWorkspaceDiagnosis() {
-  return useMutation({
-    mutationFn: async (input: { novelId: string; chapterId: string }) => {
-      const { data } = await api.post(
-        `/novels/${input.novelId}/chapters/${input.chapterId}/diagnose`,
-      );
-      return data.data as WorkspaceDiagnosis;
-    },
-  });
-}
+export const useWorkspaceDiagnosis = createMutationHook<
+  { novelId: string; chapterId: string },
+  WorkspaceDiagnosis
+>({
+  method: "post",
+  url: (input) => `/novels/${input.novelId}/chapters/${input.chapterId}/diagnose`,
+  invalidateKeys: () => [], // no invalidation
+});

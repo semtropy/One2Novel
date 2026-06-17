@@ -1,7 +1,7 @@
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { z } from "zod";
 import type { PromptAsset, PromptRenderContext } from "./promptTypes";
-import { safeShape } from "./zodIntrospect";
+import { safeShape, unwrapSchema as unwrapSchemaIntrospect } from "./zodIntrospect";
 
 const DEFAULT_MAX_DEPTH = 6;
 const DEFAULT_ARRAY_ITEM_COUNT = 1;
@@ -17,46 +17,10 @@ const MANUAL_STRUCTURED_HINT_PATTERNS = [
 
 type AnySchema = z.ZodType<unknown>;
 
-function tryUnwrapSchema(schema: AnySchema): AnySchema | null {
-  const candidate = schema as AnySchema & {
-    removeDefault?: () => AnySchema;
-    _def?: {
-      innerType?: AnySchema;
-      out?: AnySchema;
-      getter?: () => AnySchema;
-    };
-  };
-
-  if (typeof candidate.removeDefault === "function") {
-    return candidate.removeDefault();
-  }
-  if (candidate._def?.innerType) {
-    return candidate._def.innerType;
-  }
-  if (candidate._def?.out) {
-    return candidate._def.out;
-  }
-  if (typeof candidate._def?.getter === "function") {
-    return candidate._def.getter();
-  }
-
-  return null;
-}
-
+/** Delegate to zodIntrospect to unwrap wrapper types, then extract inner schema */
 function unwrapSchema(schema: AnySchema): AnySchema {
-  let current = schema;
-  let guard = 0;
-
-  while (guard < 16) {
-    guard += 1;
-    const next = tryUnwrapSchema(current);
-    if (!next || next === current) {
-      return current;
-    }
-    current = next;
-  }
-
-  return current;
+  const { schema: inner } = unwrapSchemaIntrospect(schema);
+  return inner as AnySchema;
 }
 
 function resolveArrayExampleLength(schema: AnySchema): number {

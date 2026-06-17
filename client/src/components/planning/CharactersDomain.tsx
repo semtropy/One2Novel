@@ -271,7 +271,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
                             value={rel.stage ?? "strangers"}
                             onChange={async (e) => {
                               try {
-                                await upsertRel.mutateAsync({ novelId, sourceCharacterId: rel.sourceId, targetCharacterId: rel.targetId, type: rel.type });
+                                await upsertRel.mutateAsync({ novelId, sourceCharacterId: rel.sourceId, targetCharacterId: rel.targetId, type: rel.type, stage: e.target.value });
                                 refetchRel();
                               } catch {}
                             }}>

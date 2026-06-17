@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { getPrisma } from "../../../../platform/db/client";
+import { createNovelRepo } from "../../../../platform/data/repositories";
+import { createChapterRepo } from "../../../../platform/data/repositories";
 import { streamChapter } from "../../production/writing/chapterWriter";
 import { runQualityGate } from "../../production/quality/qualityGate";
 import { persistQualityScores } from "../../production/quality/qualityPersist";
@@ -20,10 +22,11 @@ router.post("/:novelId/chapters/:chapterId/write", async (req, res, next) => {
 // Quality gate (non-streaming review)
 router.post("/:novelId/chapters/:chapterId/review", async (req, res, next) => {
   try {
-    const prisma = getPrisma();
-    const chapter = await prisma.chapter.findUnique({ where: { id: req.params.chapterId } });
+    const chapterRepo = createChapterRepo(getPrisma());
+    const novelRepo = createNovelRepo(getPrisma());
+    const chapter = await chapterRepo.findById(req.params.chapterId);
     if (!chapter?.content) { res.status(400).json({ error: { code: "NO_CONTENT", message: "Chapter has no content" } }); return; }
-    const novel = await prisma.novel.findUnique({ where: { id: req.params.novelId }, select: { genre: true } });
+    const novel = await novelRepo.findGenre(req.params.novelId);
     const characterProhibitions = await buildCharacterProhibitions(req.params.novelId).catch(() => undefined);
     const result = await runQualityGate(chapter.content, {
       genre: novel?.genre,
@@ -39,12 +42,12 @@ router.post("/:novelId/chapters/:chapterId/review", async (req, res, next) => {
 router.post("/:novelId/chapters/:chapterId/repair", async (req, res, next) => {
   try {
     const { mode, issues } = req.body;
-    const prisma = getPrisma();
-    const chapter = await prisma.chapter.findUnique({ where: { id: req.params.chapterId } });
+    const chapterRepo = createChapterRepo(getPrisma());
+    const chapter = await chapterRepo.findById(req.params.chapterId);
     if (!chapter?.content) { res.status(400).json({ error: { code: "NO_CONTENT" } }); return; }
     const result = await repairChapter(chapter.content, formatIssuesForRepair(issues ?? []));
     if (result && result !== chapter.content) {
-      await prisma.chapter.update({ where: { id: req.params.chapterId }, data: { content: result } });
+      await chapterRepo.update(req.params.chapterId, { content: result });
     }
     res.json({ data: { repaired: result !== chapter.content, wordCount: result.length } });
   } catch (e) { next(e); }

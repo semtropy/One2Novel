@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getPrisma } from "../../platform/db/client";
 import { aiInvoke } from "../../platform/llm/aiService";
+import { logEventError } from "../../platform/logging/eventErrorLog";
 
 const PayoffSchema = z.object({
   items: z.array(z.object({ title: z.string(), summary: z.string(), scopeType: z.string(), status: z.string() })),
@@ -54,7 +55,7 @@ export async function scanChapterForPayoffs(novelId: string, chapterId: string):
         update: { lastTouchedOrder: chapter.order, currentStatus: item.status },
       });
     }
-  } catch {}
+  } catch (e) { logEventError("payoff.scan", { novelId, chapterId }, e); }
 }
 
 export async function getPayoffs(novelId: string) {

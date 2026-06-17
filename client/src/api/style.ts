@@ -1,5 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../app/api";
+import { createQueryHook, createMutationHook } from "./factory";
 
 export interface StyleProfile {
   id: string;
@@ -16,42 +15,28 @@ export interface StyleProfile {
   updatedAt: string;
 }
 
-export function useStyleProfiles() {
-  return useQuery({
-    queryKey: ["styles"],
-    queryFn: async () => { const { data } = await api.get("/styles"); return data.data as StyleProfile[]; },
-  });
-}
+export const useStyleProfiles = createQueryHook<StyleProfile[], void>({
+  queryKey: ["styles"],
+  url: () => "/styles",
+  enabled: () => true,
+});
 
-export function useCreateStyleProfile() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: { name: string; sourceText?: string }) => {
-      const { data } = await api.post("/styles", input);
-      return data.data as StyleProfile;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["styles"] }),
-  });
-}
+export const useCreateStyleProfile = createMutationHook<{ name: string; sourceText?: string }, StyleProfile>({
+  method: "post",
+  url: () => "/styles",
+  invalidateKeys: () => [["styles"]],
+});
 
-export function useExtractStyle() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (profileId: string) => {
-      const { data } = await api.post(`/styles/${profileId}/extract`);
-      return data.data;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["styles"] }),
-  });
-}
+export const useExtractStyle = createMutationHook<string, unknown>({
+  method: "post",
+  url: (profileId) => `/styles/${profileId}/extract`,
+  body: () => undefined,
+  invalidateKeys: () => [["styles"]],
+});
 
-export function useBindStyle() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ profileId, targetType, targetId }: { profileId: string; targetType: string; targetId: string }) => {
-      const { data } = await api.post(`/styles/${profileId}/bind`, { targetType, targetId });
-      return data.data;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["styles"] }),
-  });
-}
+export const useBindStyle = createMutationHook<{ profileId: string; targetType: string; targetId: string }, unknown>({
+  method: "post",
+  url: (input) => `/styles/${input.profileId}/bind`,
+  body: (input) => ({ targetType: input.targetType, targetId: input.targetId }),
+  invalidateKeys: () => [["styles"]],
+});
