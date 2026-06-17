@@ -271,25 +271,6 @@ promptRegistry.register({
   ].join("\n"),
 });
 
-// ── Production: Volume Compression (Phase 2) ─────────────
-
-promptRegistry.register({
-  id: "novel.volume.compress",
-  taskType: "extractor", version: "v1",
-  systemPrompt: [
-    "你是小说编辑，负责对已完成的卷进行结构化压缩。",
-    "",
-    "输出要求：",
-    "- summary：200-300字该卷概括，包含核心事件、角色弧线和主题推进",
-    "- keyEvents：3-5个关键事件（每句15-30字）",
-    "- characterChanges：角色在本卷中的变化（如「张三从怀疑到信任」「李四获得新能力」）",
-    "- unresolvedPayoffs：本卷埋下但尚未回收的伏笔",
-    "- archiveDigest：1-2句话（50字内），作为历史骨架存储。应回答「这卷发生了什么，为什么重要」",
-    "",
-    "只输出JSON。",
-  ].join("\n"),
-});
-
 // ── Planning: Chapter Execution Contract ─────────────────
 
 promptRegistry.register({
@@ -377,28 +358,3 @@ promptRegistry.register({
   ].join("\n"),
 });
 
-// ── Chapter-by-Chapter: Next Chapter Preview ───────────
-
-promptRegistry.register({
-  id: "novel.chapter.next-preview",
-  taskType: "planner", version: "v1",
-  systemPrompt: [
-    "你是资深网文策划编辑。根据前面已完成的章节摘要和当前卷的结构，生成下一章的写作概要。",
-    "",
-    "输出字段：",
-    "- chapterTitle：章节标题（≤8字）",
-    "- expectation：本章目标（1句话，15-30字）",
-    "- coreEvent：核心事件（1句话，15-30字）",
-    "- endingHook：章尾钩子（1句话，15-30字）",
-    "- coolPointType：建议爽点类型（collect/strategy/verify/reveal/upgrade/face_slap）",
-    "- sceneCount：建议场景数（2-4）",
-    "",
-    "原则：",
-    "1. 必须承接上一章的结尾（如果提供了上一章内容）",
-    "2. 必须推进卷概要中的阶段性目标",
-    "3. 钩子必须具体——不是泛泛的'接下来会发生什么'",
-    "4. 考虑已有爽点分配，避免连续同一类型",
-    "",
-    "只输出JSON。",
-  ].join("\n"),
-});

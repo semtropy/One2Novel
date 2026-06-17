@@ -70,10 +70,10 @@ router.post("/:novelId/pipeline/step/:stepName", async (req, res, next) => {
 
     switch (stepName) {
       case "foundation":
-        result = await pipeline.step1_storyCore();
+        result = await pipeline.step1_foundation();
         break;
       case "architecture":
-        result = await pipeline.step3_architectureConfirmation({
+        result = await pipeline.step2_architecture({
           architectureType: req.body?.architectureType,
           goldenFinger: req.body?.goldenFinger,
           centralQuestion: req.body?.centralQuestion,
@@ -81,16 +81,16 @@ router.post("/:novelId/pipeline/step/:stepName", async (req, res, next) => {
         });
         break;
       case "characters":
-        result = await pipeline.step4_characterConfiguration();
+        result = await pipeline.step3_characters();
         break;
       case "outline": {
         const mode = req.body?.mode ?? "per_volume";
         if (req.body?.skeletonOnly) {
-          result = await pipeline.step5a_generateLoopSkeleton();
+          result = await pipeline.step4a_generateLoopSkeleton();
         } else if (req.body?.volumeOrder) {
-          result = await pipeline.step5b_expandVolume(req.body.volumeOrder);
+          result = await pipeline.step4b_expandVolume(req.body.volumeOrder);
         } else {
-          result = await pipeline.step5_blueprintGeneration(mode);
+          result = await pipeline.step4_outline(mode);
         }
         break;
       }
@@ -109,7 +109,7 @@ router.post("/:novelId/pipeline/step/:stepName", async (req, res, next) => {
 router.post("/:novelId/pipeline/generate-skeleton", async (req, res, next) => {
   try {
     const pipeline = new CreationPipeline(req.params.novelId);
-    const skeleton = await pipeline.step5a_generateLoopSkeleton();
+    const skeleton = await pipeline.step4a_generateLoopSkeleton();
     res.json({ data: skeleton });
   } catch (e) { next(e); }
 });
@@ -118,7 +118,7 @@ router.post("/:novelId/pipeline/generate-skeleton", async (req, res, next) => {
 router.post("/:novelId/pipeline/expand-volume/:volumeOrder", async (req, res, next) => {
   try {
     const pipeline = new CreationPipeline(req.params.novelId);
-    const expanded = await pipeline.step5b_expandVolume(
+    const expanded = await pipeline.step4b_expandVolume(
       parseInt(req.params.volumeOrder),
     );
     res.json({ data: expanded });
@@ -129,7 +129,7 @@ router.post("/:novelId/pipeline/expand-volume/:volumeOrder", async (req, res, ne
 router.post("/:novelId/pipeline/generate-all-volumes", async (req, res, next) => {
   try {
     const pipeline = new CreationPipeline(req.params.novelId);
-    const result = await pipeline.step5_blueprintGeneration("full");
+    const result = await pipeline.step4_outline("full");
     res.json({ data: result });
   } catch (e) { next(e); }
 });

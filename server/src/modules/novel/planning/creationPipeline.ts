@@ -142,7 +142,7 @@ export class CreationPipeline {
 
   // ── Step 1: Story Core ───────────────────────────────
 
-  async step1_storyCore(onProgress?: ProgressCallback): Promise<StoryCoreResult> {
+  async step1_foundation(onProgress?: ProgressCallback): Promise<StoryCoreResult> {
     await updateStepState(this.novelId, "foundation", { status: "generating" });
     onProgress?.({ step: "story_core", detail: "正在生成故事核心...", percent: 5 });
 
@@ -224,7 +224,7 @@ export class CreationPipeline {
 
   // ── Step 3: Architecture & Engine Confirmation ───────
 
-  async step3_architectureConfirmation(
+  async step2_architecture(
     params: {
       architectureType?: ArchitectureType;
       goldenFinger?: { abilities: string[]; limits: string[] };
@@ -326,7 +326,7 @@ export class CreationPipeline {
 
   // ── Step 4: Character Configuration ──────────────────
 
-  async step4_characterConfiguration(
+  async step3_characters(
     onProgress?: ProgressCallback,
   ): Promise<CharacterConfigResult> {
     await updateStepState(this.novelId, "characters", { status: "generating" });
@@ -365,7 +365,7 @@ export class CreationPipeline {
 
   // ── Step 5a: Generate Loop Skeleton ──────────────────
 
-  async step5a_generateLoopSkeleton(
+  async step4a_generateLoopSkeleton(
     onProgress?: ProgressCallback,
   ): Promise<LoopSkeleton> {
     onProgress?.({ step: "skeleton", detail: "正在生成回环骨架...", percent: 55 });
@@ -404,7 +404,7 @@ export class CreationPipeline {
 
   // ── Step 5b: Expand a Single Volume ──────────────────
 
-  async step5b_expandVolume(
+  async step4b_expandVolume(
     volumeOrder: number,
     onProgress?: ProgressCallback,
   ): Promise<ExpandedVolume> {
@@ -525,13 +525,13 @@ export class CreationPipeline {
 
   // ── Step 5: Full Blueprint Generation (all volumes) ──
 
-  async step5_blueprintGeneration(
+  async step4_outline(
     mode: "full" | "per_volume" = "full",
     onProgress?: ProgressCallback,
   ): Promise<{ skeleton: LoopSkeleton; expandedVolumes: number }> {
     await updateStepState(this.novelId, "outline", { status: "generating" });
 
-    const skeleton = await this.step5a_generateLoopSkeleton(onProgress);
+    const skeleton = await this.step4a_generateLoopSkeleton(onProgress);
     let expandedCount = 0;
 
     if (mode === "full") {
@@ -541,7 +541,7 @@ export class CreationPipeline {
           detail: `正在展开第 ${i + 1}/${skeleton.totalLoops} 卷...`,
           percent: 55 + Math.round(((i + 1) / skeleton.totalLoops) * 30),
         });
-        await this.step5b_expandVolume(i + 1);
+        await this.step4b_expandVolume(i + 1);
         expandedCount++;
       }
     }
