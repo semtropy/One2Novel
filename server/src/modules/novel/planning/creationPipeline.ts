@@ -1,11 +1,11 @@
 /**
- * CreationPipeline — unified orchestration layer for the 7-step novel creation flow.
+ * CreationPipeline — 4-step serial pipeline for novel creation.
  *
- * Each step is an independent async method that can be called individually (advanced mode)
- * or chained via runFullPipeline() (fast mode). All steps delegate to existing services.
+ * Step order: foundation → architecture → characters → outline
+ * Each step receives the full context of all previous steps as structured summary.
+ * No mesh calls — each step only depends on previous outputs.
  *
- * The pipeline does NOT own business logic — it coordinates existing services and
- * provides a consistent progress-callback interface.
+ * Can be called individually (advanced mode) or chained via runFullPipeline() (fast mode).
  */
 import { getPrisma } from "../../../platform/db/client";
 import { serializeTags } from "../../../platform/data/tagHelpers";
@@ -80,6 +80,64 @@ export class CreationPipeline {
 
   constructor(novelId: string) {
     this.novelId = novelId;
+  }
+
+  /**
+   * Build a structured summary of all completed previous steps' outputs.
+   * Each subsequent AI call receives this as context, ensuring a serial pipeline
+   * where every step benefits from richer upstream context.
+   */
+  private async buildSerialContext(upToStep: string): Promise<string> {
+    const prisma = getPrisma();
+    const novel = await prisma.novel.findUnique({
+      where: { id: this.novelId },
+      select: {
+        storySummary: true, centralQuestion: true, endingDirection: true,
+        genre: true, narrativePov: true, pacePreference: true,
+        styleTone: true, emotionIntensity: true,
+        targetAudience: true, bookSellingPoint: true, commercialTags: true,
+        competingFeel: true, first30ChapterPromise: true,
+        goldenFinger: true, architectureType: true, loopSkeleton: true,
+        expectationProfile: true,
+      },
+    });
+    if (!novel) return "";
+
+    const parts: string[] = ["[前序步骤上下文 — 串行流水线自动注入]"];
+    const { parseTags } = await import("../../../platform/data/tagHelpers");
+
+    // Step 1 foundation context (always available for steps 2+)
+    if (novel.storySummary) {
+      parts.push(`## 故事核心\n简介：${novel.storySummary}\n核心悬念：${novel.centralQuestion ?? ""}\n结局方向：${novel.endingDirection ?? ""}`);
+    }
+    if (novel.goldenFinger) {
+      try { const gf = JSON.parse(novel.goldenFinger); parts.push(`## 金手指\n名称：${gf.goldenFingerName ?? ""}\n能力：${(gf.abilities ?? []).join("；")}\n限制：${(gf.limits ?? []).join("；")}`); } catch {}
+    }
+    if (novel.targetAudience || novel.bookSellingPoint) {
+      parts.push(`## 商业定位\n目标读者：${novel.targetAudience ?? ""}\n核心卖点：${novel.bookSellingPoint ?? ""}\n前30章承诺：${novel.first30ChapterPromise ?? ""}`);
+    }
+
+    // Step 2 architecture context
+    if (upToStep === "architecture" || upToStep === "characters" || upToStep === "outline") {
+      if (novel.architectureType) parts.push(`## 架构选择\n类型：${novel.architectureType}`);
+      if (novel.expectationProfile) {
+        try { const ep = JSON.parse(novel.expectationProfile); parts.push(`## 期待参数\n${JSON.stringify(ep)}`); } catch {}
+      }
+    }
+
+    // Step 3 characters context
+    if (upToStep === "characters" || upToStep === "outline") {
+      const chars = await prisma.novelCharacter.findMany({
+        where: { novelId: this.novelId },
+        select: { name: true, role: true, personality: true, factionLabel: true },
+      });
+      if (chars.length > 0) {
+        const charList = chars.map(c => `- ${c.name}（${c.role === "protagonist" ? "主角" : c.role === "antagonist" ? "对手" : "配角"}）：${c.personality ?? ""}${c.factionLabel ? ` [${c.factionLabel}]` : ""}`).join("\n");
+        parts.push(`## 角色阵容\n${charList}`);
+      }
+    }
+
+    return parts.join("\n\n");
   }
 
   // ── Step 1: Story Core ───────────────────────────────

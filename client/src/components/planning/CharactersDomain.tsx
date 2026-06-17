@@ -97,6 +97,10 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
       appearance: char.appearance ?? "",
       voiceTexture: char.voiceTexture ?? "",
       currentGoal: char.currentGoal ?? "",
+      currentStatus: char.currentStatus ?? "",
+      quirks: char.quirks ?? "",
+      factionLabel: char.factionLabel ?? "",
+      flaw: char.prohibitions?.[0] ?? "",
     });
   };
 
@@ -169,9 +173,9 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
 
                       {editCharId === char.id ? (
                         <div className="space-y-1.5 mt-2">
-                          {["personality","background","appearance","voiceTexture","currentGoal"].map(field => (
+                          {["personality","background","appearance","voiceTexture","currentGoal","currentStatus","quirks","factionLabel","flaw"].map(field => (
                             <div key={field}>
-                              <label className="text-[10px] text-slate-400">{field === "personality" ? "性格" : field === "background" ? "背景" : field === "appearance" ? "外貌" : field === "voiceTexture" ? "语气" : "当前目标"}</label>
+                              <label className="text-[10px] text-slate-400">{field === "personality" ? "性格" : field === "background" ? "背景" : field === "appearance" ? "外貌" : field === "voiceTexture" ? "语气" : field === "currentGoal" ? "当前目标" : field === "currentStatus" ? "当前状态" : field === "quirks" ? "习惯动作" : field === "factionLabel" ? "所属阵营" : "致命缺陷"}</label>
                               <input className="w-full rounded border border-slate-200 px-1.5 py-0.5 text-xs focus:border-brand-300 focus:outline-none"
                                 value={editCharFields[field] ?? ""} onChange={e => setEditCharFields(prev => ({ ...prev, [field]: e.target.value }))} />
                             </div>
@@ -183,7 +187,10 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
                         </div>
                       ) : (
                         <>
-                          {char.personality && <p className="text-xs text-slate-500 mb-1 line-clamp-2">性格：{char.personality}{char.identityLabel ? ` · ${char.identityLabel}` : ""}</p>}
+                          {char.personality && <p className="text-xs text-slate-500 mb-1 line-clamp-2">性格：{char.personality}{char.identityLabel ? ` · ${char.identityLabel}` : ""}{char.factionLabel ? ` · ${char.factionLabel}` : ""}</p>}
+                          {char.currentStatus && <p className="text-xs text-slate-400 mb-0.5">状态：{char.currentStatus}</p>}
+                          {char.quirks && <p className="text-xs text-slate-400 mb-0.5">习惯：{char.quirks}</p>}
+                          {char.prohibitions?.[0] && <p className="text-xs text-amber-600 mb-0.5">缺陷：{char.prohibitions[0]}</p>}
                           <div className="mt-2 flex items-center justify-between">
                             <select value={char.loopFunctionTag ?? ""} onChange={e => handleTagChange(char.id, e.target.value)} disabled={updatingTag === char.id}
                               className="rounded border border-slate-200 px-2 py-0.5 text-xs focus:border-brand-300 focus:outline-none max-w-[160px]">
