@@ -1,6 +1,6 @@
 /**
  * Prompt barrel — side-effect imports register all prompts into promptRegistry.
- * Imported by aiService.ts at startup; must come after promptRegistry definition.
+ * Imported by app.ts at startup (after aiService.ts is fully initialized).
  */
 import "./planningPrompts";
 import "./productionPrompts";
@@ -8,5 +8,5 @@ import "./postWritePrompts";
 import "./timelinePrompts";
 import "./payoffPrompts";
 import "./referencePrompts";
-import "./stylePrompts";
+// stylePrompts removed — style extraction now uses reference.writing_assets.extract (richer struct)
 import "./worldPrompts";

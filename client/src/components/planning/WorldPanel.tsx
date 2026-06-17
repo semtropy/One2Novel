@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useWorldRules, useCreateWorldRule, useUpdateWorldRule, useDeleteWorldRule, useGenerateWorldRules, useCheckWorldConflicts, useResolveWorldConflict, type WorldRule, type ConflictResult } from "../../api/novel";
+import { PowerSystemTree, type PowerNode } from "../pipeline/PowerSystemTree";
 
 const CATEGORIES = ["势力格局", "力量体系", "资源规则", "社会结构", "地理环境", "历史背景"] as const;
 
@@ -12,8 +13,22 @@ export function WorldPanel({ novelId }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [conflicts, setConflicts] = useState<ConflictResult[] | null>(null);
   const [genError, setGenError] = useState("");
+  const [showTree, setShowTree] = useState(false);
 
   const { data: rules, isLoading } = useWorldRules(novelId, activeCategory || undefined);
+
+  // Convert 力量体系 rules to PowerNode tree
+  const powerNodes = useMemo(() => {
+    if (!showTree) return [];
+    const powerRules = (rules ?? []).filter(r => r.category === "力量体系" && r.status !== "deprecated");
+    return powerRules.map(r => ({
+      id: r.id,
+      name: r.title,
+      breakthroughCondition: r.content,
+      abilityUpgrade: "",
+      children: [],
+    } satisfies PowerNode));
+  }, [showTree, rules]);
   const createMutation = useCreateWorldRule();
   const updateMutation = useUpdateWorldRule();
   const deleteMutation = useDeleteWorldRule();
@@ -76,7 +91,26 @@ export function WorldPanel({ novelId }: Props) {
             {cat}
           </button>
         ))}
+        <button onClick={() => { setShowTree(!showTree); if (!showTree) setActiveCategory("力量体系"); }}
+          className={`px-2.5 py-1 rounded-md text-xs whitespace-nowrap transition-colors border ${showTree ? "bg-emerald-800 text-white border-emerald-800" : "bg-white text-slate-600 border-slate-300 hover:bg-slate-100"}`}>
+          树状视图
+        </button>
       </div>
+
+      {/* Tree view for 力量体系 */}
+      {showTree && (
+        <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-700">力量体系树状图</span>
+            <span className="text-[10px] text-slate-400">从「力量体系」分类规则自动生成</span>
+          </div>
+          {powerNodes.length > 0 ? (
+            <PowerSystemTree nodes={powerNodes} onChange={() => {}} readonly />
+          ) : (
+            <p className="text-xs text-slate-400 py-4 text-center">暂无力量体系规则。先添加规则再查看树状视图。</p>
+          )}
+        </div>
+      )}
 
       {/* Conflicts */}
       {conflicts && conflicts.length > 0 && (

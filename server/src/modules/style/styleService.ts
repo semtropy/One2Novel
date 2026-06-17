@@ -22,11 +22,32 @@ export async function extractStyle(profileId: string): Promise<ExtractedFeatures
   const profile = await prisma.styleProfile.findUnique({ where: { id: profileId } });
   if (!profile?.sourceText) throw new Error("No source text");
 
-  const result = await aiInvoke({
-    assetId: "style.extract",
-    userPrompt: `分析以下文本风格：\n\n${profile.sourceText.slice(0, 10000)}`,
-    schema: ExtractSchema, temperature: 0.5,
+  // Uses reference.writing_assets.extract (richer structured output) instead of deleted style.extract.
+  // Map the WritingAssetCollection format → flat ExtractedFeatures format.
+  const WritingAssetsSchema = z.object({
+    overallStyleDescription: z.string(),
+    narrativeAssets: z.array(z.object({ category: z.string(), observation: z.string(), rule: z.string(), confidence: z.number() })),
+    languageAssets: z.array(z.object({ category: z.string(), observation: z.string(), rule: z.string(), confidence: z.number() })),
+    characterAssets: z.array(z.object({ category: z.string(), observation: z.string(), rule: z.string(), confidence: z.number() })),
+    rhythmAssets: z.array(z.object({ category: z.string(), observation: z.string(), rule: z.string(), confidence: z.number() })),
+    antiAiAssets: z.array(z.object({ category: z.string(), observation: z.string(), rule: z.string(), confidence: z.number() })),
   });
+
+  const raw = await aiInvoke({
+    assetId: "reference.writing_assets.extract",
+    userPrompt: `分析以下文本的写作技法：\n\n${profile.sourceText.slice(0, 10000)}`,
+    schema: WritingAssetsSchema, temperature: 0.5,
+  });
+
+  // Map rich format → flat format
+  const result: ExtractedFeatures = {
+    narrativeRules: raw.narrativeAssets.map(t => t.rule),
+    languageRules: raw.languageAssets.map(t => t.rule),
+    characterRules: raw.characterAssets.map(t => t.rule),
+    rhythmRules: raw.rhythmAssets.map(t => t.rule),
+    antiAiRules: raw.antiAiAssets.map(t => t.rule),
+    overallDescription: raw.overallStyleDescription,
+  };
 
   await prisma.styleProfile.update({ where: { id: profileId }, data: { extractedFeatures: JSON.stringify(result), narrativeRules: JSON.stringify(result.narrativeRules), languageRules: JSON.stringify(result.languageRules), characterRules: JSON.stringify(result.characterRules), rhythmRules: JSON.stringify(result.rhythmRules), antiAiRules: JSON.stringify(result.antiAiRules) } });
   return result;

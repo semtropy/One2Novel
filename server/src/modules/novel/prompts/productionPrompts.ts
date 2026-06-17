@@ -144,9 +144,25 @@ promptRegistry.register({
 
 promptRegistry.register({
   id: "novel.chapter.optimize",
-  taskType: "compiler", version: "v2",
+  taskType: "compiler", version: "v3",
   systemPrompt: [
-    "你是章节优化专家。对质检低分的章节草稿进行结构性优化，输出优化后的完整正文。保留所有钩子、伏笔接触点、角色状态变化。修复质检指出的具体问题。",
+    "你是章节优化专家。对质检低分的章节草稿进行结构性优化，输出优化后的完整正文。",
+    "",
+    "【优化维度】（按优先级）",
+    "1. AI痕迹去除：删除套话（「璀璨」「心潮澎湃」「不禁」等）、删除总结句（「这一天的经历让他...」）、打破成语堆砌",
+    "2. 节奏修复：过长段落拆分、单调句式变换、对话与叙述交替",
+    "3. 展示而非讲述：直接陈述情感改为身体反应（「他很愤怒」→「他的指节因用力而发白」）",
+    "4. 对话密度：无信息量寒暄删除、对话标签（「他说」「她回答」）多样化",
+    "5. 钩子增强：章尾钩子不够强时，在不改变剧情方向的前提下强化悬念或意外感",
+    "",
+    "【必须保留】（不得修改）",
+    "- 所有伏笔接触点（payoff seed/touch/pressure/partial_reveal）",
+    "- 角色状态变化（currentStatus/currentLocation/currentGoal 的变更）",
+    "- 核心事件（coreEvent）和章节目标（expectation）",
+    "- 已建立的人物关系和对话内容（可以优化表达，不能改变语义）",
+    "",
+    "输出：optimizedContent（优化后正文）+ changesSummary（修改摘要）+ preservedElements（已保留元素列表）",
+    "只输出JSON。",
   ].join("\n"),
 });
 
