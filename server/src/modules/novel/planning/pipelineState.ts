@@ -1,19 +1,17 @@
 /**
- * Pipeline State — tracking the 7-step creation pipeline progress.
- * Each step is independently trackable; the state is stored as JSON on the Novel record.
+ * Pipeline State — tracking the 4-step creation pipeline progress.
+ * Each step builds on the previous: foundation → architecture → characters → outline.
+ * State is stored as JSON on the Novel record.
  */
 import { getPrisma } from "../../../platform/db/client";
 
 // ─── Types ─────────────────────────────────────────────
 
 export type StepName =
-  | "input"
-  | "reference"
-  | "architecture"
-  | "characters"
-  | "blueprint"
-  | "calibration"
-  | "writing";
+  | "foundation"   // Step 1: 创作起点 (story core + golden finger + commercial + world rules)
+  | "architecture" // Step 2: 架构选择 (template + reference + loop phases + expectation profile)
+  | "characters"   // Step 3: 角色阵容 (AI generation + relationship graph)
+  | "outline";      // Step 4: 章节大纲 (loop skeleton → volume expansion → chapter detail)
 
 export type StepStatus = "pending" | "generating" | "completed" | "skipped" | "error";
 
@@ -42,15 +40,12 @@ export function createInitialPipelineState(
     novelId,
     mode,
     steps: {
-      input: { status: "completed" }, // input is always done when pipeline starts
-      reference: { status: "pending" },
+      foundation: { status: "pending" },
       architecture: { status: "pending" },
       characters: { status: "pending" },
-      blueprint: { status: "pending" },
-      calibration: { status: "pending" },
-      writing: { status: "pending" },
+      outline: { status: "pending" },
     },
-    currentStep: "reference",
+    currentStep: "foundation",
   };
 }
 
@@ -102,6 +97,9 @@ export async function updateStepState(
   return state;
 }
 
+/** Step order for serial execution: 1→2→3→4 */
+const STEP_ORDER: StepName[] = ["foundation", "architecture", "characters", "outline"];
+
 /**
  * Advance currentStep to the next pending step.
  * Returns the next step name or null if all steps are done.
@@ -110,19 +108,9 @@ export async function advanceToNextStep(novelId: string): Promise<StepName | nul
   const state = await getPipelineState(novelId);
   if (!state) return null;
 
-  const stepOrder: StepName[] = [
-    "input",
-    "reference",
-    "architecture",
-    "characters",
-    "blueprint",
-    "calibration",
-    "writing",
-  ];
-
-  const currentIdx = state.currentStep ? stepOrder.indexOf(state.currentStep) : -1;
-  for (let i = currentIdx + 1; i < stepOrder.length; i++) {
-    const step = stepOrder[i];
+  const currentIdx = state.currentStep ? STEP_ORDER.indexOf(state.currentStep) : -1;
+  for (let i = currentIdx + 1; i < STEP_ORDER.length; i++) {
+    const step = STEP_ORDER[i];
     const stepState = state.steps[step];
     if (stepState && stepState.status !== "completed" && stepState.status !== "skipped") {
       state.currentStep = step;
@@ -131,21 +119,14 @@ export async function advanceToNextStep(novelId: string): Promise<StepName | nul
     }
   }
 
-  state.currentStep = "writing";
-  await savePipelineState(state);
   return null; // All steps done
 }
 
 /**
- * Check if all required (non-optional) steps are completed.
+ * Check if all required steps are completed.
  */
 export function isPipelineComplete(state: PipelineState): boolean {
-  const requiredSteps: StepName[] = [
-    "architecture",
-    "characters",
-    "blueprint",
-    "calibration",
-  ];
+  const requiredSteps: StepName[] = ["foundation", "architecture", "characters", "outline"];
   return requiredSteps.every(
     (s) =>
       state.steps[s]?.status === "completed" || state.steps[s]?.status === "skipped",

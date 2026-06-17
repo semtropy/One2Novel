@@ -1,40 +1,34 @@
 /**
- * Character State Updater — auto-update NovelCharacter states after chapter completion.
+ * Character State Updater — unified post-chapter character tracking.
  *
- * This fixes a major consistency gap: previously, character states (currentStatus,
- * currentLocation, currentGoal) were only written once during character confirmation
- * and never updated again. After 30 chapters, the AI was still using Chapter 1 states.
- *
- * This module extracts state changes from each newly completed chapter and persists
- * them to the NovelCharacter table. It is fire-and-forget — failures are logged but
- * don't block the chapter write.
+ * Extracts character state changes AND relationship changes from each newly completed
+ * chapter in a single AI call (replaces the old separate state-update + dynamics.post).
+ * Fire-and-forget — failures are logged but don't block the chapter write.
  */
-
 import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 import { logEventError } from "../../../../platform/logging/eventErrorLog";
 
-const CharacterStateUpdateSchema = z.object({
+const CharacterPostChapterSchema = z.object({
   updates: z.array(z.object({
-    name: z.string(),
+    characterName: z.string(),
+    // State changes
     currentStatus: z.string().optional(),
     currentLocation: z.string().optional(),
     currentGoal: z.string().optional(),
     availability: z.string().optional(),
+    // Relationship changes (merged from old character.dynamics.post)
+    relationshipChanges: z.array(z.object({
+      targetName: z.string(),
+      changeDescription: z.string(),
+    })).optional(),
   })).max(20).default([]),
 });
 
-export interface CharacterStateUpdate {
-  name: string;
-  currentStatus?: string;
-  currentLocation?: string;
-  currentGoal?: string;
-  availability?: string;
-}
-
 /**
- * Extract character state changes from a completed chapter and persist them.
+ * Extract character state + relationship changes from a completed chapter and persist them.
+ * Single AI call handles what was previously two separate calls.
  * Fire-and-forget — never throws, always logs errors.
  */
 export async function updateCharacterStatesAfterChapter(
@@ -46,14 +40,14 @@ export async function updateCharacterStatesAfterChapter(
     const prisma = getPrisma();
     const characters = await prisma.novelCharacter.findMany({
       where: { novelId },
-      select: { id: true, name: true, currentStatus: true, currentLocation: true, currentGoal: true },
+      select: { id: true, name: true, role: true, currentStatus: true, currentLocation: true, currentGoal: true },
     });
 
     if (characters.length === 0) return;
 
     const charList = characters
       .map(c => {
-        const parts = [`${c.name}`];
+        const parts = [`${c.name} (${c.role})`];
         if (c.currentStatus) parts.push(`当前状态: ${c.currentStatus}`);
         if (c.currentLocation) parts.push(`位置: ${c.currentLocation}`);
         if (c.currentGoal) parts.push(`目标: ${c.currentGoal}`);
@@ -61,7 +55,6 @@ export async function updateCharacterStatesAfterChapter(
       })
       .join("\n");
 
-    
     const userPrompt = [
       `## 出场角色（当前状态）`,
       charList,
@@ -71,29 +64,44 @@ export async function updateCharacterStatesAfterChapter(
     ].join("\n");
 
     const result = await aiInvoke({
-      assetId: "novel.character.state-update",
+      assetId: "novel.character.post-chapter",
       userPrompt,
-      schema: CharacterStateUpdateSchema,
+      schema: CharacterPostChapterSchema,
       temperature: 0.3,
     });
 
-    // Persist updates
+    // Persist state updates
     let updated = 0;
     for (const update of result.updates) {
-      const character = characters.find(c => c.name === update.name);
-      if (character) {
-        const data: Record<string, string> = {};
-        if (update.currentStatus) data.currentStatus = update.currentStatus;
-        if (update.currentLocation) data.currentLocation = update.currentLocation;
-        if (update.currentGoal) data.currentGoal = update.currentGoal;
-        if (update.availability) data.availability = update.availability;
+      const character = characters.find(c => c.name === update.characterName);
+      if (!character) continue;
 
-        if (Object.keys(data).length > 0) {
-          await prisma.novelCharacter.update({
-            where: { id: character.id },
-            data,
+      // Update character fields
+      const data: Record<string, string> = {};
+      if (update.currentStatus) data.currentStatus = update.currentStatus;
+      if (update.currentLocation) data.currentLocation = update.currentLocation;
+      if (update.currentGoal) data.currentGoal = update.currentGoal;
+      if (update.availability) data.availability = update.availability;
+
+      if (Object.keys(data).length > 0) {
+        await prisma.novelCharacter.update({ where: { id: character.id }, data });
+        updated++;
+      }
+
+      // Update relationships
+      if (update.relationshipChanges) {
+        for (const rel of update.relationshipChanges) {
+          const target = characters.find(c => c.name === rel.targetName);
+          if (!target) continue;
+          const existing = await prisma.novelCharacterRelation.findFirst({
+            where: { novelId, sourceCharacterId: character.id, targetCharacterId: target.id },
           });
-          updated++;
+          if (existing) {
+            await prisma.novelCharacterRelation.update({
+              where: { id: existing.id },
+              data: { summary: rel.changeDescription },
+            }).catch(() => {});
+          }
         }
       }
     }

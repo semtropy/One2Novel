@@ -1,16 +1,25 @@
 import { z } from "zod";
 import { aiInvoke } from "../../../platform/llm/aiService";
 import { getPrisma } from "../../../platform/db/client";
+import { serializeTags } from "../../../platform/data/tagHelpers";
 
 const StoryCoreSchema = z.object({
+  // Story core
   storySummary: z.string(),
   centralQuestion: z.string(),
   endingDirection: z.string(),
+  // Creative params
   genre: z.string().optional(),
   narrativePov: z.string().optional(),
   pacePreference: z.string().optional(),
-  styleTone: z.string().optional(),
+  tonePitch: z.string().optional(),
   emotionIntensity: z.string().optional(),
+  // Commercial framing (merged from deprecated novel.framing.generate)
+  targetAudience: z.string().optional(),
+  commercialTags: z.array(z.string()).optional(),
+  competingFeel: z.string().optional(),
+  bookSellingPoint: z.string().optional(),
+  first30ChapterPromise: z.string().optional(),
 });
 
 export interface StoryCoreResult {
@@ -20,13 +29,19 @@ export interface StoryCoreResult {
   genre: string | null;
   narrativePov: string | null;
   pacePreference: string | null;
-  styleTone: string | null;
+  tonePitch: string | null;
   emotionIntensity: string | null;
+  targetAudience: string | null;
+  commercialTags: string[] | null;
+  competingFeel: string | null;
+  bookSellingPoint: string | null;
+  first30ChapterPromise: string | null;
 }
 
 /**
- * Generate story core (storySummary / centralQuestion / endingDirection + creative params).
- * Writes directly to Novel columns — no more DraftStorySeed indirection.
+ * Generate unified story core — story core + creative params + commercial framing.
+ * Replaces the old separate story-core.generate + framing.generate with one AI call.
+ * Writes directly to Novel columns.
  */
 export async function generateStoryCore(novelId: string): Promise<StoryCoreResult> {
   const prisma = getPrisma();
@@ -41,7 +56,7 @@ export async function generateStoryCore(novelId: string): Promise<StoryCoreResul
 
   const raw = await aiInvoke({
     assetId: "novel.story-core.generate",
-    userPrompt: `为以下小说生成故事核心：\n\n${context}`,
+    userPrompt: `为以下小说生成故事核心 + 商业定位：\n\n${context}`,
     schema: StoryCoreSchema,
     temperature: 0.8,
     novelId,
@@ -54,8 +69,13 @@ export async function generateStoryCore(novelId: string): Promise<StoryCoreResul
     genre: raw.genre ?? novel.genre ?? null,
     narrativePov: raw.narrativePov ?? novel.narrativePov ?? null,
     pacePreference: raw.pacePreference ?? novel.pacePreference ?? null,
-    styleTone: raw.styleTone ?? novel.styleTone ?? null,
+    tonePitch: raw.tonePitch ?? novel.styleTone ?? null,
     emotionIntensity: raw.emotionIntensity ?? novel.emotionIntensity ?? null,
+    targetAudience: raw.targetAudience ?? novel.targetAudience ?? null,
+    commercialTags: raw.commercialTags ?? null,
+    competingFeel: raw.competingFeel ?? novel.competingFeel ?? null,
+    bookSellingPoint: raw.bookSellingPoint ?? novel.bookSellingPoint ?? null,
+    first30ChapterPromise: raw.first30ChapterPromise ?? novel.first30ChapterPromise ?? null,
   };
 
   // Write directly to Novel columns
@@ -68,8 +88,13 @@ export async function generateStoryCore(novelId: string): Promise<StoryCoreResul
       genre: result.genre,
       narrativePov: result.narrativePov as "first_person" | "third_person" | "mixed" | null,
       pacePreference: result.pacePreference,
-      styleTone: result.styleTone,
+      styleTone: result.tonePitch,
       emotionIntensity: result.emotionIntensity,
+      targetAudience: result.targetAudience,
+      commercialTags: result.commercialTags ? serializeTags(result.commercialTags) : undefined,
+      competingFeel: result.competingFeel,
+      bookSellingPoint: result.bookSellingPoint,
+      first30ChapterPromise: result.first30ChapterPromise,
     },
   });
 

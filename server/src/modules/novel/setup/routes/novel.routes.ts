@@ -5,7 +5,7 @@ import { serializeTags, parseTags } from "../../../../platform/data/tagHelpers";
 import { NovelCreateSchema, NovelUpdateSchema } from "@one2novel/shared/types/novel";
 import { validate } from "../validate";
 import { generateTitles } from "../titleService";
-import { generateBookFraming } from "../bookFraming";
+import { generateStoryCore } from "../../planning/storyCoreService";
 import { getPreferences, recordCreation } from "../../../settings/preferences";
 
 const router = Router();
@@ -87,26 +87,11 @@ router.post("/:id/titles", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Generate book framing
+// Generate book framing (delegates to unified story-core prompt)
 router.post("/:id/framing", async (req, res, next) => {
   try {
-    const repo = createNovelRepo(getPrisma());
-    const novel = await repo.findById(req.params.id);
-    if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND", message: "不存在" } }); return; }
-    const framing = await generateBookFraming({
-      title: novel.title,
-      description: novel.description ?? undefined,
-      genre: novel.genre ?? undefined,
-    });
-    // Save framing back to the novel
-    await repo.update(req.params.id, {
-      targetAudience: framing.targetAudience,
-      commercialTags: serializeTags(framing.commercialTags ?? []),
-      competingFeel: framing.competingFeel,
-      bookSellingPoint: framing.bookSellingPoint,
-      first30ChapterPromise: framing.first30ChapterPromise,
-    });
-    res.json({ data: framing });
+    const result = await generateStoryCore(req.params.id);
+    res.json({ data: result });
   } catch (e) { next(e); }
 });
 

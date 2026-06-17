@@ -1,13 +1,14 @@
 /**
- * PlanningHubPage — 创作决策中枢 (6-Step Pipeline, 自由导航)
+ * PlanningHubPage — 创作决策中枢 (4-Step Pipeline, 自由导航)
  *
- * Steps: 创作起点 → 架构选择 → 角色阵容 → 章节蓝图 → 发布定位 → 进入写作
- * 所有步骤可任意点击跳转，不强制线性完成。
+ * Steps: 创作起点 → 架构选择 → 角色阵容 → 章节大纲
+ * 串行流水线：每步 AI 生成接收前序全部输出作为上下文。
+ * 所有步骤可任意点击跳转（开发便利），不强制 UI 锁定。
  */
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  BookOpen, GitBranch, Users, Map, Target,
+  BookOpen, GitBranch, Users, Map,
   PenLine, ChevronRight, ChevronLeft, CheckCircle, Sparkles,
 } from "lucide-react";
 import { useNovel, useGenerateGoldenFinger } from "../api/novel";
@@ -22,15 +23,12 @@ import { ArchitectureDomain } from "../components/planning/ArchitectureDomain";
 import { WorldPanel } from "../components/planning/WorldPanel";
 import { CharactersDomain } from "../components/planning/CharactersDomain";
 import { BlueprintDomain } from "../components/planning/BlueprintDomain";
-import { PositioningDomain } from "../components/planning/PositioningDomain";
 
 const STEPS = [
-  { id: "input",        label: "创作起点", icon: BookOpen,    hint: "故事核心 · 世界规则 · 金手指设定" },
-  { id: "architecture", label: "架构选择", icon: GitBranch,   hint: "内置模板 + 参考书定制架构 · 回环阶段编辑" },
-  { id: "characters",   label: "角色阵容", icon: Users,       hint: "AI 生成角色 · 设置功能标签 · 编辑关系网络" },
-  { id: "blueprint",    label: "章节蓝图", icon: Map,         hint: "生成回环骨架 · 逐卷展开 · 章节分配" },
-  { id: "calibration",  label: "发布定位", icon: Target,      hint: "商业定位 · 爽点配方 · 期待管理" },
-  { id: "writing",      label: "进入写作", icon: PenLine,     hint: "确认所有规划，进入写作工作台" },
+  { id: "foundation",   label: "创作起点", icon: BookOpen,    hint: "故事核心 · 金手指 · 商业定位 · 世界规则" },
+  { id: "architecture", label: "架构选择", icon: GitBranch,   hint: "内置模板 + 参考书定制 · 回环阶段编辑 · 期待参数" },
+  { id: "characters",   label: "角色阵容", icon: Users,       hint: "AI 生成角色 · 功能标签 · 关系网络 · 演化轨迹" },
+  { id: "outline",      label: "章节大纲", icon: Map,         hint: "回环骨架 → 逐卷展开 · 设定释放计划" },
 ];
 
 export function PlanningHubPage() {
@@ -166,7 +164,7 @@ export function PlanningHubPage() {
                     <button onClick={() => setSubTab("world")}
                       className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                         subTab === "world" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
-                      <Target size={12} />世界规则
+                      <Map size={12} />世界规则
                     </button>
                     <button onClick={() => setSubTab("golden")}
                       className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
@@ -194,32 +192,9 @@ export function PlanningHubPage() {
                 <CharactersDomain novelId={novel.id} onComplete={() => onStepComplete(2)} />
               )}
 
-              {/* Step 3: 章节蓝图 */}
+              {/* Step 3: 章节大纲 */}
               {currentStep === 3 && (
                 <BlueprintDomain novelId={novel.id} onComplete={() => onStepComplete(3)} />
-              )}
-
-              {/* Step 4: 发布定位 */}
-              {currentStep === 4 && (
-                <PositioningDomain novelId={novel.id} onComplete={() => onStepComplete(4)} />
-              )}
-
-              {/* Step 5: 进入写作 */}
-              {currentStep === 5 && (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <CheckCircle size={48} className="mb-4 text-green-400" />
-                  <h3 className="text-lg font-bold text-slate-800 mb-2">规划完成</h3>
-                  <p className="text-sm text-slate-500 mb-6 max-w-md">
-                    你已经完成了所有规划步骤。故事核心、架构、角色、蓝图和发布定位都已就绪。
-                  </p>
-                  <button
-                    onClick={handleEnterWriting}
-                    className="rounded-xl bg-slate-900 px-8 py-3 text-sm font-medium text-white hover:bg-slate-800 shadow-sm transition-colors"
-                  >
-                    <PenLine size={16} className="inline mr-2" />
-                    进入写作工作台
-                  </button>
-                </div>
               )}
             </div>
 

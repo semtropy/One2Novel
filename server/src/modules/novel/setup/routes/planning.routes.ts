@@ -38,7 +38,7 @@ router.post("/:novelId/story-core", async (req, res, next) => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// 7-Step Advanced Creation Pipeline Routes
+// 4-Step Creation Pipeline Routes
 // ═══════════════════════════════════════════════════════════
 
 // Initialize pipeline for advanced mode
@@ -69,11 +69,8 @@ router.post("/:novelId/pipeline/step/:stepName", async (req, res, next) => {
     let result: unknown = null;
 
     switch (stepName) {
-      case "input":
+      case "foundation":
         result = await pipeline.step1_storyCore();
-        break;
-      case "reference":
-        result = await pipeline.step2_referenceAnalysis();
         break;
       case "architecture":
         result = await pipeline.step3_architectureConfirmation({
@@ -86,7 +83,7 @@ router.post("/:novelId/pipeline/step/:stepName", async (req, res, next) => {
       case "characters":
         result = await pipeline.step4_characterConfiguration();
         break;
-      case "blueprint": {
+      case "outline": {
         const mode = req.body?.mode ?? "per_volume";
         if (req.body?.skeletonOnly) {
           result = await pipeline.step5a_generateLoopSkeleton();
@@ -97,12 +94,6 @@ router.post("/:novelId/pipeline/step/:stepName", async (req, res, next) => {
         }
         break;
       }
-      case "calibration":
-        await pipeline.step6_positioningCalibration();
-        break;
-      case "writing":
-        await pipeline.step7_enterWriting();
-        break;
       default:
         res.status(400).json({ error: { code: "INVALID_STEP", message: `Unknown step: ${stepName}` } });
         return;
