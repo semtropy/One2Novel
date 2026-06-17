@@ -15,7 +15,7 @@ const LLMCharExtractSchema = z.object({
 });
 
 export interface CharacterExtraction {
-  characters: { name: string; role: string; personality: string; background: string; appearance?: string; quirks?: string; currentStatus?: string; currentGoal: string; voiceTexture: string; identityLabel: string; factionLabel?: string; prohibitions?: string[] }[];
+  characters: { name: string; role: string; personality: string; background: string; appearance?: string; quirks?: string; currentStatus?: string; currentGoal: string; voiceTexture: string; identityLabel: string; factionLabel?: string; prohibitions?: string }[];
   relationships: { source: string; target: string; type: string; summary: string }[];
 }
 
@@ -51,7 +51,7 @@ export async function persistCharacters(
         background: c.background, appearance: c.appearance, quirks: c.quirks,
         currentStatus: c.currentStatus, currentGoal: c.currentGoal,
         voiceTexture: c.voiceTexture, identityLabel: c.identityLabel,
-        prohibitions: JSON.stringify(c.prohibitions ?? []),
+        prohibitions: c.prohibitions ?? null,
       },
     });
     charNameToId[c.name] = created.id;
@@ -114,7 +114,7 @@ export async function generateCharacters(novelId: string): Promise<CharacterExtr
   });
 
   return {
-    characters: raw.characters.map(c => ({ name: c.name, role: normRole(c.role), personality: c.personality, background: c.background, appearance: c.appearance ?? undefined, quirks: c.quirks ?? undefined, currentStatus: c.currentStatus ?? undefined, currentGoal: c.goal, voiceTexture: c.voice, identityLabel: c.identity, factionLabel: c.faction ?? undefined, prohibitions: c.flaw ? [c.flaw] : undefined })),
+    characters: raw.characters.map(c => ({ name: c.name, role: normRole(c.role), personality: c.personality, background: c.background, appearance: c.appearance ?? undefined, quirks: c.quirks ?? undefined, currentStatus: c.currentStatus ?? undefined, currentGoal: c.goal, voiceTexture: c.voice, identityLabel: c.identity, factionLabel: c.faction ?? undefined, prohibitions: c.flaw ?? undefined })),
     relationships: (raw.relationships ?? []).map(r => ({ source: r.source, target: r.target, type: r.type, summary: r.summary })),
   };
 }
