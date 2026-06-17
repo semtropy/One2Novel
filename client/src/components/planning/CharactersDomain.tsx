@@ -208,28 +208,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
             </div>
           </section>
 
-          {/* Relationship Summary */}
-          {relations.length > 0 && (
-            <section className="rounded-xl border border-slate-200 bg-white p-4">
-              <h3 className="text-sm font-medium text-slate-700 mb-3">角色关系</h3>
-              <div className="space-y-1.5">
-                {relations.slice(0, 10).map(rel => {
-                  const source = relGraph?.nodes.find(n => n.id === rel.sourceId);
-                  const target = relGraph?.nodes.find(n => n.id === rel.targetId);
-                  return (
-                    <div key={rel.id} className="flex items-center gap-2 text-xs">
-                      <span className="font-medium text-slate-700">{source?.name ?? "?"}</span>
-                      <span className="text-slate-400">—{rel.type}—</span>
-                      <span className="font-medium text-slate-700">{target?.name ?? "?"}</span>
-                      {rel.stage && <span className="rounded bg-slate-100 px-1.5 py-0 text-[10px] text-slate-500">{STAGE_LABELS[rel.stage] ?? rel.stage}</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Relationship Network Graph */}
+          {/* Relationship Network Graph (primary relationship view) */}
           {characters.length > 0 && relations.length > 0 && (
             <section className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex items-center gap-2 mb-3">

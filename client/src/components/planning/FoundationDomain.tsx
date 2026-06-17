@@ -215,9 +215,17 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
 
       {/* ── 3. 金手指设定 ── */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-1.5">
-          <Target size={14} /> 金手指设定
-        </h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+            <Target size={14} /> 金手指设定
+          </h3>
+          <button onClick={async () => {
+            try { const result = await genGoldenFinger.mutateAsync(novelId); setGfName(result.goldenFingerName); setGfAbilities(result.abilities.join("\n")); setGfLimits(result.limits.join("\n")); refetch(); } catch {}
+          }} disabled={genGoldenFinger.isPending}
+            className="flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50">
+            <Sparkles size={11} />{genGoldenFinger.isPending ? "生成中…" : "AI 生成金手指"}
+          </button>
+        </div>
         <div className="space-y-2">
           <div>
             <label className="text-[10px] text-slate-400">名称</label>
