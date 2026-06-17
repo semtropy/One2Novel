@@ -107,9 +107,17 @@ export async function generateCharacters(novelId: string): Promise<CharacterExtr
     } catch { /* ignore */ }
   }
 
+  // Build story core context (Step 1 output → Step 3 input)
+  let storyCoreContext = "";
+  if (novel.storySummary) storyCoreContext += `\n【故事简介】${novel.storySummary}`;
+  if (novel.centralQuestion) storyCoreContext += `\n【核心悬念】${novel.centralQuestion}`;
+  if (novel.endingDirection) storyCoreContext += `\n【结局方向】${novel.endingDirection}`;
+  if (novel.targetAudience) storyCoreContext += `\n【目标读者】${novel.targetAudience}`;
+  if (novel.bookSellingPoint) storyCoreContext += `\n【核心卖点】${novel.bookSellingPoint}`;
+
   const raw = await aiInvoke({
     assetId: "novel.character.extract", skillModules: ["character","fatal_flaw"],
-    userPrompt: [`书名：《${novel.title}》`, novel.genre ? `题材：${novel.genre}` : null, `章节：${chList}`, outline ? `大纲：${outline.slice(0, 4000)}` : null, descriptionText, archContext, "请基于以上信息生成角色阵容，确保角色在架构中承担明确的功能标签（副本触发器/奖励来源/伏笔载体/长期威胁/情感锚点），不要凭空创造与大纲/灵感冲突的角色。"].filter(Boolean).join("\n"),
+    userPrompt: [`书名：《${novel.title}》`, novel.genre ? `题材：${novel.genre}` : null, storyCoreContext, `章节：${chList}`, outline ? `大纲：${outline.slice(0, 4000)}` : null, descriptionText, archContext, "请基于以上信息生成角色阵容，确保角色在架构中承担明确的功能标签（副本触发器/奖励来源/伏笔载体/长期威胁/情感锚点），不要凭空创造与大纲/灵感冲突的角色。"].filter(Boolean).join("\n"),
     schema: LLMCharExtractSchema, temperature: 0.85,
   });
 

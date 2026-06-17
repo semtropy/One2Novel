@@ -107,9 +107,21 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
     refetch();
   }, [novelId, gfName, gfAbilities, gfLimits, updateNovel, refetch]);
 
+  const [saveError, setSaveError] = useState("");
+
   const quickSave = async (field: string, value: string) => {
-    await updateNovel.mutateAsync({ id: novelId, [field]: value });
-    refetch();
+    try {
+      if (field === "commercialTags") {
+        const tags = value.split(",").map(s => s.trim()).filter(Boolean);
+        await updateNovel.mutateAsync({ id: novelId, commercialTags: tags as unknown as string });
+      } else {
+        await updateNovel.mutateAsync({ id: novelId, [field]: value });
+      }
+      refetch();
+      setSaveError("");
+    } catch {
+      setSaveError("保存失败，请重试");
+    }
   };
 
   const hasCore = !!(novel?.storySummary);
@@ -139,6 +151,9 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
 
       {genError && (
         <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">{genError}</div>
+      )}
+      {saveError && (
+        <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-600">{saveError}</div>
       )}
 
       {/* ── 1. 灵感输入 ── */}
@@ -210,6 +225,15 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
               </select>
             </div>
           ))}
+          <div className="col-span-2 sm:col-span-4">
+            <label className="text-[10px] text-slate-400 block mb-0.5">语气基调 (tonePitch)</label>
+            <input
+              value={(novel as unknown as Record<string,string>)["styleTone"] ?? ""}
+              onChange={e => quickSave("styleTone", e.target.value)}
+              placeholder="如：冷峻克制，以客观叙述和对话推进，氛围偏阴郁"
+              className="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:border-brand-300 focus:outline-none"
+            />
+          </div>
         </div>
       </section>
 

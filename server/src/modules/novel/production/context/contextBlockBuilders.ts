@@ -274,6 +274,30 @@ export async function assembleChapterBlocks(
     }));
   }
 
+  // ── expectation_profile (cool point recipe + hook targets from architecture step) ──
+  try {
+    const profileRaw = (await prisma.novel.findUnique({ where: { id: novelId }, select: { expectationProfile: true } }))?.expectationProfile;
+    if (profileRaw) {
+      const ep = JSON.parse(profileRaw);
+      const parts: string[] = [];
+      if (ep.coolPointRecipe) {
+        const recipe = Object.entries(ep.coolPointRecipe as Record<string, number>)
+          .map(([type, pct]) => `${({collect:"收集",strategy:"策略",verify:"验证",reveal:"揭示",upgrade:"升级"} as Record<string,string>)[type] ?? type}:${pct}%`).join(" ");
+        parts.push(`爽点配方：${recipe}`);
+      }
+      if (ep.hookProfile) {
+        parts.push(`钩子目标：每章${ep.hookProfile.shortTermPerChapter}个短期钩子 每卷${ep.hookProfile.mediumTermPerVolume}个中期钩子 ${ep.hookProfile.longTermLines}条长期线`);
+      }
+      if (ep.payoffWindow) parts.push(`伏笔回收窗口：${ep.payoffWindow}章`);
+      if (parts.length > 0) {
+        blocks.push(createContextBlock({
+          id: "expectation_profile", group: "chapter_mission", priority: 95,
+          content: `[架构期待参数]\n${parts.join("\n")}`,
+        }));
+      }
+    }
+  } catch { /* best-effort */ }
+
   // ── content_beat_mission ──
   if (chapterPlan?.contentBeat) {
     const beatGuide = getContentBeatGuide(chapterPlan.contentBeat);

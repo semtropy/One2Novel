@@ -215,6 +215,15 @@ export async function expandLoopToVolume(
   const novel = await prisma.novel.findUnique({ where: { id: novelId } });
   if (!novel) throw new Error("Novel not found");
 
+  // Fetch character roster for context injection (Step 3 output → Step 4 input)
+  const characters = await prisma.novelCharacter.findMany({
+    where: { novelId },
+    select: { name: true, role: true, factionLabel: true },
+  });
+  const charContext = characters.length > 0
+    ? `\n【角色阵容】\n${characters.map(c => `- ${c.name}（${c.role === "protagonist" ? "主角" : c.role === "antagonist" ? "对手" : "配角"}）${c.factionLabel ? ` [${c.factionLabel}]` : ""}`).join("\n")}`
+    : "";
+
   const arch = getArchitectureTemplate(skeleton.architectureType);
 
   const loopItem = skeleton.loops.find(l => l.loopIndex === loopIndex);
@@ -297,6 +306,7 @@ export async function expandLoopToVolume(
     `升级方向：${loopItem.scaleUpDirection}`,
     prevLoop ? `\n上一轮回环结算：${prevLoop.settlementContent}` : "",
     novel.centralQuestion ? `\n核心悬念（可在本回环中渐进揭示）：${novel.centralQuestion}` : "",
+    charContext,
     prevVolContext,
   ].filter(Boolean).join("\n");
 
