@@ -32,6 +32,12 @@ const STAGE_LABELS: Record<string, string> = {
   strangers: "陌生人", acquainted: "相识", allied: "盟友", conflicted: "冲突", estranged: "疏远", reconciled: "和解",
 };
 
+/** prohibitions may be stored as JSON array string ["defect"] or plain text — parse safely */
+function parseProhibitions(raw?: string | null): string {
+  if (!raw) return "";
+  try { const arr = JSON.parse(raw); return Array.isArray(arr) ? arr[0] ?? "" : raw; } catch { return raw; }
+}
+
 export function CharactersDomain({ novelId, onComplete }: Props) {
   const { data: novel, refetch: refetchNovel } = useNovel(novelId);
   const { data: relGraph, refetch: refetchRel } = useDraftRelationshipGraph(novelId);
@@ -100,7 +106,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
       currentStatus: char.currentStatus ?? "",
       quirks: char.quirks ?? "",
       factionLabel: char.factionLabel ?? "",
-      flaw: char.prohibitions?.[0] ?? "",
+      flaw: parseProhibitions(char.prohibitions),
     });
   };
 
@@ -190,7 +196,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
                           {char.personality && <p className="text-xs text-slate-500 mb-1 line-clamp-2">性格：{char.personality}{char.identityLabel ? ` · ${char.identityLabel}` : ""}{char.factionLabel ? ` · ${char.factionLabel}` : ""}</p>}
                           {char.currentStatus && <p className="text-xs text-slate-400 mb-0.5">状态：{char.currentStatus}</p>}
                           {char.quirks && <p className="text-xs text-slate-400 mb-0.5">习惯：{char.quirks}</p>}
-                          {char.prohibitions?.[0] && <p className="text-xs text-amber-600 mb-0.5">缺陷：{char.prohibitions[0]}</p>}
+                          {parseProhibitions(char.prohibitions) && <p className="text-xs text-amber-600 mb-0.5">缺陷：{parseProhibitions(char.prohibitions)}</p>}
                           <div className="mt-2 flex items-center justify-between">
                             <select value={char.loopFunctionTag ?? ""} onChange={e => handleTagChange(char.id, e.target.value)} disabled={updatingTag === char.id}
                               className="rounded border border-slate-200 px-2 py-0.5 text-xs focus:border-brand-300 focus:outline-none max-w-[160px]">
