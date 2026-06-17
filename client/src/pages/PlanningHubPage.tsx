@@ -9,16 +9,16 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   BookOpen, GitBranch, Users, Map,
-  PenLine, ChevronRight, ChevronLeft, CheckCircle, Sparkles,
+  PenLine, ChevronRight, ChevronLeft, CheckCircle,
 } from "lucide-react";
-import { useNovel, useGenerateGoldenFinger } from "../api/novel";
+import { useNovel } from "../api/novel";
 import { api } from "../app/api";
 import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
 import { cn } from "../lib/cn";
 
 // Domain panels
-import { StoryCoreDomain } from "../components/planning/StoryCoreDomain";
+import { FoundationDomain } from "../components/planning/FoundationDomain";
 import { ArchitectureDomain } from "../components/planning/ArchitectureDomain";
 import { WorldPanel } from "../components/planning/WorldPanel";
 import { CharactersDomain } from "../components/planning/CharactersDomain";
@@ -152,13 +152,13 @@ export function PlanningHubPage() {
           <div className="max-w-4xl mx-auto">
             <div className="rounded-xl border border-slate-200 bg-white p-6 min-h-[400px]">
 
-              {/* Step 0: 创作起点 — 故事核心 + 世界规则 + 金手指 */}
+              {/* Step 0: 创作起点 — 统一的故事核心 + 金手指 + 商业定位 + 世界规则入口 */}
               {currentStep === 0 && (
                 <div className="space-y-4">
                   <div className="flex gap-1 border-b border-slate-100 pb-2">
-                    <button onClick={() => setSubTab("arch")}
+                    <button onClick={() => setSubTab("foundation")}
                       className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        subTab === "arch" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
+                        subTab === "foundation" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
                       <BookOpen size={12} />故事核心
                     </button>
                     <button onClick={() => setSubTab("world")}
@@ -166,18 +166,11 @@ export function PlanningHubPage() {
                         subTab === "world" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
                       <Map size={12} />世界规则
                     </button>
-                    <button onClick={() => setSubTab("golden")}
-                      className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        subTab === "golden" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
-                      <Sparkles size={12} />金手指
-                    </button>
                   </div>
-                  {subTab === "arch" ? (
-                    <StoryCoreDomain novelId={novel.id} onComplete={() => onStepComplete(0)} />
-                  ) : subTab === "world" ? (
-                    <WorldPanel novelId={novel.id} />
+                  {subTab === "foundation" ? (
+                    <FoundationDomain novelId={novel.id} onComplete={() => onStepComplete(0)} />
                   ) : (
-                    <GoldenFingerPanel novelId={novel.id} />
+                    <WorldPanel novelId={novel.id} />
                   )}
                 </div>
               )}
@@ -238,64 +231,4 @@ export function PlanningHubPage() {
   );
 }
 
-function GoldenFingerPanel({ novelId }: { novelId: string }) {
-  const { data: novel } = useNovel(novelId);
-  const generate = useGenerateGoldenFinger();
-  const [abilities, setAbilities] = useState("");
-  const [limits, setLimits] = useState("");
-  const [gfName, setGfName] = useState("");
-
-  useEffect(() => {
-    if (novel?.goldenFinger) {
-      try {
-        const gf = JSON.parse(novel.goldenFinger);
-        if (gf.goldenFingerName) setGfName(gf.goldenFingerName);
-        if (Array.isArray(gf.abilities)) setAbilities(gf.abilities.join("\n"));
-        if (Array.isArray(gf.limits)) setLimits(gf.limits.join("\n"));
-      } catch {}
-    }
-  }, [novel?.goldenFinger]);
-
-  async function handleSave() {
-    const abilityList = abilities.split("\n").filter(Boolean);
-    const limitList = limits.split("\n").filter(Boolean);
-    await api.patch(`/novels/${novelId}`, { goldenFinger: JSON.stringify({ goldenFingerName: gfName, abilities: abilityList, limits: limitList }) });
-  }
-
-  async function handleGenerate() {
-    const result = await generate.mutateAsync(novelId);
-    setGfName(result.goldenFingerName);
-    setAbilities(result.abilities.join("\n"));
-    setLimits(result.limits.join("\n"));
-    // Auto-save after generation
-    await api.patch(`/novels/${novelId}`, { goldenFinger: JSON.stringify(result) });
-  }
-
-  return (
-    <div className="space-y-4">
-      <p className="text-xs text-slate-500">设定主角的独特能力及其边界——网文最核心的爽点引擎。能力的稀缺感和代价感比能力本身更重要。</p>
-      <div className="flex items-center gap-2">
-        <button onClick={handleGenerate} disabled={generate.isPending}
-          className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50">
-          <Sparkles size={12} />{generate.isPending ? "AI 生成中..." : "AI 生成金手指"}
-        </button>
-        {gfName && <span className="text-xs font-medium text-slate-700">名称：{gfName}</span>}
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <span className="text-xs font-medium text-slate-500">能力清单</span>
-          <textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-slate-400 focus:outline-none" rows={6}
-            value={abilities} onChange={e => setAbilities(e.target.value)} placeholder="每行一条能力" />
-        </div>
-        <div>
-          <span className="text-xs font-medium text-slate-500">限制清单</span>
-          <textarea className="w-full mt-1 rounded-lg border border-slate-200 p-2.5 text-xs resize-none focus:border-slate-400 focus:outline-none" rows={6}
-            value={limits} onChange={e => setLimits(e.target.value)} placeholder="每行一条限制" />
-        </div>
-      </div>
-      <button onClick={handleSave} className="rounded-lg bg-slate-800 px-4 py-1.5 text-xs font-medium text-white hover:bg-slate-700">
-        保存金手指设定
-      </button>
-    </div>
-  );
-}
+// GoldenFingerPanel removed — now integrated into FoundationDomain
