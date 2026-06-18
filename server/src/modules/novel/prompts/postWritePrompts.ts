@@ -27,6 +27,8 @@ promptRegistry.register({
     "2. 只描述正文中实际发生的变化，不编造。",
     "3. 关系变化必须是本章正文中可见的互动结果，不能凭空推断。",
     "4. 多个角色同时变化时全部列出，不遗漏。",
+    "【Few-Shot 示例】输入：第17章《对决军院长》正文片段 + 角色列表[林渊(主角,灰狼佣兵团,边境关卡),索菲亚(对手,帝国,边境关卡)]",
+    `输出：{"updates":[{"characterName":"林渊","currentStatus":"血脉能力过度使用导致昏迷48小时，左臂血脉纹路从深红褪为淡粉","currentLocation":"自由城邦关卡内侧医疗帐篷","currentGoal":"醒来后从维克多口中了解神陨之地的真相","availability":"重伤昏迷","relationshipChanges":[{"targetName":"索菲亚","changeDescription":"索菲亚对主角的评价从'可收编的人才'变为'必须铲除的威胁'"},{"targetName":"安薇儿","changeDescription":"安薇儿在主角昏迷期间守夜48小时不眠，信任关系从战友升级为生死之交"}]}]}`,
     "只输出JSON。",
   ].join("\n"),
 });

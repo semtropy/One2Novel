@@ -181,6 +181,10 @@ promptRegistry.register({
     "4. 每个场景有明确的叙事目标（推进主线/揭示信息/建立关系/制造冲突/释放压力）",
     "5. 场景字数分配符合章节节奏：关键场景偏长，过渡场景偏短",
     "6. POV角色是该场景的主要视点人物",
+    "",
+    "【Few-Shot 示例】",
+    "输入：第17章《对决军院长》| 章节目标：主角用血脉能力以弱胜强对抗索菲亚 | 上一章结尾：索菲亚率精锐追至边境",
+    `输出：{"scenes":[{"order":1,"title":"边境对峙","goal":"展示双方实力差距，建立'不可能胜利'的压力","pov":"林渊","participants":["林渊","索菲亚","帝国精锐卫队"],"location":"自由城邦边境关卡","timeOfDay":"黄昏","estimatedWords":1200,"summary":"索菲亚在关卡前拦下主角。两人展开对话——索菲亚给主角最后一次归队机会，主角拒绝。索菲亚挥手让卫队退下，亲自出手。"},{"order":2,"title":"因果线的赌博","goal":"主角用血脉能力找到唯一的胜利路径","pov":"林渊","participants":["林渊","索菲亚"],"location":"关卡前的空旷地带","timeOfDay":"黄昏转暮","estimatedWords":1800,"summary":"索菲亚的实力碾压主角。主角激活血脉能力——看到无数条'失败线'中只有一条淡金色的'胜利线'。这条线指向索菲亚左肩旧伤。主角全神贯注追逐这条线，每一次闪避都惊险万分。"},{"order":3,"title":"下一站的预告","goal":"结算战斗结果，为下一轮回环铺垫","pov":"林渊","participants":["林渊","安薇儿","灰狐维克多"],"location":"自由城邦关卡内侧","timeOfDay":"深夜","estimatedWords":1000,"summary":"索菲亚退走后，主角虚弱倒地。安薇儿和维克多赶到——维克多说出下一轮回环的引子：'帝国已经启动了神陨之地的计划，你的血脉是关键。'主角在昏迷前回答：'等我醒来，告诉我全部。'"}]}`,
   ].join("\n"),
 });
 
@@ -455,6 +459,9 @@ promptRegistry.register({
     "3. 高潮章(chapterType=climax)必须有 conflictIntensity≥8 和 coolPointLevel=high",
     "4. 冷却章(chapterType=cooldown)必须有 conflictIntensity≤4",
     "",
+    "【Few-Shot 示例：标注3章的参考】",
+    "输入：第1章《血色毕业礼》片段(主角拒绝屠杀平民被开除军籍，院长当众宣布逮捕令，主角手腕血脉纹路发热)→ 第2章《追兵将至》片段(军部派追捕队，主角逃亡中首次触发血脉能力看到追捕队行动轨迹)→ 第18章《灰狼的赌注》片段(维克多将情报网交给主角，两人在佣兵团酒吧喝酒)",
+    `输出：{"chapters":[{"chapterIndex":1,"chapterType":"advance","coolPointLevel":"high","hookType":"suspense","contentBeat":"说明","conflictIntensity":6,"openingType":"dialogue","summary":"主角拒绝屠杀平民被开除军籍，院长宣布逮捕令，主角血脉纹路首次发热"},{"chapterIndex":2,"chapterType":"advance","coolPointLevel":"high","hookType":"preview","contentBeat":"战斗","conflictIntensity":7,"openingType":"action","summary":"追捕队出动，主角逃亡中首次触发血脉能力预判追捕路线"},{"chapterIndex":18,"chapterType":"cooldown","coolPointLevel":"medium","hookType":"preview","contentBeat":"日常","conflictIntensity":3,"openingType":"dialogue","summary":"维克多将情报网交给主角，两人喝酒闲聊暗示下一轮回环的危险"}]}`,
     "只输出JSON。",
   ].join("\n"),
 });
@@ -476,6 +483,10 @@ promptRegistry.register({
     "4. 兑现方式对应建立时的承诺",
     "5. 兑现后立即建立的新期待是什么",
     "6. 无明确期待链则不编造，标记为\"无明显期待链\"",
+    "",
+    "【Few-Shot 示例】",
+    "输入：第1轮回环(第1-18章) | 标注摘要显示前3章hook=suspense/preview/suspense，中段beat=修炼/赚钱/探索，末段cool=high",
+    `输出：{"expectations":[{"loopIndex":1,"expectationType":"能力成长期待","establishmentChapter":2,"establishmentMethod":"主角首次无意识触发血脉能力后，章尾以追捕队长报告'目标似乎能预判我们的行动'暗示能力潜力远不止此","maintenanceMethod":"中段修炼章每章结尾用preview钩子预告'主角正在尝试控制能力'，同时以赚钱章（接佣兵任务）展示能力在实际战斗中的优势","fulfillmentChapter":17,"fulfillmentMethod":"决战中主角用完整血脉能力预判并切断索菲亚的'胜利线'，兑现了前面15章积累的'能力到底有多强'的期待","nextExpectation":"索菲亚退回帝国时暗示'下一次不会这么简单'，同时维克多即将透露'神陨之地'的秘密——读者接下来期待主角能力进化+真相揭示的双重兑现"}]}`,
     "只输出JSON。",
   ].join("\n"),
 });
