@@ -102,8 +102,6 @@ export function ReferenceCockpitPage() {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [profileCreated, setProfileCreated] = useState(false);
   const [applyTargetId, setApplyTargetId] = useState<string>("");
-  const doneCount = Object.values(done).filter(Boolean).length;
-
   useEffect(() => {
     if (profId) loadProfile(profId);
   }, [profId]);
@@ -256,7 +254,7 @@ export function ReferenceCockpitPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {doneCount > 0 && (
+            {r && (
               <select value={applyTargetId} onChange={e => setApplyTargetId(e.target.value)}
                 className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 focus:border-slate-400 focus:outline-none">
                 <option value="">目标小说</option>
@@ -311,68 +309,11 @@ export function ReferenceCockpitPage() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-2 text-xs">
+        <div className="grid grid-cols-3 gap-2 text-xs">
           <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">总章数</div><div className="text-lg font-bold text-slate-700">{r?.totalChapters ?? "—"}</div></div>
-          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">回环数</div><div className="text-lg font-bold text-slate-700">{r?.totalLoops || "—"}</div></div>
-          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">已完成</div><div className="text-lg font-bold text-slate-700">{doneCount}/8</div></div>
-          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">档案</div><div className="text-lg font-bold text-slate-700">{profId ? "已保存" : "新建"}</div></div>
+          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">回环数</div><div className="text-lg font-bold text-slate-700">{r?.loopNarratives?.length ?? "—"}</div></div>
+          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">节奏</div><div className="text-lg font-bold text-slate-700">{r?.rhythmProfile?.rhythmTemplate ?? "—"}</div></div>
         </div>
-
-        {/* Architecture Profile (deep analysis result) */}
-        {r && (
-          <div className="rounded-xl border border-brand-200 bg-brand-50/30 p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-800">深度分析结果</h3>
-              <span className="text-[10px] text-brand-500 font-medium">{r.totalChapters ?? r?.totalChapters}章 · {r.loops?.length ?? r?.totalLoops}轮回环</span>
-            </div>
-            <div className="grid grid-cols-4 gap-2 text-xs">
-              <StatBadge label="推进章" value={`${r.chapterTypeDistribution?.advance ?? 0}%`} />
-              <StatBadge label="过渡章" value={`${r.chapterTypeDistribution?.transition ?? 0}%`} />
-              <StatBadge label="冷却章" value={`${r.chapterTypeDistribution?.cooldown ?? 0}%`} />
-              <StatBadge label="高潮章" value={`${r.chapterTypeDistribution?.climax ?? 0}%`} />
-            </div>
-            {r.coolPointRecipe && (
-              <div>
-                <p className="text-[10px] text-slate-500 mb-1.5">爽点配方</p>
-                <div className="flex gap-1 h-4 rounded-full overflow-hidden bg-slate-200">
-                  {Object.entries(r.coolPointRecipe as Record<string,number>).filter(([,v]) => v > 0).map(([k, v]) => (
-                    <div key={k} title={`${k}: ${v}%`} className="h-full" style={{ width: `${v}%`, backgroundColor: { collect: "#059669", strategy: "#2563eb", verify: "#7c3aed", reveal: "#ea580c", upgrade: "#e11d48", faceSlap: "#ca8a04" }[k] || "#94a3b8" }} />
-                  ))}
-                </div>
-                <div className="flex gap-2 mt-1 flex-wrap">
-                  {Object.entries(r.coolPointRecipe as Record<string,number>).filter(([,v]) => v > 0).map(([k, v]) => (
-                    <span key={k} className="text-[10px] text-slate-500">{({collect:"收集",strategy:"策略",verify:"验证",reveal:"揭示",upgrade:"升级",faceSlap:"打脸"} as Record<string,string>)[k]??k} {v}%</span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {r.hookProfile && (
-              <div className="grid grid-cols-2 gap-2 text-[10px]">
-                <div className="rounded bg-white p-2">
-                  <span className="text-slate-400">钩子密度</span>
-                  <p className="font-semibold text-slate-700">每章 {r.hookProfile.shortTermPerChapter} · 每卷 {r.hookProfile.mediumTermPerVolume} · {r.hookProfile.longTermLines}条长线</p>
-                </div>
-                <div className="rounded bg-white p-2">
-                  <span className="text-slate-400">伏笔窗口</span>
-                  <p className="font-semibold text-slate-700">约 {r.payoffPatterns?.typicalPayoffWindow ?? "?"} 章</p>
-                </div>
-              </div>
-            )}
-            {r.contentBeatProfile && (
-              <div>
-                <p className="text-[10px] text-slate-500 mb-1">内容节拍</p>
-                <div className="flex gap-1 flex-wrap">
-                  {Object.entries(r.contentBeatProfile as Record<string,number>).sort(([,a],[,b])=>b-a).slice(0,6).map(([k, v]) => (
-                    <span key={k} className="rounded bg-white px-1.5 py-0.5 text-[10px] text-slate-600">{k} {v}%</span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {r.avgChapterWordCount && (
-              <div className="text-[10px] text-slate-400">平均章节 {r.avgChapterWordCount.avg} 字 ({r.avgChapterWordCount.min}-{r.avgChapterWordCount.max}) · 平均每回环 {r.avgChaptersPerLoop?.avg} 章</div>
-            )}
-          </div>
-        )}
 
         {/* Analysis Results V2 */}
         {hasResult ? (
@@ -456,6 +397,27 @@ export function ReferenceCockpitPage() {
                     <p className="text-[10px] text-slate-400">每章约 {r.craftStats.avgDialoguePerChapter} 次对话</p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Writing Techniques */}
+            {r.writingTechniques && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><BookOpen size={14}/>写法技法</h3>
+                <p className="text-xs text-slate-500 mb-2">{r.writingTechniques.overallStyleDescription}</p>
+                {(["narrativeAssets","languageAssets","characterAssets","rhythmAssets","antiAiAssets"] as const).map(cat => {
+                  const items = r.writingTechniques[cat] as Array<{category:string;rule:string;confidence:number}> | undefined;
+                  if (!items?.length) return null;
+                  const label: Record<string,string> = {narrativeAssets:"叙事技法",languageAssets:"语言风格",characterAssets:"角色塑造",rhythmAssets:"节奏控制",antiAiAssets:"反AI特征"};
+                  return (
+                    <details key={cat} className="mt-1 text-xs">
+                      <summary className="cursor-pointer text-slate-600 font-medium">{label[cat]} ({items.length}条)</summary>
+                      <div className="mt-1 space-y-1 pl-2 border-l-2 border-slate-200">
+                        {items.slice(0,3).map((t,i) => <p key={i} className="text-slate-500">{t.rule} <span className="text-[10px] text-slate-300">({(t.confidence*100).toFixed(0)}%)</span></p>)}
+                      </div>
+                    </details>
+                  );
+                })}
               </div>
             )}
 
