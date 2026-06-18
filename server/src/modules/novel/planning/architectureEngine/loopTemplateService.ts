@@ -102,6 +102,28 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
     } catch { /* use default */ }
   }
 
+  // Read ArchitectureProfile for statistics-based parameters (from reference analysis or built-in template)
+  let archProfileStats = "";
+  if (novel.architectureProfile) {
+    try {
+      const ap = JSON.parse(novel.architectureProfile);
+      if (ap.avgChaptersPerLoop) {
+        archProfileStats += `\n【统计参考 — 对标书/模板的真实数据】`;
+        archProfileStats += `\n平均每回环 ${ap.avgChaptersPerLoop.avg} 章（范围 ${ap.avgChaptersPerLoop.min}-${ap.avgChaptersPerLoop.max}）`;
+        if (ap.chapterTypeDistribution) {
+          archProfileStats += `\n章节类型分布 — 推进:${ap.chapterTypeDistribution.advance}% 过渡:${ap.chapterTypeDistribution.transition}% 冷却:${ap.chapterTypeDistribution.cooldown}% 高潮:${ap.chapterTypeDistribution.climax}%`;
+        }
+        if (ap.coolPointRecipe) {
+          const recipe = ap.coolPointRecipe;
+          archProfileStats += `\n爽点配比 — 收集:${recipe.collect}% 策略:${recipe.strategy}% 验证:${recipe.verify}% 揭示:${recipe.reveal}% 升级:${recipe.upgrade}% 打脸:${recipe.faceSlap}%`;
+        }
+        if (ap.hookProfile) {
+          archProfileStats += `\n钩子密度 — 每章${ap.hookProfile.shortTermPerChapter}个短期 每卷${ap.hookProfile.mediumTermPerVolume}个中期 ${ap.hookProfile.longTermLines}条长线`;
+        }
+      }
+    } catch { /* use defaults */ }
+  }
+
   const effectivePhases = customPhases ?? arch?.defaultLoop.phases ?? [];
   const effectivePhaseDesc = effectivePhases.map(p => `${p.label}（${p.description}，${p.typicalChapterCount[0]}-${p.typicalChapterCount[1]}章）`).join(" → ");
 
@@ -167,6 +189,7 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
     Array.isArray(gfLimits) && gfLimits.length > 0
       ? `金手指限制：${gfLimits.join("、")}` : null,
     worldRulesContext,
+    archProfileStats,
   ].filter(Boolean).join("\n");
 
   // Feed reference book analysis as supplementary context

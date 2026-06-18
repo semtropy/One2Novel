@@ -149,22 +149,10 @@ async function annotateBatch(
   }).join("\n\n");
 
   const raw = await aiInvoke({
-    assetId: "novel.chapter.review", // reuse review prompt for its quality rubric
+    assetId: "novel.chapter.annotate",
     userPrompt: [
-      `你是网文章节结构分析师。分析以下 ${batchChapters.length} 章（批次 ${batchIndex + 1}/${totalBatches}），标注每章的结构特征。`,
-      "",
-      "【标注字段】",
-      "- chapterType: advance(推进)/transition(过渡)/cooldown(冷却)/climax(高潮)",
-      "- coolPointLevel: high(高爽点)/medium(中)/low(低爽点)",
-      "- hookType: suspense(悬念型)/reversal(反转型)/preview(预告型)/emotional(情绪型)",
-      "- contentBeat: 主要节拍类型 (修炼/显圣/赚钱/恋爱/日常/过渡/说明/调查/推理/战斗)",
-      "- secondaryBeat: 次要节拍 (可选)",
-      "- conflictIntensity: 1-10 (冲突激烈程度)",
-      "- summary: 一句话概括 (15-30字)",
-      "",
-      "原则：基于实际内容判断，不编造。如果章节开头未展示完整内容，根据可见部分合理推断。",
-      "",
-      `章节目录参考：${batchChapters.map(c => `第${c.index}章 ${c.title}`).join("、")}`,
+      `批注 ${batchChapters.length} 章（批次 ${batchIndex + 1}/${totalBatches}）`,
+      `章节目录：${batchChapters.map(c => `第${c.index}章 ${c.title}`).join("、")}`,
       "",
       excerpts,
     ].join("\n"),
