@@ -124,6 +124,21 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
     } catch { /* use defaults */ }
   }
 
+  // Rhythm profile from reference analysis (V2)
+  try {
+    const activeProfileId = (await prisma.novel.findUnique({ where: { id: input.novelId }, select: { activeProfileId: true } }))?.activeProfileId;
+    if (activeProfileId) {
+      const refProfile = await prisma.referenceProfile.findUnique({ where: { id: activeProfileId }, select: { analysisResult: true } });
+      if (refProfile?.analysisResult) {
+        const ar = JSON.parse(refProfile.analysisResult);
+        if (ar.rhythmProfile) {
+          archProfileStats += `\n【对标书节奏曲线】${ar.rhythmProfile.rhythmDescription}`;
+          archProfileStats += `\n高潮间隔≈${ar.rhythmProfile.avgClimaxInterval}章 冷却段≈${ar.rhythmProfile.avgCooldownLength}章 周期≈${ar.rhythmProfile.tensionCycleLength}章`;
+        }
+      }
+    }
+  } catch {}
+
   const effectivePhases = customPhases ?? arch?.defaultLoop.phases ?? [];
   const effectivePhaseDesc = effectivePhases.map(p => `${p.label}（${p.description}，${p.typicalChapterCount[0]}-${p.typicalChapterCount[1]}章）`).join(" → ");
 

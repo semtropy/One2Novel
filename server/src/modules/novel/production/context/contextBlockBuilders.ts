@@ -324,6 +324,23 @@ export async function assembleChapterBlocks(
           content: lines.join("\n"), conflictGroup: "style_contract", freshness: 1,
         }));
       }
+      // Craft stats from reference analysis (V2): opening patterns + dialogue ratio
+      if (ap.craftStats) {
+        const cs = ap.craftStats;
+        const craftLines = ["【对标书写作手法】"];
+        if (cs.dominantOpening) craftLines.push(`开场方式：${cs.dominantOpening}`);
+        if (cs.dialogueRatio) craftLines.push(`对白密度：约${cs.dialogueRatio}%`);
+        if (cs.descriptionDistribution) {
+          const dd = cs.descriptionDistribution;
+          craftLines.push(`描写分布：视觉${dd.visual}% 动作${dd.action}% 内心${dd.internal}% 感官${dd.sensory}%`);
+        }
+        if (craftLines.length > 1) {
+          blocks.push(createContextBlock({
+            id: "craft_stats", group: "style_contract", priority: 71,
+            content: craftLines.join("\n"), conflictGroup: "style_contract", freshness: 1,
+          }));
+        }
+      }
     }
   } catch { /* best-effort */ }
 

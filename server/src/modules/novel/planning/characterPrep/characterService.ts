@@ -136,9 +136,24 @@ export async function generateCharacters(novelId: string): Promise<CharacterExtr
     } catch {}
   }
 
+  // Loop narrative context (reference book analysis → Step 3)
+  let loopContext = "";
+  try {
+    const activeProfileId = (await prisma.novel.findUnique({ where: { id: novelId }, select: { activeProfileId: true } }))?.activeProfileId;
+    if (activeProfileId) {
+      const refProfile = await prisma.referenceProfile.findUnique({ where: { id: activeProfileId }, select: { analysisResult: true } });
+      if (refProfile?.analysisResult) {
+        const ar = JSON.parse(refProfile.analysisResult);
+        if (ar.loopNarratives?.length > 0) {
+          loopContext = `\n【对标书回环角色变化】\n${ar.loopNarratives.slice(0, 8).map((l: any) => `第${l.loopIndex}轮回环：核心冲突=${l.coreConflict} | 主角变化=${l.protagonistChange} | 叙事功能=${l.narrativeFunction}`).join("\n")}`;
+        }
+      }
+    }
+  } catch {}
+
   const raw = await aiInvoke({
     assetId: "novel.character.extract", skillModules: ["character","fatal_flaw"],
-    userPrompt: [`书名：《${novel.title}》`, novel.genre ? `题材：${novel.genre}` : null, storyCoreContext, worldContext, `章节：${chList}`, outline ? `大纲：${outline.slice(0, 4000)}` : null, descriptionText, archContext, "请基于以上信息生成角色阵容，确保角色在架构中承担明确的功能标签（副本触发器/奖励来源/伏笔载体/长期威胁/情感锚点），不要凭空创造与大纲/灵感冲突的角色。"].filter(Boolean).join("\n"),
+    userPrompt: [`书名：《${novel.title}》`, novel.genre ? `题材：${novel.genre}` : null, storyCoreContext, worldContext, loopContext, `章节：${chList}`, outline ? `大纲：${outline.slice(0, 4000)}` : null, descriptionText, archContext, "请基于以上信息生成角色阵容，确保角色在架构中承担明确的功能标签（副本触发器/奖励来源/伏笔载体/长期威胁/情感锚点），不要凭空创造与大纲/灵感冲突的角色。"].filter(Boolean).join("\n"),
     schema: LLMCharExtractSchema, temperature: 0.85,
   });
 
