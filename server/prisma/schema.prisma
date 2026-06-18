@@ -338,6 +338,7 @@ model ReferenceBook {
 model ReferenceProfile {
   id                String   @id @default(cuid())
   name              String   // 参考书名称
+  content           String?  // 上传的原始文本（用于独立分析，不依赖 Novel）
   architectureType  String?  // 检测到的架构类型
   totalChapters     Int?     // 总章数
   loopBoundaries    String?  // JSON: 回环边界
