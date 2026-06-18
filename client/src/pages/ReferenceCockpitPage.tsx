@@ -1,88 +1,16 @@
 /**
- * ReferenceCockpitPage — 参考书驾驶舱，独立页面，通过 profileId 访问
+ * ReferenceCockpitPage — 参考书驾驶舱 V2
  * /reference-profiles/new → 上传+分析
  * /reference-profiles/:id → 查看已有档案
  */
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Upload, Sparkles, Check, RefreshCw, Zap, GitBranch, BookOpen, TrendingUp, Eye, FileText, X, ArrowLeft } from "lucide-react";
+import { Upload, Sparkles, Check, RefreshCw, Zap, GitBranch, BookOpen, TrendingUp, X, ArrowLeft } from "lucide-react";
 import { useNovels } from "../api/novel";
 import { api } from "../app/api";
 import { cn } from "../lib/cn";
 import JSZip from "jszip";
 
-interface AnalysisState {
-  loops?: boolean; coolpoints?: boolean; architecture?: boolean;
-  hooks?: boolean; goldenFinger?: boolean; timeline?: boolean;
-  writing?: boolean; contentBeats?: boolean;
-}
-
-const HOOK_LABELS: Record<string, string> = { suspense:"悬念型", reversal:"反转型", preview:"预告型", emotional:"情绪型" };
-
-function StatusLine({ label }: { label?: string }) {
-  return <span className="text-sm text-slate-500">{label || "分析完成"}</span>;
-}
-
-function StatBadge({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">{label}</div><div className="font-bold text-slate-700">{value}</div></div>;
-}
-
-// ═══ Detail Components (modals) ═══
-
-function HookDetail({ data }: { data: { distribution: Record<string,number>; avgHookStrength: number; typicalHookStyle: string } }) {
-  return <div className="space-y-3">
-    <div className="grid grid-cols-2 gap-2">{(Object.entries(data.distribution ?? {}) as [string,number][]).map(([k,v]) => <div key={k} className="rounded-lg border border-slate-200 p-3 text-center"><div className="text-2xl font-bold text-slate-700">{v}</div><div className="text-xs text-slate-400">{HOOK_LABELS[k]??k}</div></div>)}</div>
-    <div className="text-sm text-slate-600">平均钩力 <b className="text-slate-800">{(data.avgHookStrength*100).toFixed(0)}%</b> · {data.typicalHookStyle}</div>
-  </div>;
-}
-
-function GFDetail({ data }: { data: { abilities: string[]; limits: string[] } }) {
-  return <div className="grid grid-cols-2 gap-4 text-sm">
-    <div><p className="font-semibold text-slate-700 mb-2">能力 ({data.abilities.length})</p><div className="space-y-1">{data.abilities.map((a,i) => <div key={i} className="rounded bg-green-50 px-2 py-1 text-xs text-green-700">{a}</div>)}</div></div>
-    <div><p className="font-semibold text-slate-700 mb-2">限制 ({data.limits.length})</p><div className="space-y-1">{data.limits.map((l,i) => <div key={i} className="rounded bg-red-50 px-2 py-1 text-xs text-red-600">{l}</div>)}</div></div>
-  </div>;
-}
-
-function BeatDetail({ data, onApply, disabled }: { data: { beatTypes: string[]; overallDistribution: Record<string,number>; totalChapters: number }; onApply: () => void; disabled: boolean }) {
-  return <div className="space-y-3">
-    <div className="grid grid-cols-3 gap-2">{data.beatTypes.map(bt => { const c = data.overallDistribution[bt] ?? 0; return <div key={bt} className="rounded-lg border border-slate-200 p-3 text-center"><div className="text-2xl font-bold text-slate-700">{c}</div><div className="text-xs text-slate-400">{bt}章</div><div className="text-[10px] text-slate-300">{(c/data.totalChapters*100).toFixed(0)}%</div></div>; })}</div>
-    <button onClick={onApply} disabled={disabled} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-40">应用</button>
-  </div>;
-}
-
-function CoolPointDetail({ high, low }: { high: number[]; low: number[] }) {
-  return <div className="space-y-4">
-    <div className="flex items-center gap-4 text-sm"><span>高爽点 <b className="text-green-600">{high.length}章</b></span><span>低爽点 <b className="text-red-400">{low.length}章</b></span></div>
-    <div className="flex flex-wrap gap-1 text-xs">{high.map(ch => <span key={ch} className="rounded bg-green-50 px-1.5 py-0.5 text-green-700">第{ch}章</span>)}</div>
-    {low.length > 0 && <div className="flex flex-wrap gap-1 text-xs">{low.map(ch => <span key={ch} className="rounded bg-red-50 px-1.5 py-0.5 text-red-400">第{ch}章</span>)}</div>}
-  </div>;
-}
-
-function TimelineDetail({ data }: { data: Array<{ chapterIndex: number; settingName: string }> }) {
-  return <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">{data.map((s,i) => <div key={i} className="flex items-center gap-2"><span className="text-slate-400 w-14 shrink-0">第{s.chapterIndex}章</span><span className="text-slate-600">{s.settingName}</span></div>)}</div>;
-}
-
-type Technique = { category: string; observation: string; rule: string; confidence: number };
-type WritingAssets = { overallStyleDescription?: string; narrativeAssets?: Technique[]; languageAssets?: Technique[]; characterAssets?: Technique[]; rhythmAssets?: Technique[]; antiAiAssets?: Technique[]; };
-
-function WritingDetail({ data, onApply, applied, disabled }: { data: WritingAssets; onApply: () => void; applied: boolean; disabled: boolean }) {
-  const cats = [{k:"narrativeAssets" as const,l:"叙事技法"},{k:"languageAssets" as const,l:"语言风格"},{k:"characterAssets" as const,l:"角色塑造"},{k:"rhythmAssets" as const,l:"节奏控制"},{k:"antiAiAssets" as const,l:"反AI特征"}];
-  return <div className="space-y-5">
-    {data.overallStyleDescription && <div className="rounded-lg bg-slate-50 p-3"><p className="text-sm font-medium text-slate-600 mb-1">整体风格</p><p className="text-sm text-slate-700 leading-relaxed">{data.overallStyleDescription}</p></div>}
-    {cats.map(({k,l}) => { const ts = data[k]??[]; if(!ts.length) return null; return <div key={k}><p className="text-sm font-semibold text-slate-700 mb-2">{l} ({ts.length}条)</p><div className="space-y-2">{ts.map((t,i) => <div key={i} className="rounded-lg border border-slate-200 p-3"><div className="flex items-center justify-between mb-1.5"><span className="text-xs font-medium text-slate-500">{t.category}</span><span className={cn("text-[10px] px-1.5 py-0.5 rounded-full",t.confidence>=0.9?"bg-green-100 text-green-700":t.confidence>=0.8?"bg-accent-100 text-accent-700":"bg-slate-100 text-slate-500")}>置信度 {(t.confidence*100).toFixed(0)}%</span></div><p className="text-xs text-slate-400 mb-1">对标书做法：</p><p className="text-sm text-slate-600 mb-2 leading-relaxed">{t.observation}</p><p className="text-xs text-slate-400 mb-1">可模仿规则：</p><p className="text-sm text-slate-800 leading-relaxed">{t.rule}</p></div>)}</div></div>; })}
-    <button onClick={onApply} disabled={applied || disabled} className={cn("rounded-lg px-4 py-1.5 text-xs font-medium",applied?"bg-green-100 text-green-700":"bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40")}>{applied?"已应用":"应用"}</button>
-  </div>;
-}
-
-function LoopDetail({ boundaries, total }: { boundaries: Array<{chapterIndex:number;type:string}>; total: number }) {
-  const starts = boundaries.filter(b => b.type === "start");
-  const ends = boundaries.filter(b => b.type === "end");
-  const loops = starts.map((s,i) => ({ start: s.chapterIndex, end: ends[i]?.chapterIndex ?? "?" }));
-  return <div className="space-y-3">
-    <div className="text-sm text-slate-500">共 <b className="text-slate-700">{loops.length}轮回环</b>，平均 {loops.length>0?Math.round(total/loops.length):"?"} 章/轮</div>
-    <div className="flex flex-wrap gap-1 text-xs">{loops.map((l,i) => <span key={i} className="rounded bg-brand-50 border border-brand-100 px-2 py-1 text-slate-600">第{i+1}轮: 第{l.start}-{l.end}章</span>)}</div>
-  </div>;
-}
 export function ReferenceCockpitPage() {
   const { profileId } = useParams<{ profileId: string }>();
   const navigate = useNavigate();
@@ -95,12 +23,10 @@ export function ReferenceCockpitPage() {
   const [fileName, setFileName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
-  const [done, setDone] = useState<AnalysisState>({});
   const [deepRunning, setDeepRunning] = useState(false);
   const [deepProgress, setDeepProgress] = useState<{phase:string;detail:string;pct:number}|null>(null);
   const [runError, setRunError] = useState("");
   const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [profileCreated, setProfileCreated] = useState(false);
   const [applyTargetId, setApplyTargetId] = useState<string>("");
   useEffect(() => {
     if (profId) loadProfile(profId);
@@ -219,22 +145,6 @@ export function ReferenceCockpitPage() {
       setDeepProgress(null);
     } catch (e: any) { clearInterval(pollInterval); setDeepProgress(null); setRunError(e?.response?.data?.error?.message || "深度分析失败"); }
     finally { setDeepRunning(false); }
-  }
-
-  async function handleApplyContentBeats() {
-    if (!applyTargetId || !r.contentBeatPatterns?.overallDistribution) return;
-    try {
-      await api.put(`/novels/${applyTargetId}/architecture`, { contentBeatProfile: JSON.stringify(r.contentBeatPatterns.overallDistribution) });
-    } catch { setRunError("应用内容节拍失败"); }
-  }
-
-  async function handleApplyStyle() {
-    if (!applyTargetId) return;
-    try {
-      await api.post(`/novels/${applyTargetId}/reference-book/create-style-profile`);
-      setProfileCreated(true);
-      setTimeout(() => setProfileCreated(false), 3000);
-    } catch { setRunError("应用风格失败"); }
   }
 
   const r = analysisResult;
