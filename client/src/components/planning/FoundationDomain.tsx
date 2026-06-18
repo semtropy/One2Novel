@@ -230,7 +230,7 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
                   className="w-full rounded border border-slate-200 px-2 py-1 text-xs resize-y focus:border-brand-300 focus:outline-none" rows={2} />
               ) : (
                 <input value={value} onChange={e => setter(e.target.value)}
-                  onBlur={() => quickSave(key, key === "commercialTags" ? value : value)}
+                  onBlur={() => quickSave(key, value)}
                   placeholder={placeholder}
                   className="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:border-brand-300 focus:outline-none" />
               )}

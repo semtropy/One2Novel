@@ -34,6 +34,7 @@ export function WorldDomain({ novelId, onComplete }: Props) {
   // ── Power System Tree ──
   const [powerNodes, setPowerNodes] = useState<PowerNode[]>([]);
   const [powerGenPending, setPowerGenPending] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     if (novel?.powerSystemTree) {
@@ -42,16 +43,18 @@ export function WorldDomain({ novelId, onComplete }: Props) {
   }, [novel?.powerSystemTree]);
 
   const handleGeneratePowerSystem = async () => {
-    setPowerGenPending(true);
+    setPowerGenPending(true); setSaveError("");
     try {
       const { data } = await api.post(`/novels/${novelId}/power-system/generate`);
       if (data?.data) { setPowerNodes(data.data); refetch(); }
-    } catch {} finally { setPowerGenPending(false); }
+    } catch { setSaveError("生成失败，请重试"); } finally { setPowerGenPending(false); }
   };
 
   const handleSavePowerNodes = async () => {
-    await updateNovel.mutateAsync({ id: novelId, powerSystemTree: JSON.stringify(powerNodes) });
-    refetch();
+    try {
+      await updateNovel.mutateAsync({ id: novelId, powerSystemTree: JSON.stringify(powerNodes) });
+      refetch(); setSaveError("");
+    } catch { setSaveError("保存失败"); }
   };
 
   // ── Golden Finger (moved from FoundationDomain) ──
@@ -82,6 +85,9 @@ export function WorldDomain({ novelId, onComplete }: Props) {
 
   return (
     <div className="space-y-4">
+      {saveError && (
+        <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-600">{saveError}</div>
+      )}
       {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-slate-100 pb-2">
         {([
@@ -141,7 +147,7 @@ export function WorldDomain({ novelId, onComplete }: Props) {
           <div className="flex items-center justify-between">
             <p className="text-xs text-slate-500">金手指是主角在力量体系中的「例外」——设计时必须参照左侧架构选择中的力量体系类型和世界规则中的约束边界。</p>
             <button onClick={async () => {
-              try { const result = await genGoldenFinger.mutateAsync(novelId); setGfName(result.goldenFingerName); setGfAbilities(result.abilities.join("\n")); setGfLimits(result.limits.join("\n")); refetch(); } catch {}
+              try { const result = await genGoldenFinger.mutateAsync(novelId); setGfName(result.goldenFingerName); setGfAbilities(result.abilities.join("\n")); setGfLimits(result.limits.join("\n")); refetch(); setSaveError(""); } catch { setSaveError("金手指生成失败"); }
             }} disabled={genGoldenFinger.isPending}
               className="flex items-center gap-1 shrink-0 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50">
               <Sparkles size={11} />{genGoldenFinger.isPending ? "生成中…" : "AI 生成金手指"}

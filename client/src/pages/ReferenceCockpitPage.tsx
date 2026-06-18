@@ -108,6 +108,7 @@ export function ReferenceCockpitPage() {
   const [done, setDone] = useState<AnalysisState>({});
   const [running, setRunning] = useState<string | null>(null);
   const [runAll, setRunAll] = useState(false);
+  const [runError, setRunError] = useState("");
   const [annotData, setAnnotData] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<{ totalChapters: number; totalLoops: number } | null>(null);
   const [appliedArch, setAppliedArch] = useState(false);
@@ -147,7 +148,7 @@ export function ReferenceCockpitPage() {
       setAnnotData(annot);
       setStats({ totalChapters: p.totalChapters ?? 0, totalLoops: (annot.loopBoundaries as any[])?.filter((b: any) => b.type === "start").length ?? 0 });
       setFileName(p.name ?? "");
-    } catch {}
+    } catch { setRunError("加载档案失败"); }
   }
 
   async function handleUpload(text: string, fname: string) {
@@ -164,10 +165,9 @@ export function ReferenceCockpitPage() {
     const pid = profId;
     if (!pid) return;
     setRunning(k);
-    try {
-      await api.post(`/profiles/${pid}/analyze`, { dimension: k });
-      await loadProfile(pid);
-    } catch {} finally { setRunning(null); }
+    try { setRunError(""); await api.post(`/profiles/${pid}/analyze`, { dimension: k }); await loadProfile(pid); }
+    catch { setRunError(`${k} 分析失败`); }
+    finally { setRunning(null); }
   }
 
   async function handleRunAll() {
@@ -186,14 +186,14 @@ export function ReferenceCockpitPage() {
       });
       setAppliedArch(true);
       setTimeout(() => setAppliedArch(false), 3000);
-    } catch {}
+    } catch { setRunError("应用架构失败"); }
   }
 
   async function handleApplyContentBeats() {
     if (!applyTargetId || !annotData.contentBeatPatterns?.overallDistribution) return;
     try {
       await api.put(`/novels/${applyTargetId}/architecture`, { contentBeatProfile: JSON.stringify(annotData.contentBeatPatterns.overallDistribution) });
-    } catch {}
+    } catch { setRunError("应用内容节拍失败"); }
   }
 
   async function handleApplyStyle() {
@@ -202,7 +202,7 @@ export function ReferenceCockpitPage() {
       await api.post(`/novels/${applyTargetId}/reference-book/create-style-profile`);
       setProfileCreated(true);
       setTimeout(() => setProfileCreated(false), 3000);
-    } catch {}
+    } catch { setRunError("应用风格失败"); }
   }
 
   const archData = annotData.detectedArchitecture as { type: string; confidence: number; reasoning: string; observedPatterns: string[] } | undefined;
@@ -262,6 +262,7 @@ export function ReferenceCockpitPage() {
               </button>
             )}
             <span className="text-xs text-slate-400">{doneCount}/8 项完成</span>
+            {runError && <span className="text-xs text-red-500 ml-2">{runError}</span>}
           </div>
         )}
 
