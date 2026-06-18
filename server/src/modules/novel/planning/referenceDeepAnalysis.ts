@@ -624,7 +624,7 @@ export async function deepAnalyze(profileId: string): Promise<ArchitectureProfil
     where: { id: profileId },
     data: {
       deepAnalysisProgress: null,
-      chapterAnnotations: null,
+      // Keep chapterAnnotations for fast re-analysis (skip annotation phase on re-run)
       architectureProfile: JSON.stringify(architectureProfile),
       totalChapters: chapters.length,
       loopBoundaries: JSON.stringify(loopBoundariesClient),
