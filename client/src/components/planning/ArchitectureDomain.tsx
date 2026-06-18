@@ -94,6 +94,14 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
     setSelectedProfileId(profile.id);
     if (profile.architectureType) setSelectedArch(profile.architectureType);
     await api.put(`/novels/${novelId}/active-profile`, { profileId: profile.id }).catch(() => {});
+    // If the profile has a deep analysis result, apply its ArchitectureProfile to the novel
+    try {
+      const { data } = await api.get(`/profiles/${profile.id}`);
+      const full = data?.data;
+      if (full?.architectureProfile) {
+        await api.patch(`/novels/${novelId}`, { architectureProfile: full.architectureProfile });
+      }
+    } catch {}
     refetch();
   };
 
