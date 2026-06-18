@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useWorldRules, useCreateWorldRule, useUpdateWorldRule, useDeleteWorldRule, useGenerateWorldRules, useCheckWorldConflicts, useResolveWorldConflict, type WorldRule, type ConflictResult } from "../../api/novel";
 
-const CATEGORIES = ["势力格局", "力量体系", "资源规则", "社会结构", "地理环境", "历史背景"] as const;
+const CATEGORIES = ["势力格局", "力量规则", "资源规则", "社会结构", "地理环境", "历史背景"] as const;
 
 interface Props { novelId: string }
 

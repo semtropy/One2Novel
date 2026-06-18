@@ -10,7 +10,7 @@ import { aiInvoke } from "../../../platform/llm/aiService";
 // ─── Types ─────────────────────────────────────────────
 
 export const WORLD_CATEGORIES = [
-  "势力格局", "力量体系", "资源规则", "社会结构", "地理环境", "历史背景",
+  "势力格局", "力量规则", "资源规则", "社会结构", "地理环境", "历史背景",
 ] as const;
 export type WorldCategory = typeof WORLD_CATEGORIES[number];
 
