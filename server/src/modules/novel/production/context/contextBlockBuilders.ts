@@ -344,6 +344,37 @@ export async function assembleChapterBlocks(
     }
   } catch { /* best-effort */ }
 
+  // ── reference_exemplars — writing examples from reference book at similar structural position ──
+  try {
+    const novel2 = await prisma.novel.findUnique({ where: { id: novelId }, select: { activeProfileId: true } });
+    if (novel2?.activeProfileId) {
+      const refProfile = await prisma.referenceProfile.findUnique({ where: { id: novel2.activeProfileId }, select: { analysisResult: true } });
+      if (refProfile?.analysisResult) {
+        const ar = JSON.parse(refProfile.analysisResult);
+        const exemplars = (ar.annotations as Array<{chapterIndex:number;chapterType:string;coolPointLevel:string;hookType:string;exemplarOpening?:string;exemplarEnding?:string;summary?:string}> | undefined);
+        if (exemplars?.length) {
+          // Match: same chapterType, similar coolPointLevel
+          const targetType = chapterPlan?.chapterType ?? "advance";
+          const targetCool = "medium"; // match by chapterType regardless of coolPointLevel
+          const matches = exemplars.filter(e => e.chapterType === targetType || e.coolPointLevel === targetCool).slice(0, 3);
+          if (matches.length > 0) {
+            const lines = ["【对标书写作范例 — 相同结构位置的章节是怎么写的】"];
+            for (const m of matches) {
+              lines.push(`\n--- 对标书第${m.chapterIndex}章 (${m.chapterType}/${m.coolPointLevel}/${m.hookType}) ---`);
+              if (m.summary) lines.push(`内容概要：${m.summary}`);
+              if (m.exemplarOpening) lines.push(`开头写法：${m.exemplarOpening.slice(0, 200)}`);
+              if (m.exemplarEnding) lines.push(`结尾钩子：${m.exemplarEnding.slice(0, 200)}`);
+            }
+            blocks.push(createContextBlock({
+              id: "reference_exemplars", group: "style_contract", priority: 77,
+              content: lines.join("\n"), conflictGroup: "style_contract", freshness: 1,
+            }));
+          }
+        }
+      }
+    }
+  } catch { /* best-effort */ }
+
   // ── content_beat_mission ──
   if (chapterPlan?.contentBeat) {
     const beatGuide = getContentBeatGuide(chapterPlan.contentBeat);

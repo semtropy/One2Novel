@@ -44,6 +44,9 @@ export interface ChapterAnnotation {
   conflictIntensity: number;
   openingType: "action" | "dialogue" | "environment" | "internal" | "exposition";
   summary: string;
+  // Exemplar snippets for chapter writing reference (not AI-generated, captured from source text)
+  exemplarOpening?: string;  // first ~300 chars
+  exemplarEnding?: string;   // last ~300 chars
 }
 
 export interface LoopNarrative {
@@ -198,7 +201,16 @@ async function annotateBatch(
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const raw = await aiInvoke({ assetId: "novel.chapter.annotate", userPrompt, schema: BatchAnnotationSchema, temperature: 0.3 });
-      return raw.chapters.filter(a => a.chapterIndex > 0);
+      const annotations: ChapterAnnotation[] = raw.chapters.filter(a => a.chapterIndex > 0) as any;
+      // Enrich with exemplar text snippets for chapter writing reference
+      for (const a of annotations) {
+        const ch = chapters.find(c => c.index === a.chapterIndex);
+        if (ch) {
+          a.exemplarOpening = text.slice(ch.startChar, ch.startChar + 300).trim().replace(/\n/g, " ");
+          a.exemplarEnding = text.slice(Math.max(ch.startChar, ch.endChar - 300), ch.endChar).trim().replace(/\n/g, " ");
+        }
+      }
+      return annotations;
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
       if (attempt < 3) { const delay = Math.pow(2, attempt) * 1000; console.warn(`[DeepAnalysis] Batch ${batchIndex + 1} attempt ${attempt} failed, retrying in ${delay}ms`); await new Promise(r => setTimeout(r, delay)); }
