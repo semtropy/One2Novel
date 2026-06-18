@@ -140,7 +140,41 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
         <p className="text-[10px] text-slate-400 mt-1">{inspiration.length}/2000</p>
       </section>
 
-      {/* ── 2. 故事核心 ── */}
+      {/* ── 2. 创意参数 ── */}
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-medium text-slate-700 mb-3">创意参数</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {([
+            { key: "genre", label: "题材", opts: GENRE_OPTIONS.map(o => ({ value: o, label: o })) },
+            { key: "narrativePov", label: "视角", opts: POV_OPTIONS },
+            { key: "pacePreference", label: "节奏", opts: PACE_OPTIONS },
+            { key: "emotionIntensity", label: "情感", opts: EMOTION_OPTIONS },
+          ] as const).map(({ key, label, opts }) => (
+            <div key={key}>
+              <label className="text-[10px] text-slate-400 block mb-0.5">{label}</label>
+              <select
+                value={(novel as unknown as Record<string,string>)[key] ?? ""}
+                onChange={e => quickSave(key, e.target.value)}
+                className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs focus:border-brand-300 focus:outline-none"
+              >
+                <option value="">未选择</option>
+                {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          ))}
+          <div className="col-span-2 sm:col-span-4">
+            <label className="text-[10px] text-slate-400 block mb-0.5">语气基调</label>
+            <input
+              value={(novel as unknown as Record<string,string>)["styleTone"] ?? ""}
+              onChange={e => quickSave("styleTone", e.target.value)}
+              placeholder="如：冷峻克制，以客观叙述和对话推进，氛围偏阴郁"
+              className="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:border-brand-300 focus:outline-none"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ── 3. 故事核心 ── */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-medium text-slate-700 mb-3">故事核心</h3>
         {hasCore ? (
@@ -172,40 +206,9 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
         ) : (
           <p className="text-xs text-slate-400 py-4 text-center">点击上方按钮 AI 生成故事核心，或手动填写灵感后生成</p>
         )}
-
-        {/* Creative params */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t border-slate-100">
-          {([
-            { key: "genre", label: "题材", opts: GENRE_OPTIONS.map(o => ({ value: o, label: o })) },
-            { key: "narrativePov", label: "视角", opts: POV_OPTIONS },
-            { key: "pacePreference", label: "节奏", opts: PACE_OPTIONS },
-            { key: "emotionIntensity", label: "情感", opts: EMOTION_OPTIONS },
-          ] as const).map(({ key, label, opts }) => (
-            <div key={key}>
-              <label className="text-[10px] text-slate-400 block mb-0.5">{label}</label>
-              <select
-                value={(novel as unknown as Record<string,string>)[key] ?? ""}
-                onChange={e => quickSave(key, e.target.value)}
-                className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs focus:border-brand-300 focus:outline-none"
-              >
-                <option value="">未选择</option>
-                {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-          ))}
-          <div className="col-span-2 sm:col-span-4">
-            <label className="text-[10px] text-slate-400 block mb-0.5">语气基调 (tonePitch)</label>
-            <input
-              value={(novel as unknown as Record<string,string>)["styleTone"] ?? ""}
-              onChange={e => quickSave("styleTone", e.target.value)}
-              placeholder="如：冷峻克制，以客观叙述和对话推进，氛围偏阴郁"
-              className="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:border-brand-300 focus:outline-none"
-            />
-          </div>
-        </div>
       </section>
 
-      {/* ── 3. 商业定位 ── */}
+      {/* ── 4. 商业定位 ── */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-1.5">
           <Globe size={14} /> 商业定位
