@@ -220,17 +220,18 @@ export function ReferenceCockpitPage() {
         const zip = await JSZip.loadAsync(file);
         // Read the OPF file for spine order
         const opfFile = Object.keys(zip.files).find(k => k.endsWith(".opf"));
+        const opfDir = opfFile ? opfFile.replace(/[^/]+$/, "") : "";
         let spineOrder: string[] = [];
         if (opfFile) {
           const opfContent = await zip.files[opfFile].async("text");
-          const spineMatch = opfContent.match(/<spine[^>]*>([\s\S]*?)<\/spine>/i);
+          const spineMatch = opfContent.match(/<(?:opf:)?spine[^>]*>([\s\S]*?)<\/(?:opf:)?spine>/i);
           if (spineMatch) {
             const idrefs = spineMatch[1].match(/idref="([^"]+)"/g);
             if (idrefs) {
               const ids = idrefs.map(r => r.match(/idref="([^"]+)"/)![1]);
-              const manifest = opfContent.match(/<manifest>([\s\S]*?)<\/manifest>/i);
+              const manifest = opfContent.match(/<(?:opf:)?manifest[^>]*>([\s\S]*?)<\/(?:opf:)?manifest>/i);
               if (manifest) {
-                const hrefs = manifest[1].match(/<item[^>]*>/g);
+                const hrefs = manifest[1].match(/<(?:opf:)?item[^>]*>/g);
                 if (hrefs) {
                   const idToHref: Record<string, string> = {};
                   for (const h of hrefs) {
@@ -245,7 +246,9 @@ export function ReferenceCockpitPage() {
           }
         }
         // Each spine item = one chapter. Keep them as separate entries.
-        const htmlFiles = spineOrder.length > 0 ? spineOrder : Object.keys(zip.files).filter(k => /\.x?html?$/i.test(k));
+        // Resolve relative hrefs against the OPF directory
+        const resolvePath = (href: string) => opfDir ? (opfDir + href).replace(/\/\//g, "/") : href;
+        const htmlFiles = spineOrder.length > 0 ? spineOrder.map(resolvePath) : Object.keys(zip.files).filter(k => /\.x?html?$/i.test(k));
         const chapters: { title: string; content: string }[] = [];
         for (let i = 0; i < htmlFiles.length; i++) {
           const path = htmlFiles[i];
