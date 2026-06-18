@@ -62,8 +62,14 @@ export interface LoopBoundary {
  */
 export function parseChapters(text: string): ParsedChapter[] {
   const patterns = [
-    /(?:^|\n)\s*第\s*([一二三四五六七八九十百千\d]+)\s*[章節节回]\s*(.*?)(?:\n|$)/gm,
+    // Chinese: 第X章/节/回, supports Chinese numerals + Arabic digits
+    /(?:^|\n)\s*第\s*([一二三四五六七八九十百千\d]+)\s*[章節节回卷]\s*(.*?)(?:\n|$)/gm,
+    // English: Chapter X
     /(?:^|\n)\s*Chapter\s+(\d+)\s*[:：]?\s*(.*?)(?:\n|$)/gim,
+    // Pure number heading: "123. 标题" or "123、标题"
+    /(?:^|\n)\s*(\d{1,4})\s*[\.、．]\s*(.{2,40})(?:\n|$)/gm,
+    // Volume marker: 卷X / 第X卷
+    /(?:^|\n)\s*(?:第)?\s*([一二三四五六七八九十百千\d]+)\s*卷\s*(.*?)(?:\n|$)/gm,
   ];
 
   const hits: Array<{ index: number; start: number; title: string }> = [];
@@ -75,6 +81,15 @@ export function parseChapters(text: string): ParsedChapter[] {
       hits.push({ index: num, start: m.index, title });
     }
   }
+
+  // Deduplicate: keep earliest occurrence when multiple patterns match the same position
+  hits.sort((a, b) => a.start - b.start);
+  const deduped: typeof hits = [];
+  for (const h of hits) {
+    if (deduped.length > 0 && h.start - deduped[deduped.length - 1].start < 50) continue; // same chapter, different pattern
+    deduped.push(h);
+  }
+  hits.length = 0; hits.push(...deduped);
 
   // Sort by position and re-index sequentially
   hits.sort((a, b) => a.start - b.start);
@@ -144,25 +159,39 @@ async function annotateBatch(
   const batchChapters = chapters.slice(startIdx, startIdx + batchSize);
   if (batchChapters.length === 0) return [];
 
-  // Full chapter content — no truncation
   const excerpts = batchChapters.map(ch => {
     const content = text.slice(ch.startChar, ch.endChar).trim();
     return `=== 第${ch.index}章 ${ch.title} ===\n${content}`;
   }).join("\n\n");
 
-  const raw = await aiInvoke({
-    assetId: "novel.chapter.annotate",
-    userPrompt: [
-      `批注 ${batchChapters.length} 章（批次 ${batchIndex + 1}/${totalBatches}）`,
-      `章节目录：${batchChapters.map(c => `第${c.index}章 ${c.title}`).join("、")}`,
-      "",
-      excerpts,
-    ].join("\n"),
-    schema: BatchAnnotationSchema,
-    temperature: 0.3,
-  });
+  const userPrompt = [
+    `批注 ${batchChapters.length} 章（批次 ${batchIndex + 1}/${totalBatches}）`,
+    `章节目录：${batchChapters.map(c => `第${c.index}章 ${c.title}`).join("、")}`,
+    "",
+    excerpts,
+  ].join("\n");
 
-  return raw.chapters.filter(a => a.chapterIndex > 0);
+  // Retry up to 3 times with exponential backoff
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const raw = await aiInvoke({
+        assetId: "novel.chapter.annotate",
+        userPrompt,
+        schema: BatchAnnotationSchema,
+        temperature: 0.3,
+      });
+      return raw.chapters.filter(a => a.chapterIndex > 0);
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      if (attempt < 3) {
+        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s
+        console.warn(`[DeepAnalysis] Batch ${batchIndex + 1} attempt ${attempt} failed, retrying in ${delay}ms: ${lastError.message.slice(0, 80)}`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError || new Error(`Batch ${batchIndex + 1} failed after 3 attempts`);
 }
 
 /**
@@ -172,22 +201,66 @@ async function annotateBatch(
 export async function batchAnnotateChapters(
   chapters: ParsedChapter[],
   text: string,
+  profileId: string,
   onProgress?: (batch: number, total: number) => Promise<void>,
 ): Promise<ChapterAnnotation[]> {
-  // Dynamic batch size: fit as many chapters as possible within MAX_CHARS_PER_BATCH
   const avgChapterSize = chapters.reduce((s, c) => s + c.wordCount, 0) / chapters.length;
   const batchSize = Math.max(5, Math.min(BASE_BATCH_SIZE, Math.floor(MAX_CHARS_PER_BATCH / avgChapterSize)));
   const totalBatches = Math.ceil(chapters.length / batchSize);
-  const results: ChapterAnnotation[] = [];
+
+  // Resume: load already-annotated chapter indices from profile
+  const prisma = getPrisma();
+  const existing = await prisma.referenceProfile.findUnique({ where: { id: profileId }, select: { chapterAnnotations: true } });
+  let results: ChapterAnnotation[] = [];
+  let doneIndices = new Set<number>();
+  if (existing?.chapterAnnotations) {
+    try { const saved = JSON.parse(existing.chapterAnnotations) as ChapterAnnotation[]; results = saved; doneIndices = new Set(saved.map(a => a.chapterIndex)); console.log(`[DeepAnalysis] Resuming: ${results.length} chapters already annotated`); } catch {}
+  }
 
   for (let i = 0; i < totalBatches; i++) {
+    const startIdx = i * batchSize;
+    const batchChapters = chapters.slice(startIdx, startIdx + batchSize);
+    // Skip batches where all chapters are already annotated
+    if (batchChapters.every(c => doneIndices.has(c.index))) continue;
+
     const batch = await annotateBatch(chapters, text, i, totalBatches, batchSize);
-    results.push(...batch);
-    console.log(`[DeepAnalysis] Batch ${i + 1}/${totalBatches}: annotated ${batch.length} chapters (batch size: ${batchSize}, avg chapter: ${avgChapterSize} chars)`);
+    // Merge: replace any previously annotated chapters in this batch with new results
+    for (const a of batch) {
+      const idx = results.findIndex(r => r.chapterIndex === a.chapterIndex);
+      if (idx >= 0) results[idx] = a; else results.push(a);
+    }
+    // Save intermediate results to profile for resume
+    await prisma.referenceProfile.update({
+      where: { id: profileId },
+      data: { chapterAnnotations: JSON.stringify(results.sort((a, b) => a.chapterIndex - b.chapterIndex)) },
+    }).catch(() => {});
+    console.log(`[DeepAnalysis] Batch ${i + 1}/${totalBatches}: annotated ${batch.length} chapters (batch size: ${batchSize}, total: ${results.length})`);
     if (onProgress) await onProgress(i + 1, totalBatches);
   }
 
   return results.sort((a, b) => a.chapterIndex - b.chapterIndex);
+}
+
+/**
+ * Validate annotation consistency. Flags impossible combinations that
+ * indicate AI misclassification. Returns list of suspicious chapter indices.
+ */
+function validateAnnotations(annotations: ChapterAnnotation[]): number[] {
+  const suspicious: number[] = [];
+  for (const a of annotations) {
+    // Rule: climax chapters must have conflictIntensity >= 8 and coolPointLevel = high
+    if (a.chapterType === "climax" && (a.conflictIntensity < 8 || a.coolPointLevel !== "high")) {
+      suspicious.push(a.chapterIndex);
+    }
+    // Rule: cooldown chapters must have conflictIntensity <= 4
+    if (a.chapterType === "cooldown" && a.conflictIntensity > 4) {
+      suspicious.push(a.chapterIndex);
+    }
+  }
+  if (suspicious.length > 0) {
+    console.warn(`[DeepAnalysis] Validation: ${suspicious.length} suspicious annotations (chapters: ${suspicious.slice(0, 10).join(",")}${suspicious.length > 10 ? "..." : ""})`);
+  }
+  return suspicious;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -477,11 +550,17 @@ export async function deepAnalyze(profileId: string): Promise<ArchitectureProfil
   // Phase 2
   const totalBatches = Math.ceil(chapters.length / BASE_BATCH_SIZE);
   await updateProgress(profileId, "annotate", `标注章节 (0/${totalBatches} 批)...`, 15);
-  const annotations = await batchAnnotateChapters(chapters, text, async (batch, total) => {
+  const annotations = await batchAnnotateChapters(chapters, text, profileId, async (batch, total) => {
     await updateProgress(profileId, "annotate", `标注章节 (${batch}/${total} 批)`, 15 + Math.round(batch / total * 40));
   });
   console.log(`[DeepAnalysis] Annotated ${annotations.length} chapters`);
   await updateProgress(profileId, "annotate", `完成 ${annotations.length} 章标注`, 55);
+
+  // Validate annotation quality
+  const suspicious = validateAnnotations(annotations);
+  if (suspicious.length > annotations.length * 0.1) {
+    console.warn(`[DeepAnalysis] WARNING: ${suspicious.length}/${annotations.length} annotations flagged as suspicious (${(suspicious.length/annotations.length*100).toFixed(1)}%)`);
+  }
 
   // Phase 3
   await updateProgress(profileId, "loops", "检测回环边界...", 60);
@@ -505,11 +584,12 @@ export async function deepAnalyze(profileId: string): Promise<ArchitectureProfil
     console.warn("[DeepAnalysis] Writing technique extraction failed (non-fatal)", e);
   }
 
-  // Clear progress, persist results
+  // Clear transient state, persist results
   await prisma.referenceProfile.update({
     where: { id: profileId },
     data: {
-      deepAnalysisProgress: null,  // clear transient progress
+      deepAnalysisProgress: null,       // clear transient progress
+      chapterAnnotations: null,         // clear resume data (analysis complete)
       architectureProfile: JSON.stringify(architectureProfile),
       totalChapters: chapters.length,
       loopBoundaries: JSON.stringify(loops),

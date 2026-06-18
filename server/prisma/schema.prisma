@@ -351,6 +351,7 @@ model ReferenceProfile {
   settingTimeline   String?  // JSON: 设定时间线
   architectureProfile String?  // JSON: ArchitectureProfile — unified structure blueprint
   deepAnalysisProgress String?  // JSON: {phase, detail, pct} — transient progress state
+  chapterAnnotations   String?  // JSON: ChapterAnnotation[] — persisted for resume
   books             ReferenceBook[]         @relation("ProfileBooks")
   novels            Novel[]                @relation("ActiveProfile")
   createdAt         DateTime  @default(now())
