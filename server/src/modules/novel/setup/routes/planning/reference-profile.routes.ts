@@ -106,12 +106,36 @@ router.post("/profiles/:id/analyze", async (req: Request, res: Response, next: N
     const profile = await getPrisma().referenceProfile.findUnique({ where: { id: param(req, "id") } });
     if (!profile?.content) throw new AppError(400, "档案无内容，请先上传文件", "NO_CONTENT");
 
-    const { dimension } = req.body; // "architecture" | "loops" | "coolpoints" | "hooks" | "goldenFinger" | "timeline" | "writing" | "contentBeats"
+    const { dimension } = req.body;
     const { aiInvoke } = await import("../../../../../platform/llm/aiService");
     const { z } = await import("zod");
 
-    // Truncate content to fit context window (~100k chars ~= 30k tokens)
-    const content = profile.content.slice(0, 150000);
+    // Extract chapter structure from raw text so per-chapter analyses get chapter-indexed context
+    const chapterPattern = /(?:^|\n)\s*(?:第([一二三四五六七八九十百千\d]+)[章節节回]|Chapter\s+(\d+))/gim;
+    const chapters: { index: number; start: number }[] = [];
+    let cm: RegExpExecArray | null;
+    while ((cm = chapterPattern.exec(profile.content!)) !== null) {
+      chapters.push({ index: chapters.length + 1, start: cm.index });
+    }
+    const totalChapters = chapters.length || profile.totalChapters || 100;
+
+    // Build chapter-indexed samples: spread across the full book, not just the first N chapters
+    const sampleCount = Math.min(30, totalChapters);
+    const sampleStep = totalChapters > sampleCount ? Math.floor(totalChapters / sampleCount) : 1;
+    let chapterSamples = `[全书共 ${totalChapters} 章，采样 ${sampleCount} 章作为分析依据]\n`;
+    for (let i = 0; i < chapters.length && chapterSamples.length < 60000; i += sampleStep) {
+      const ch = chapters[i];
+      const nextStart = chapters[i + 1]?.start ?? profile.content!.length;
+      const chContent = profile.content!.slice(ch.start, Math.min(ch.start + 2000, nextStart)).trim();
+      if (chContent) {
+        const heading = chContent.split("\n")[0]?.slice(0, 40) || "";
+        chapterSamples += `\n--- 第${ch.index}章 ${heading} ---\n${chContent.slice(0, 1000)}`;
+      }
+    }
+
+    // Per-chapter analyses get chapter samples; others get the book opening for style/architecture detection
+    const isPerChapter = ["loops", "coolpoints", "timeline", "contentBeats"].includes(dimension);
+    const content = isPerChapter ? chapterSamples : profile.content!.slice(0, 120000);
 
     let assetId: string;
     let schema: z.ZodType<any>;
@@ -161,8 +185,8 @@ router.post("/profiles/:id/analyze", async (req: Request, res: Response, next: N
         throw new AppError(400, `未知分析维度: ${dimension}`, "UNKNOWN_DIMENSION");
     }
 
-    // System prompt in registry has all instructions — userPrompt is just the content
-    userPrompt = content.slice(0, dimension === "writing" ? 80000 : 50000);
+    // System prompt in registry has all instructions — userPrompt is just the (already-truncated) content
+    userPrompt = content;
 
     const result = await aiInvoke({ assetId, userPrompt, schema, temperature: 0.5 });
 

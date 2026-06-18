@@ -127,14 +127,31 @@ export function ReferenceCockpitPage() {
       if (!p) return;
       setName(p.name ?? "");
       const annot: Record<string, any> = {};
-      if (p.loopBoundaries) Object.assign(annot, JSON.parse(p.loopBoundaries));
-      if (p.coolPointDensity) { const cp = JSON.parse(p.coolPointDensity); annot.highCoolChapters = cp.highCoolChapters ?? []; annot.lowCoolChapters = cp.lowCoolChapters ?? []; }
-      if (p.hookPatterns) annot.hookPatterns = typeof p.hookPatterns === "string" ? JSON.parse(p.hookPatterns) : p.hookPatterns;
-      if (p.goldenFingerBounds) annot.goldenFingerBounds = typeof p.goldenFingerBounds === "string" ? JSON.parse(p.goldenFingerBounds) : p.goldenFingerBounds;
-      if (p.contentBeatPatterns) annot.contentBeatPatterns = typeof p.contentBeatPatterns === "string" ? JSON.parse(p.contentBeatPatterns) : p.contentBeatPatterns;
-      if (p.settingTimeline) annot.keySettings = typeof p.settingTimeline === "string" ? JSON.parse(p.settingTimeline) : p.settingTimeline;
-      if (p.architectureType) annot.detectedArchitecture = { type: p.architectureType };
-      if (p.writingAssets) annot.writingAssets = typeof p.writingAssets === "string" ? JSON.parse(p.writingAssets) : p.writingAssets;
+      // Array fields: parse JSON string → array (NOT Object.assign which corrupts arrays)
+      if (p.loopBoundaries) {
+        try { const arr = JSON.parse(p.loopBoundaries); annot.loopBoundaries = Array.isArray(arr) ? arr : []; } catch { annot.loopBoundaries = []; }
+      }
+      if (p.coolPointDensity) {
+        try { const cp = JSON.parse(p.coolPointDensity); annot.highCoolChapters = cp.highCoolChapters ?? []; annot.lowCoolChapters = cp.lowCoolChapters ?? []; } catch {}
+      }
+      if (p.hookPatterns) {
+        try { annot.hookPatterns = JSON.parse(p.hookPatterns); } catch {}
+      }
+      if (p.goldenFingerBounds) {
+        try { annot.goldenFingerBounds = JSON.parse(p.goldenFingerBounds); } catch {}
+      }
+      if (p.contentBeatPatterns) {
+        try { annot.contentBeatPatterns = JSON.parse(p.contentBeatPatterns); } catch {}
+      }
+      if (p.settingTimeline) {
+        try { annot.keySettings = JSON.parse(p.settingTimeline); } catch {}
+      }
+      if (p.architectureType) {
+        annot.detectedArchitecture = { type: p.architectureType };
+      }
+      if (p.writingAssets) {
+        try { annot.writingAssets = JSON.parse(p.writingAssets); } catch {}
+      }
       const nd: AnalysisState = {};
       if (annot.loopBoundaries) nd.loops = true;
       if ((annot.highCoolChapters ?? []).length > 0 || (annot.lowCoolChapters ?? []).length > 0) nd.coolpoints = true;
