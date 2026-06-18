@@ -89,11 +89,8 @@ export function WorldDomain({ novelId, onComplete }: Props) {
     setGenAllPending(true); setSaveError("");
     try {
       // Generate world rules + power system + golden finger in parallel
-      await Promise.all([
-        api.post(`/novels/${novelId}/world-rules/generate`).catch(() => {}),
-        api.post(`/novels/${novelId}/power-system/generate`).catch(() => {}),
-        genGoldenFinger.mutateAsync(novelId).catch(() => {}),
-      ]);
+      // Serial pipeline: world rules → power system → golden finger
+      await api.post(`/novels/${novelId}/generate-world-framework`);
       refetch();
     } catch { setSaveError("生成失败"); }
     finally { setGenAllPending(false); }
