@@ -114,7 +114,7 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
         className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 shadow-sm transition-colors"
       >
         <Sparkles size={16} className={genStoryCore.isPending ? "animate-spin" : ""} />
-        {hasCore ? "重新生成故事核心 + 商业定位" : "AI 生成故事核心 + 商业定位"}
+        {hasCore ? "重新生成全部" : "AI 生成故事核心 · 创意参数 · 商业定位"}
       </button>
 
       {genError && (
