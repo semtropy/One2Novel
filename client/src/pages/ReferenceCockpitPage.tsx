@@ -17,10 +17,6 @@ interface AnalysisState {
   writing?: boolean; contentBeats?: boolean;
 }
 
-const ARCH_LABELS: Record<string, string> = {
-  skill_slot:"技能栏搭配", sequence_promotion:"序列晋升", case_driven:"超凡办案",
-  cultivation_planning:"修真规划", hexagon_godhood:"六边形成神", historical_transmigration:"穿越历史",
-};
 const HOOK_LABELS: Record<string, string> = { suspense:"悬念型", reversal:"反转型", preview:"预告型", emotional:"情绪型" };
 
 function StatusLine({ label }: { label?: string }) {
@@ -32,15 +28,6 @@ function StatBadge({ label, value }: { label: string; value: string }) {
 }
 
 // ═══ Detail Components (modals) ═══
-
-function ArchDetail({ data, onApply, applied, disabled }: { data: { type: string; confidence?: number; reasoning?: string; observedPatterns?: string[] }; onApply: () => void; applied: boolean; disabled: boolean }) {
-  return <div className="space-y-4">
-    <div className="flex items-center gap-3"><span className="text-lg font-bold text-slate-800">{ARCH_LABELS[data.type] ?? data.type}</span>{data.confidence && <span className="text-sm text-slate-400">置信度 {(data.confidence*100).toFixed(0)}%</span>}</div>
-    {data.reasoning && <p className="text-sm text-slate-600">{data.reasoning}</p>}
-    {data.observedPatterns?.length! > 0 && <div className="flex flex-wrap gap-1">{data.observedPatterns!.map((p,i) => <span key={i} className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">{p}</span>)}</div>}
-    <button onClick={onApply} disabled={applied || disabled} className={cn("rounded-lg px-4 py-1.5 text-xs font-medium", applied?"bg-green-100 text-green-700":"bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40")}>{applied?"已应用":"应用"}</button>
-  </div>;
-}
 
 function HookDetail({ data }: { data: { distribution: Record<string,number>; avgHookStrength: number; typicalHookStyle: string } }) {
   return <div className="space-y-3">
@@ -115,7 +102,6 @@ export function ReferenceCockpitPage() {
   const [annotData, setAnnotData] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<{ totalChapters: number; totalLoops: number } | null>(null);
   const [archProfile, setArchProfile] = useState<any>(null);
-  const [appliedArch, setAppliedArch] = useState(false);
   const [profileCreated, setProfileCreated] = useState(false);
   const [applyTargetId, setApplyTargetId] = useState<string>("");
   const doneCount = Object.values(done).filter(Boolean).length;
@@ -271,19 +257,6 @@ export function ReferenceCockpitPage() {
     finally { setDeepRunning(false); }
   }
 
-  async function handleApplyArchitecture() {
-    const arch = annotData.detectedArchitecture as { type: string } | undefined;
-    if (!arch || !applyTargetId) return;
-    try {
-      await api.post(`/novels/${applyTargetId}/pipeline/step/architecture`, {
-        architectureType: arch.type,
-        goldenFinger: annotData.goldenFingerBounds,
-      });
-      setAppliedArch(true);
-      setTimeout(() => setAppliedArch(false), 3000);
-    } catch { setRunError("应用架构失败"); }
-  }
-
   async function handleApplyContentBeats() {
     if (!applyTargetId || !annotData.contentBeatPatterns?.overallDistribution) return;
     try {
@@ -300,7 +273,6 @@ export function ReferenceCockpitPage() {
     } catch { setRunError("应用风格失败"); }
   }
 
-  const archData = annotData.detectedArchitecture as { type: string; confidence: number; reasoning: string; observedPatterns: string[] } | undefined;
   const hookData = annotData.hookPatterns as { distribution: Record<string,number>; avgHookStrength: number; typicalHookStyle: string } | undefined;
   const gfData = annotData.goldenFingerBounds as { abilities: string[]; limits: string[] } | undefined;
   const beatData = annotData.contentBeatPatterns as { beatTypes: string[]; overallDistribution: Record<string,number>; totalChapters: number } | undefined;
@@ -441,11 +413,6 @@ export function ReferenceCockpitPage() {
 
         {/* Analysis Results */}
         <div className="space-y-3">
-          <Section title="架构判定" icon={GitBranch} done={done.architecture}
-            detailContent={archData ? <ArchDetail data={archData} onApply={handleApplyArchitecture} applied={appliedArch} disabled={!applyTargetId} /> : null}>
-            {done.architecture && <StatusLine label={ARCH_LABELS[archData?.type ?? ""] ?? archData?.type} />}
-          </Section>
-
           <Section title="钩子模式" icon={Eye} done={done.hooks}
             detailContent={hookData ? <HookDetail data={hookData} /> : null}>
             {done.hooks && <StatusLine label={`${Object.values(hookData?.distribution ?? {}).reduce((a:number,b:number)=>a+b,0)}章 · 平均钩力${((hookData?.avgHookStrength??0)*100).toFixed(0)}%`} />}
