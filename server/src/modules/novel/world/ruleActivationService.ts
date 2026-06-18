@@ -47,7 +47,7 @@ function relevanceScore(rule: WorldRuleData, chapterContext: string): number {
   }
 
   // Certain categories are more likely to be relevant
-  if (rule.category === "力量体系" && /修炼|魔法|能力|力量|功法|灵力/.test(ctx)) score += 5;
+  if (rule.category === "力量规则" && /修炼|魔法|能力|力量|功法|灵力/.test(ctx)) score += 5;
   if (rule.category === "势力格局" && /势力|门派|家族|组织|阵营/.test(ctx)) score += 5;
   if (rule.category === "地理环境" && /地点|城|山|海|森林|沙漠|地域/.test(ctx)) score += 5;
   if (rule.category === "资源规则" && /资源|灵石|丹药|宝物|材料|装备/.test(ctx)) score += 5;
