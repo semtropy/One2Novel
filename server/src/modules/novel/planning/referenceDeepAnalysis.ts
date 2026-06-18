@@ -519,14 +519,6 @@ export async function deepAnalyze(profileId: string): Promise<ArchitectureProfil
     },
   });
 
-  // Clear raw content after successful analysis (keep first 5000 chars as preview)
-  // ArchitectureProfile + individual dimension columns now contain all extracted data
-  const preview = text.slice(0, 5000);
-  await prisma.referenceProfile.update({
-    where: { id: profileId },
-    data: { content: preview },
-  }).catch(() => {});
-
   console.log(`[DeepAnalysis] Complete — ${chapters.length} chapters, ${loops.length} loops`);
   return architectureProfile;
 }

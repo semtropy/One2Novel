@@ -208,6 +208,17 @@ router.post("/profiles/:id/analyze", async (req: Request, res: Response, next: N
   } catch (e) { next(e); }
 });
 
+// Clear raw content (user action — frees DB space after deep analysis)
+router.delete("/profiles/:id/content", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await getPrisma().referenceProfile.update({
+      where: { id: param(req, "id") },
+      data: { content: null },
+    });
+    res.json({ data: { ok: true } });
+  } catch (e) { next(e); }
+});
+
 // Deep analysis pipeline (5-phase: parse → annotate → detect loops → synthesize → extract techniques)
 router.post("/profiles/:id/deep-analyze", async (req: Request, res: Response, next: NextFunction) => {
   try {

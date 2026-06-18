@@ -299,6 +299,15 @@ export function ReferenceCockpitPage() {
               </div>
             )}
             {!deepProgress && <span className="text-[10px] text-slate-400">全章统计 · 回环检测 · 技法提取</span>}
+            {archProfile && (
+              <button onClick={() => {
+                if (window.confirm("分析结果已保存。删除上传的原始文本可释放存储空间，确认删除？")) {
+                  api.delete(`/profiles/${profId}/content`).then(() => loadProfile(profId!)).catch(() => {});
+                }
+              }} className="text-[10px] text-slate-400 hover:text-red-500 underline">
+                清理原文
+              </button>
+            )}
           </div>
         )}
 
