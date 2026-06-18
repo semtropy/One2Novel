@@ -12,7 +12,7 @@ router.get("/profiles", async (_req: Request, res: Response, next: NextFunction)
   try {
     const profiles = await getPrisma().referenceProfile.findMany({
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, architectureType: true, totalChapters: true, createdAt: true },
+      select: { id: true, name: true, createdAt: true },
     });
     res.json({ data: profiles });
   } catch (e) { next(e); }
@@ -25,10 +25,8 @@ router.post("/profiles", async (req: Request, res: Response, next: NextFunction)
     if (!name || !content) throw new AppError(400, "请提供书名和文件内容", "MISSING_FIELDS");
     if (content.length < 1000) throw new AppError(400, "文件内容太短（至少1000字）", "CONTENT_TOO_SHORT");
 
-    const totalChapters = (content.match(/(?:^|\n)\s*(?:第[一二三四五六七八九十百千\d]+[章節节回]|Chapter\s+\d+)/gim) || []).length;
-
     const profile = await getPrisma().referenceProfile.create({
-      data: { name, content, totalChapters: totalChapters || null },
+      data: { name, content },
     });
     res.status(201).json({ data: profile });
   } catch (e) { next(e); }
@@ -65,23 +63,8 @@ router.post("/:novelId/reference-book/save-profile", async (req: Request, res: R
       try { annotations = JSON.parse(rb.annotations); } catch { /* old format */ }
     }
 
-    // Reconstruct from old annotations field (backward compat) + direct writingAssets
     const profile = await prisma.referenceProfile.create({
-      data: {
-        name: req.body.name || rb.fileName || "未命名档案",
-        architectureType: (annotations.detectedArchitecture as { type: string })?.type ?? null,
-        totalChapters: rb.totalChapters ?? null,
-        loopBoundaries: annotations.loopBoundaries ? JSON.stringify(annotations.loopBoundaries) : null,
-        coolPointDensity: JSON.stringify({
-          highCoolChapters: annotations.highCoolChapters ?? [],
-          lowCoolChapters: annotations.lowCoolChapters ?? [],
-        }),
-        hookPatterns: annotations.hookPatterns ? JSON.stringify(annotations.hookPatterns) : null,
-        goldenFingerBounds: annotations.goldenFingerBounds ? JSON.stringify(annotations.goldenFingerBounds) : null,
-        contentBeatPatterns: annotations.contentBeatPatterns ? JSON.stringify(annotations.contentBeatPatterns) : null,
-        writingAssets: rb.writingAssets ?? null,
-        settingTimeline: annotations.keySettings ? JSON.stringify(annotations.keySettings) : null,
-      },
+      data: { name: req.body.name || rb.fileName || "未命名档案", content: rb.writingAssets ?? null },
     });
 
     // Link reference book to profile
@@ -117,7 +100,7 @@ router.post("/profiles/:id/analyze", async (req: Request, res: Response, next: N
     while ((cm = chapterPattern.exec(profile.content!)) !== null) {
       chapters.push({ index: chapters.length + 1, start: cm.index });
     }
-    const totalChapters = chapters.length || profile.totalChapters || 100;
+    const totalChapters = chapters.length || 100;
 
     // Build chapter-indexed samples: spread across the full book, not just the first N chapters
     const sampleCount = Math.min(30, totalChapters);

@@ -99,9 +99,7 @@ export function ReferenceCockpitPage() {
   const [deepRunning, setDeepRunning] = useState(false);
   const [deepProgress, setDeepProgress] = useState<{phase:string;detail:string;pct:number}|null>(null);
   const [runError, setRunError] = useState("");
-  const [annotData, setAnnotData] = useState<Record<string, any>>({});
-  const [stats, setStats] = useState<{ totalChapters: number; totalLoops: number } | null>(null);
-  const [archProfile, setArchProfile] = useState<any>(null);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [profileCreated, setProfileCreated] = useState(false);
   const [applyTargetId, setApplyTargetId] = useState<string>("");
   const doneCount = Object.values(done).filter(Boolean).length;
@@ -116,87 +114,9 @@ export function ReferenceCockpitPage() {
       const p = data.data;
       if (!p) return;
       setName(p.name ?? "");
-      const annot: Record<string, any> = {};
-      let ap: any = null;
-      if (p.architectureProfile) {
-        try { ap = JSON.parse(p.architectureProfile); } catch {}
+      if (p.analysisResult) {
+        try { setAnalysisResult(JSON.parse(p.analysisResult)); } catch {}
       }
-
-      // Unified data source: ArchitectureProfile (deep analysis) or fallback to individual columns
-      if (ap) {
-        setArchProfile(ap);
-        // Populate annotData from ArchitectureProfile for Section display
-        annot.loopBoundaries = p.loopBoundaries ? (() => { try { return JSON.parse(p.loopBoundaries); } catch { return []; } })() : [];
-        annot.highCoolChapters = p.coolPointDensity ? (() => { try { const cp = JSON.parse(p.coolPointDensity); return cp.highCoolChapters ?? []; } catch { return []; } })() : [];
-        annot.lowCoolChapters = p.coolPointDensity ? (() => { try { const cp = JSON.parse(p.coolPointDensity); return cp.lowCoolChapters ?? []; } catch { return []; } })() : [];
-        // hookPatterns: ArchitectureProfile stores hookProfile, convert to display format
-        if (ap.hookProfile) {
-          annot.hookPatterns = {
-            distribution: ap.hookProfile.hookDistribution ?? {},
-            avgHookStrength: 0.7,
-            typicalHookStyle: `每章${ap.hookProfile.shortTermPerChapter ?? "?"}个短期钩子 · 每卷${ap.hookProfile.mediumTermPerVolume ?? "?"}个中期 · ${ap.hookProfile.longTermLines ?? "?"}条长线`,
-          };
-        }
-        // goldenFinger: from ArchitectureProfile or individual column
-        if (p.goldenFingerBounds) {
-          try { annot.goldenFingerBounds = JSON.parse(p.goldenFingerBounds); } catch {}
-        }
-        // contentBeatProfile → display format
-        if (ap.contentBeatProfile) {
-          const beats = ap.contentBeatProfile as Record<string, number>;
-          annot.contentBeatPatterns = {
-            beatTypes: Object.keys(beats),
-            overallDistribution: beats,
-            totalChapters: p.totalChapters ?? 100,
-          };
-        }
-        // settingTimeline from individual column
-        if (p.settingTimeline) {
-          try { annot.keySettings = JSON.parse(p.settingTimeline); } catch {}
-        }
-        // architectureType from profile
-        if (p.architectureType) {
-          annot.detectedArchitecture = { type: p.architectureType };
-        }
-      } else {
-        // Fallback: load from individual columns (old analysis data, no ArchitectureProfile)
-        if (p.loopBoundaries) {
-          try { const arr = JSON.parse(p.loopBoundaries); annot.loopBoundaries = Array.isArray(arr) ? arr : []; } catch { annot.loopBoundaries = []; }
-        }
-        if (p.coolPointDensity) {
-          try { const cp = JSON.parse(p.coolPointDensity); annot.highCoolChapters = cp.highCoolChapters ?? []; annot.lowCoolChapters = cp.lowCoolChapters ?? []; } catch {}
-        }
-        if (p.hookPatterns) {
-          try { annot.hookPatterns = JSON.parse(p.hookPatterns); } catch {}
-        }
-        if (p.goldenFingerBounds) {
-          try { annot.goldenFingerBounds = JSON.parse(p.goldenFingerBounds); } catch {}
-        }
-        if (p.contentBeatPatterns) {
-          try { annot.contentBeatPatterns = JSON.parse(p.contentBeatPatterns); } catch {}
-        }
-        if (p.settingTimeline) {
-          try { annot.keySettings = JSON.parse(p.settingTimeline); } catch {}
-        }
-        if (p.writingAssets) {
-          try { annot.writingAssets = JSON.parse(p.writingAssets); } catch {}
-        }
-      }
-      if (p.writingAssets && !annot.writingAssets) {
-        try { annot.writingAssets = JSON.parse(p.writingAssets); } catch {}
-      }
-
-      const nd: AnalysisState = {};
-      if ((annot.loopBoundaries as any[])?.length > 0) nd.loops = true;
-      if ((annot.highCoolChapters ?? []).length > 0 || (annot.lowCoolChapters ?? []).length > 0) nd.coolpoints = true;
-      if (annot.hookPatterns) nd.hooks = true;
-      if (annot.goldenFingerBounds) nd.goldenFinger = true;
-      if ((annot.keySettings as any[])?.length > 0) nd.timeline = true;
-      if (annot.writingAssets) nd.writing = true;
-      if (annot.contentBeatPatterns) nd.contentBeats = true;
-      setDone(nd);
-      setAnnotData(annot);
-      setStats({ totalChapters: p.totalChapters ?? 0, totalLoops: (annot.loopBoundaries as any[])?.filter((b: any) => b.type === "start").length ?? 0 });
       setFileName(p.name ?? "");
     } catch { setRunError("加载档案失败"); }
   }
@@ -304,9 +224,9 @@ export function ReferenceCockpitPage() {
   }
 
   async function handleApplyContentBeats() {
-    if (!applyTargetId || !annotData.contentBeatPatterns?.overallDistribution) return;
+    if (!applyTargetId || !r.contentBeatPatterns?.overallDistribution) return;
     try {
-      await api.put(`/novels/${applyTargetId}/architecture`, { contentBeatProfile: JSON.stringify(annotData.contentBeatPatterns.overallDistribution) });
+      await api.put(`/novels/${applyTargetId}/architecture`, { contentBeatProfile: JSON.stringify(r.contentBeatPatterns.overallDistribution) });
     } catch { setRunError("应用内容节拍失败"); }
   }
 
@@ -319,11 +239,8 @@ export function ReferenceCockpitPage() {
     } catch { setRunError("应用风格失败"); }
   }
 
-  const hookData = annotData.hookPatterns as { distribution: Record<string,number>; avgHookStrength: number; typicalHookStyle: string } | undefined;
-  const gfData = annotData.goldenFingerBounds as { abilities: string[]; limits: string[] } | undefined;
-  const beatData = annotData.contentBeatPatterns as { beatTypes: string[]; overallDistribution: Record<string,number>; totalChapters: number } | undefined;
-  const timelineData = annotData.keySettings as Array<{ chapterIndex: number; settingName: string }> | undefined;
-  const writingData = annotData.writingAssets as { overallStyleDescription?: string; narrativeAssets?: Array<{category:string;observation:string;rule:string;confidence:number}>; languageAssets?: Array<{category:string;observation:string;rule:string;confidence:number}>; characterAssets?: Array<{category:string;observation:string;rule:string;confidence:number}>; rhythmAssets?: Array<{category:string;observation:string;rule:string;confidence:number}>; antiAiAssets?: Array<{category:string;observation:string;rule:string;confidence:number}> } | undefined;
+  const r = analysisResult;
+  const hasResult = !!r;
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -381,7 +298,7 @@ export function ReferenceCockpitPage() {
               </div>
             )}
             {!deepProgress && <span className="text-[10px] text-slate-400">全章统计 · 回环检测 · 技法提取</span>}
-            {archProfile && (
+            {r && (
               <button onClick={() => {
                 if (window.confirm("分析结果已保存。删除上传的原始文本可释放存储空间，确认删除？")) {
                   api.delete(`/profiles/${profId}/content`).then(() => loadProfile(profId!)).catch(() => {});
@@ -395,105 +312,171 @@ export function ReferenceCockpitPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-4 gap-2 text-xs">
-          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">总章数</div><div className="text-lg font-bold text-slate-700">{stats?.totalChapters ?? "—"}</div></div>
-          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">回环数</div><div className="text-lg font-bold text-slate-700">{stats?.totalLoops || "—"}</div></div>
+          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">总章数</div><div className="text-lg font-bold text-slate-700">{r?.totalChapters ?? "—"}</div></div>
+          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">回环数</div><div className="text-lg font-bold text-slate-700">{r?.totalLoops || "—"}</div></div>
           <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">已完成</div><div className="text-lg font-bold text-slate-700">{doneCount}/8</div></div>
           <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">档案</div><div className="text-lg font-bold text-slate-700">{profId ? "已保存" : "新建"}</div></div>
         </div>
 
         {/* Architecture Profile (deep analysis result) */}
-        {archProfile && (
+        {r && (
           <div className="rounded-xl border border-brand-200 bg-brand-50/30 p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-800">深度分析结果</h3>
-              <span className="text-[10px] text-brand-500 font-medium">{archProfile.totalChapters ?? stats?.totalChapters}章 · {archProfile.loops?.length ?? stats?.totalLoops}轮回环</span>
+              <span className="text-[10px] text-brand-500 font-medium">{r.totalChapters ?? r?.totalChapters}章 · {r.loops?.length ?? r?.totalLoops}轮回环</span>
             </div>
             <div className="grid grid-cols-4 gap-2 text-xs">
-              <StatBadge label="推进章" value={`${archProfile.chapterTypeDistribution?.advance ?? 0}%`} />
-              <StatBadge label="过渡章" value={`${archProfile.chapterTypeDistribution?.transition ?? 0}%`} />
-              <StatBadge label="冷却章" value={`${archProfile.chapterTypeDistribution?.cooldown ?? 0}%`} />
-              <StatBadge label="高潮章" value={`${archProfile.chapterTypeDistribution?.climax ?? 0}%`} />
+              <StatBadge label="推进章" value={`${r.chapterTypeDistribution?.advance ?? 0}%`} />
+              <StatBadge label="过渡章" value={`${r.chapterTypeDistribution?.transition ?? 0}%`} />
+              <StatBadge label="冷却章" value={`${r.chapterTypeDistribution?.cooldown ?? 0}%`} />
+              <StatBadge label="高潮章" value={`${r.chapterTypeDistribution?.climax ?? 0}%`} />
             </div>
-            {archProfile.coolPointRecipe && (
+            {r.coolPointRecipe && (
               <div>
                 <p className="text-[10px] text-slate-500 mb-1.5">爽点配方</p>
                 <div className="flex gap-1 h-4 rounded-full overflow-hidden bg-slate-200">
-                  {Object.entries(archProfile.coolPointRecipe as Record<string,number>).filter(([,v]) => v > 0).map(([k, v]) => (
+                  {Object.entries(r.coolPointRecipe as Record<string,number>).filter(([,v]) => v > 0).map(([k, v]) => (
                     <div key={k} title={`${k}: ${v}%`} className="h-full" style={{ width: `${v}%`, backgroundColor: { collect: "#059669", strategy: "#2563eb", verify: "#7c3aed", reveal: "#ea580c", upgrade: "#e11d48", faceSlap: "#ca8a04" }[k] || "#94a3b8" }} />
                   ))}
                 </div>
                 <div className="flex gap-2 mt-1 flex-wrap">
-                  {Object.entries(archProfile.coolPointRecipe as Record<string,number>).filter(([,v]) => v > 0).map(([k, v]) => (
+                  {Object.entries(r.coolPointRecipe as Record<string,number>).filter(([,v]) => v > 0).map(([k, v]) => (
                     <span key={k} className="text-[10px] text-slate-500">{({collect:"收集",strategy:"策略",verify:"验证",reveal:"揭示",upgrade:"升级",faceSlap:"打脸"} as Record<string,string>)[k]??k} {v}%</span>
                   ))}
                 </div>
               </div>
             )}
-            {archProfile.hookProfile && (
+            {r.hookProfile && (
               <div className="grid grid-cols-2 gap-2 text-[10px]">
                 <div className="rounded bg-white p-2">
                   <span className="text-slate-400">钩子密度</span>
-                  <p className="font-semibold text-slate-700">每章 {archProfile.hookProfile.shortTermPerChapter} · 每卷 {archProfile.hookProfile.mediumTermPerVolume} · {archProfile.hookProfile.longTermLines}条长线</p>
+                  <p className="font-semibold text-slate-700">每章 {r.hookProfile.shortTermPerChapter} · 每卷 {r.hookProfile.mediumTermPerVolume} · {r.hookProfile.longTermLines}条长线</p>
                 </div>
                 <div className="rounded bg-white p-2">
                   <span className="text-slate-400">伏笔窗口</span>
-                  <p className="font-semibold text-slate-700">约 {archProfile.payoffPatterns?.typicalPayoffWindow ?? "?"} 章</p>
+                  <p className="font-semibold text-slate-700">约 {r.payoffPatterns?.typicalPayoffWindow ?? "?"} 章</p>
                 </div>
               </div>
             )}
-            {archProfile.contentBeatProfile && (
+            {r.contentBeatProfile && (
               <div>
                 <p className="text-[10px] text-slate-500 mb-1">内容节拍</p>
                 <div className="flex gap-1 flex-wrap">
-                  {Object.entries(archProfile.contentBeatProfile as Record<string,number>).sort(([,a],[,b])=>b-a).slice(0,6).map(([k, v]) => (
+                  {Object.entries(r.contentBeatProfile as Record<string,number>).sort(([,a],[,b])=>b-a).slice(0,6).map(([k, v]) => (
                     <span key={k} className="rounded bg-white px-1.5 py-0.5 text-[10px] text-slate-600">{k} {v}%</span>
                   ))}
                 </div>
               </div>
             )}
-            {archProfile.avgChapterWordCount && (
-              <div className="text-[10px] text-slate-400">平均章节 {archProfile.avgChapterWordCount.avg} 字 ({archProfile.avgChapterWordCount.min}-{archProfile.avgChapterWordCount.max}) · 平均每回环 {archProfile.avgChaptersPerLoop?.avg} 章</div>
+            {r.avgChapterWordCount && (
+              <div className="text-[10px] text-slate-400">平均章节 {r.avgChapterWordCount.avg} 字 ({r.avgChapterWordCount.min}-{r.avgChapterWordCount.max}) · 平均每回环 {r.avgChaptersPerLoop?.avg} 章</div>
             )}
           </div>
         )}
 
-        {/* Analysis Results */}
-        <div className="space-y-3">
-          <Section title="钩子模式" icon={Eye} done={done.hooks}
-            detailContent={hookData ? <HookDetail data={hookData} /> : null}>
-            {done.hooks && <StatusLine label={`${Object.values(hookData?.distribution ?? {}).reduce((a:number,b:number)=>a+b,0)}章 · 平均钩力${((hookData?.avgHookStrength??0)*100).toFixed(0)}%`} />}
-          </Section>
+        {/* Analysis Results V2 */}
+        {hasResult ? (
+          <div className="space-y-3">
+            {/* Loop Narratives */}
+            {r.loopNarratives?.length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><GitBranch size={14}/>回环叙事分析 ({r.loopNarratives.length}轮)</h3>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {r.loopNarratives.map((l:any, i:number) => (
+                    <details key={i} className="rounded-lg border border-slate-100 p-2 text-xs">
+                      <summary className="cursor-pointer font-medium text-slate-600">
+                        第{l.loopIndex}轮回环 (第{l.startChapter}-{l.endChapter}章) — {l.narrativeFunction}
+                      </summary>
+                      <div className="mt-2 space-y-1 text-slate-500 pl-2 border-l-2 border-brand-200">
+                        <p><b className="text-slate-600">核心冲突：</b>{l.coreConflict}</p>
+                        <p><b className="text-slate-600">主角变化：</b>{l.protagonistChange}</p>
+                        <p><b className="text-slate-600">关键事件：</b>{l.keyEvents?.join(" · ")}</p>
+                        <p><b className="text-slate-600">信息揭示：</b>{l.infoRevealed?.join(" · ")}</p>
+                        <p><b className="text-slate-600">结算：</b>{l.settlementContent}</p>
+                        <p><b className="text-slate-600">升级方向：</b>{l.progressionFromPrevious}</p>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </div>
+            )}
 
-          <Section title="金手指" icon={Sparkles} done={done.goldenFinger} 
-            detailContent={gfData ? <GFDetail data={gfData} /> : null}>
-            {done.goldenFinger && <StatusLine label={`${gfData?.abilities?.length??0}项能力 · ${gfData?.limits?.length??0}条限制`} />}
-          </Section>
+            {/* Rhythm Profile */}
+            {r.rhythmProfile && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><TrendingUp size={14}/>节奏曲线</h3>
+                <p className="text-xs text-slate-500 mb-2">{r.rhythmProfile.rhythmDescription}</p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">高潮间隔</span><p className="font-bold text-slate-700">{r.rhythmProfile.avgClimaxInterval}章</p></div>
+                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">冷却段</span><p className="font-bold text-slate-700">{r.rhythmProfile.avgCooldownLength}章</p></div>
+                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">节奏模板</span><p className="font-bold text-slate-700">{r.rhythmProfile.rhythmTemplate}</p></div>
+                </div>
+              </div>
+            )}
 
-          <Section title="内容节拍DNA" icon={BookOpen} done={done.contentBeats} 
-            detailContent={beatData ? <BeatDetail data={beatData} onApply={handleApplyContentBeats} disabled={!applyTargetId} /> : null}>
-            {done.contentBeats && <StatusLine label={`${beatData?.beatTypes?.length??0}种节拍 · ${beatData?.totalChapters??0}章`} />}
-          </Section>
+            {/* Golden Finger Design Pattern */}
+            {r.goldenFingerAnalysis && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><Sparkles size={14}/>金手指：{r.goldenFingerAnalysis.name}</h3>
+                <div className="text-xs text-slate-500 space-y-1">
+                  <p><b>能力：</b>{r.goldenFingerAnalysis.abilities?.join(" · ")}</p>
+                  <p><b>限制：</b>{r.goldenFingerAnalysis.limits?.join(" · ")}</p>
+                  {r.goldenFingerAnalysis.designPattern && (
+                    <div className="mt-2 p-2 rounded bg-brand-50 border border-brand-100">
+                      <p className="font-medium text-brand-700 mb-1">设计模式：{r.goldenFingerAnalysis.designPattern.type} — {r.goldenFingerAnalysis.designPattern.typeDescription}</p>
+                      <p><b>核心机制：</b>{r.goldenFingerAnalysis.designPattern.coreMechanic}</p>
+                      <p><b>获取方式：</b>{r.goldenFingerAnalysis.designPattern.acquisitionPattern}</p>
+                      <p><b>进化路径：</b>{r.goldenFingerAnalysis.designPattern.evolutionPath?.join(" → ")}</p>
+                      <p><b>限制策略：</b>{r.goldenFingerAnalysis.designPattern.limitationStrategy}</p>
+                      <p><b>叙事融合：</b>{r.goldenFingerAnalysis.designPattern.narrativeIntegration}</p>
+                      <p><b>适用：</b>{r.goldenFingerAnalysis.designPattern.suitability?.genres?.join("、")} · {r.goldenFingerAnalysis.designPattern.suitability?.architectures?.join("、")}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
-          <Section title="爽点分布" icon={TrendingUp} done={done.coolpoints} 
-            detailContent={done.coolpoints ? <CoolPointDetail high={(annotData.highCoolChapters as number[])??[]} low={(annotData.lowCoolChapters as number[])??[]} /> : null}>
-            {done.coolpoints && <StatusLine label={`高爽点${(annotData.highCoolChapters as any[])?.length??0}章 · 低爽点${(annotData.lowCoolChapters as any[])?.length??0}章`} />}
-          </Section>
+            {/* Craft Stats */}
+            {r.craftStats && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><BookOpen size={14}/>写作手法统计</h3>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded bg-slate-50 p-2">
+                    <span className="text-slate-400">开场方式</span>
+                    <p className="font-semibold text-slate-700">{r.craftStats.dominantOpening}</p>
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {Object.entries(r.craftStats.openingPatterns as Record<string,number>).map(([k,v]) => (
+                        <span key={k} className="text-[10px] bg-white rounded px-1 py-0 text-slate-500">{k} {v}章</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded bg-slate-50 p-2">
+                    <span className="text-slate-400">对白密度</span>
+                    <p className="font-semibold text-slate-700">约 {r.craftStats.dialogueRatio}%</p>
+                    <p className="text-[10px] text-slate-400">每章约 {r.craftStats.avgDialoguePerChapter} 次对话</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
-          <Section title="设定释放时间线" icon={FileText} done={done.timeline} 
-            detailContent={timelineData ? <TimelineDetail data={timelineData} /> : null}>
-            {done.timeline && <StatusLine label={`${timelineData?.length??0}条设定`} />}
-          </Section>
-
-          <Section title="写法技法" icon={BookOpen} done={done.writing} 
-            detailContent={writingData ? <WritingDetail data={writingData} onApply={handleApplyStyle} applied={profileCreated} disabled={!applyTargetId} /> : null}>
-            {done.writing && <StatusLine label={`${(writingData?.narrativeAssets?.length??0)+(writingData?.languageAssets?.length??0)+(writingData?.characterAssets?.length??0)+(writingData?.rhythmAssets?.length??0)+(writingData?.antiAiAssets?.length??0)}条技法`} />}
-          </Section>
-
-          <Section title="回环推断" icon={GitBranch} done={done.loops} 
-            detailContent={done.loops ? <LoopDetail boundaries={(annotData.loopBoundaries as Array<{chapterIndex:number;type:string}>)??[]} total={stats?.totalChapters??0} /> : null}>
-            {done.loops && <StatusLine label={`${((annotData.loopBoundaries as any[])??[]).filter((b:any)=>b.type==="start").length}轮回环`} />}
-          </Section>
-        </div>
+            {/* Architecture Profile summary */}
+            {r.architectureProfile && (
+              <div className="rounded-xl border border-brand-200 bg-brand-50/30 p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">架构蓝图</h3>
+                <div className="grid grid-cols-4 gap-1 text-[10px]">
+                  <span className="text-slate-400">章节分布：</span>
+                  <span className="col-span-3 text-slate-600">推进 {r.architectureProfile.chapterTypeDistribution?.advance}% · 过渡 {r.architectureProfile.chapterTypeDistribution?.transition}% · 冷却 {r.architectureProfile.chapterTypeDistribution?.cooldown}% · 高潮 {r.architectureProfile.chapterTypeDistribution?.climax}%</span>
+                  <span className="text-slate-400">平均章数：</span>
+                  <span className="col-span-3 text-slate-600">{r.architectureProfile.avgChapterWordCount?.avg}字 · 每回环 {r.architectureProfile.avgChaptersPerLoop?.avg}章</span>
+                  <span className="text-slate-400">钩子密度：</span>
+                  <span className="col-span-3 text-slate-600">短期 {r.architectureProfile.hookProfile?.shortTermPerChapter} · 中期 {r.architectureProfile.hookProfile?.mediumTermPerVolume} · 长线 {r.architectureProfile.hookProfile?.longTermLines}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-12 text-center text-xs text-slate-400">暂无分析结果。上传参考书后点击「全量深度分析」。</div>
+        )}
       </div>
     </div>
   );

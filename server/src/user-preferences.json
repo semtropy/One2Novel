@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-06-18T02:49:00.171Z",
+  "updatedAt": "2026-06-18T10:12:47.616Z",
   "preferences": {
     "favoriteGenres": [
       "都市",
@@ -12,6 +12,11 @@
     "estimatedChapterCount": null,
     "defaultChapterLength": 3000,
     "creationHistory": [
+      {
+        "title": "未命名小说",
+        "genre": "",
+        "createdAt": "2026-06-18T10:12:47.609Z"
+      },
       {
         "title": "未命名小说",
         "genre": "",
@@ -56,11 +61,6 @@
         "title": "验收测试",
         "genre": "悬疑",
         "createdAt": "2026-06-15T11:16:50.692Z"
-      },
-      {
-        "title": "未命名小说",
-        "genre": "",
-        "createdAt": "2026-06-15T09:46:30.545Z"
       }
     ],
     "providerModels": {

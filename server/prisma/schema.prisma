@@ -340,16 +340,7 @@ model ReferenceProfile {
   id                String   @id @default(cuid())
   name              String   // 参考书名称
   content           String?  // 上传的原始文本（用于独立分析，不依赖 Novel）
-  architectureType  String?  // 检测到的架构类型
-  totalChapters     Int?     // 总章数
-  loopBoundaries    String?  // JSON: 回环边界
-  coolPointDensity  String?  // JSON: 爽点分布
-  hookPatterns      String?  // JSON: 钩子模式
-  goldenFingerBounds String? // JSON: 金手指提取
-  contentBeatPatterns String?// JSON: 内容节拍DNA
-  writingAssets     String?  // JSON: 写法技法
-  settingTimeline   String?  // JSON: 设定时间线
-  architectureProfile String?  // JSON: ArchitectureProfile — unified structure blueprint
+  analysisResult    String?  // JSON: AnalysisResult — 完整的分析结果（V2 统一列）
   deepAnalysisProgress String?  // JSON: {phase, detail, pct} — transient progress state
   chapterAnnotations   String?  // JSON: ChapterAnnotation[] — persisted for resume
   books             ReferenceBook[]         @relation("ProfileBooks")
