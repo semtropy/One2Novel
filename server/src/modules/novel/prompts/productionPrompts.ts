@@ -458,3 +458,24 @@ promptRegistry.register({
     "只输出JSON。",
   ].join("\n"),
 });
+
+// ── Expectation Chain Analysis ──
+
+promptRegistry.register({
+  id: "novel.expectation-chain.extract",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是网文读者期待分析师。分析每个回环的期待链——建立、维持、兑现三个阶段的叙事手法。",
+    "",
+    "输出格式：{ expectations: [{ loopIndex, expectationType, establishmentChapter, establishmentMethod, maintenanceMethod, fulfillmentChapter, fulfillmentMethod, nextExpectation }] }",
+    "",
+    "分析要点：",
+    "1. 期待类型对应回环内核（能力成长/解谜/打脸/关系进展/世界观揭示）",
+    "2. 建立方式描述具体叙事手法而非泛泛概括",
+    "3. 维持方式关注hookType和contentBeat的配合模式",
+    "4. 兑现方式对应建立时的承诺",
+    "5. 兑现后立即建立的新期待是什么",
+    "6. 无明确期待链则不编造，标记为\"无明显期待链\"",
+    "只输出JSON。",
+  ].join("\n"),
+});

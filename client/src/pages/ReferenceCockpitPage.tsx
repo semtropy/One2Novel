@@ -229,11 +229,11 @@ export function ReferenceCockpitPage() {
         {hasResult ? (
           <div className="space-y-3">
             {/* Loop Narratives */}
-            {r.architecture.loopNarratives?.length > 0 && (
+            {r.architecture?.loopNarratives?.length > 0 && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><GitBranch size={14}/>回环叙事分析 ({r.architecture.loopNarratives.length}轮)</h3>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><GitBranch size={14}/>回环叙事分析 ({r.architecture?.loopNarratives.length}轮)</h3>
                 <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {r.architecture.loopNarratives.map((l:any, i:number) => (
+                  {r.architecture?.loopNarratives.map((l:any, i:number) => (
                     <details key={i} className="rounded-lg border border-slate-100 p-2 text-xs">
                       <summary className="cursor-pointer font-medium text-slate-600">
                         第{l.loopIndex}轮回环 (第{l.startChapter}-{l.endChapter}章) — {l.narrativeFunction}
@@ -244,7 +244,7 @@ export function ReferenceCockpitPage() {
                         <p><b className="text-slate-600">关键事件：</b>{l.keyEvents?.join(" · ")}</p>
                         <p><b className="text-slate-600">信息揭示：</b>{l.infoRevealed?.join(" · ")}</p>
                         <p><b className="text-slate-600">结算：</b>{l.settlementContent}</p>
-                        <p><b className="text-slate-600">升级方向：</b>{l.progressionFromPrevious}</p>
+                        <p><b className="text-slate-600">与上轮回环的递进：</b>{l.progressionFromPrevious}</p>
                       </div>
                     </details>
                   ))}
@@ -253,14 +253,14 @@ export function ReferenceCockpitPage() {
             )}
 
             {/* Rhythm Profile */}
-            {r.architecture.rhythmProfile && (
+            {r.architecture?.rhythmProfile && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><TrendingUp size={14}/>节奏曲线</h3>
-                <p className="text-xs text-slate-500 mb-2">{r.architecture.rhythmProfile.rhythmDescription}</p>
+                <p className="text-xs text-slate-500 mb-2">{r.architecture?.rhythmProfile.rhythmDescription}</p>
                 <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">高潮间隔</span><p className="font-bold text-slate-700">{r.architecture.rhythmProfile.avgClimaxInterval}章</p></div>
-                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">冷却段</span><p className="font-bold text-slate-700">{r.architecture.rhythmProfile.avgCooldownLength}章</p></div>
-                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">节奏模板</span><p className="font-bold text-slate-700">{r.architecture.rhythmProfile.rhythmTemplate}</p></div>
+                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">高潮间隔</span><p className="font-bold text-slate-700">{r.architecture?.rhythmProfile.avgClimaxInterval}章</p></div>
+                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">冷却段</span><p className="font-bold text-slate-700">{r.architecture?.rhythmProfile.avgCooldownLength}章</p></div>
+                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">节奏模板</span><p className="font-bold text-slate-700">{r.architecture?.rhythmProfile.rhythmTemplate}</p></div>
                 </div>
               </div>
             )}
@@ -297,14 +297,9 @@ export function ReferenceCockpitPage() {
                     <p className="font-semibold text-slate-700">{r.writing.craftStats.dominantOpening}</p>
                     <div className="flex gap-1 mt-1 flex-wrap">
                       {Object.entries(r.writing.craftStats.openingPatterns as Record<string,number>).map(([k,v]) => (
-                        <span key={k} className="text-[10px] bg-white rounded px-1 py-0 text-slate-500">{k} {v}章</span>
+                        <span key={k} className="text-[10px] bg-white rounded px-1 py-0 text-slate-500">{({exposition:"说明",environment:"环境",action:"动作",internal:"内心",dialogue:"对话"} as Record<string,string>)[k]??k} {v}章</span>
                       ))}
                     </div>
-                  </div>
-                  <div className="rounded bg-slate-50 p-2">
-                    <span className="text-slate-400">对白密度</span>
-                    <p className="font-semibold text-slate-700">约 {r.writing.craftStats.dialogueRatio}%</p>
-                    <p className="text-[10px] text-slate-400">每章约 {r.writing.craftStats.avgDialoguePerChapter} 次对话</p>
                   </div>
                 </div>
               </div>
@@ -372,11 +367,11 @@ export function ReferenceCockpitPage() {
                 <h3 className="text-sm font-semibold text-slate-700 mb-2">架构蓝图</h3>
                 <div className="grid grid-cols-4 gap-1 text-[10px]">
                   <span className="text-slate-400">章节分布：</span>
-                  <span className="col-span-3 text-slate-600">推进 {r.architecture.architectureProfile.chapterTypeDistribution?.advance}% · 过渡 {r.architecture.architectureProfile.chapterTypeDistribution?.transition}% · 冷却 {r.architecture.architectureProfile.chapterTypeDistribution?.cooldown}% · 高潮 {r.architecture.architectureProfile.chapterTypeDistribution?.climax}%</span>
+                  <span className="col-span-3 text-slate-600">推进 {r.architecture?.architectureProfile.chapterTypeDistribution?.advance}% · 过渡 {r.architecture?.architectureProfile.chapterTypeDistribution?.transition}% · 冷却 {r.architecture?.architectureProfile.chapterTypeDistribution?.cooldown}% · 高潮 {r.architecture?.architectureProfile.chapterTypeDistribution?.climax}%</span>
                   <span className="text-slate-400">平均章数：</span>
-                  <span className="col-span-3 text-slate-600">{r.architecture.architectureProfile.avgChapterWordCount?.avg}字 · 每回环 {r.architecture.architectureProfile.avgChaptersPerLoop?.avg}章</span>
+                  <span className="col-span-3 text-slate-600">{r.architecture?.architectureProfile.avgChapterWordCount?.avg}字 · 每回环 {r.architecture?.architectureProfile.avgChaptersPerLoop?.avg}章</span>
                   <span className="text-slate-400">钩子密度：</span>
-                  <span className="col-span-3 text-slate-600">短期 {r.architecture.architectureProfile.hookProfile?.shortTermPerChapter} · 中期 {r.architecture.architectureProfile.hookProfile?.mediumTermPerVolume} · 长线 {r.architecture.architectureProfile.hookProfile?.longTermLines}</span>
+                  <span className="col-span-3 text-slate-600">短期 {r.architecture?.architectureProfile.hookProfile?.shortTermPerChapter} · 中期 {r.architecture?.architectureProfile.hookProfile?.mediumTermPerVolume} · 长线 {r.architecture?.architectureProfile.hookProfile?.longTermLines}</span>
                 </div>
               </div>
             )}

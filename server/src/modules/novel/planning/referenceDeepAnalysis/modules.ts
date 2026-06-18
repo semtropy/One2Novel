@@ -206,19 +206,12 @@ export async function extractWritingTechniques(text: string, annotations: Chapte
   } catch { return null; }
 }
 
-export function computeCraftStats(annotations: ChapterAnnotation[], text: string): CraftStats {
+export function computeCraftStats(annotations: ChapterAnnotation[]): CraftStats {
   const openingPatterns: Record<string, number> = {};
   for (const a of annotations) openingPatterns[a.openingType] = (openingPatterns[a.openingType] || 0) + 1;
   const entries = Object.entries(openingPatterns).sort(([,a],[,b]) => b - a);
-  const dominantOpening = entries.length > 0 ? `${entries[0][0]} (${pct(entries[0][1], annotations.length)}%)` : "unknown";
-  const sample = text.slice(0, 100000); const lines = sample.split("\n").filter(l => l.trim());
-  const dialogueLines = lines.filter(l => /^[「「\"'“‘]/.test(l.trim())).length;
-  const dialogueRatio = lines.length > 0 ? Math.round(dialogueLines / lines.length * 100) : 30;
-  const visual = (sample.match(/[色光暗亮红蓝绿黑白金]/g) || []).length;
-  const action = (sample.match(/[打攻击杀砍刺挥踢跳跃翻滚]/g) || []).length;
-  const internal = (sample.match(/[想想觉得感到似乎也许可能内心]/g) || []).length;
-  const total = visual + action + internal || 1;
-  return { openingPatterns, dominantOpening, dialogueRatio, avgDialoguePerChapter: Math.round(dialogueLines / Math.max(1, annotations.length)), avgDialogueLineLength: 15, descriptionDistribution: { visual: Math.round(visual/total*100), action: Math.round(action/total*100), internal: Math.round(internal/total*100), sensory: Math.round(Math.max(0,100-(visual+action+internal)/total*100)) } };
+  const dominantOpening = entries.length > 0 ? entries[0][0] : "unknown";
+  return { openingPatterns, dominantOpening, dialogueRatio: 0, avgDialoguePerChapter: 0, avgDialogueLineLength: 0, descriptionDistribution: {} };
 }
 
 const ExpectationSchema = z.object({
@@ -239,8 +232,8 @@ export async function extractExpectationChains(annotations: ChapterAnnotation[],
       return `Loop ${l.loopIndex} (ch${l.startChapter}-${l.endChapter}): conflict="${l.coreConflict.slice(0, 50)}" hooks=s:${hookDist.suspense}/r:${hookDist.reversal}/p:${hookDist.preview}/e:${hookDist.emotional} topBeats=${Object.entries(beatDist).sort(([,a],[,b])=>b-a).slice(0,3).map(([k,v])=>`${k}:${v}`).join(",")}`;
     }).join("\n");
     const raw = await aiInvoke({
-      assetId: "novel.chapter.review",
-      userPrompt: [`分析以下 ${loopNarratives.length} 轮回环的读者期待链。对每个回环，判断：读者读完这个回环后期待下一轮回环发生什么？这个期待是如何被建立和维持的？`,`${loopSummary.slice(0, 6000)}`].join("\n"),
+      assetId: "novel.expectation-chain.extract",
+      userPrompt: loopSummary.slice(0, 6000),
       schema: ExpectationSchema, temperature: 0.5,
     });
     return raw.expectations;

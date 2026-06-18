@@ -4,7 +4,7 @@ import { parseChapters } from "./parse";
 import { batchAnnotateChapters } from "./annotate";
 import {
   detectAndAnalyzeLoops, computeRhythmProfile, synthesizeArchitectureProfile,
-  extractPowerSystem, extractGoldenFinger,
+  extractGoldenFinger,
   extractWritingTechniques, computeCraftStats, extractExpectationChains,
 } from "./modules";
 
@@ -73,7 +73,6 @@ export interface AnalysisResultV3 {
     rhythmProfile: RhythmProfile;
     architectureProfile: ArchitectureProfile;
   };
-  powerSystem: PowerSystemResult | null;
   goldenFinger: GoldenFingerAnalysis | null;
   writing: {
     techniques: WritingTechniques | null;
@@ -128,32 +127,26 @@ export async function deepAnalyze(profileId: string): Promise<AnalysisResultV3> 
   console.log(`[Module A] ${narratives.length} loops, rhythm=${rhythmProfile.rhythmTemplate}`);
   await updateProgress(profileId, "arch", `${narratives.length} 轮回环分析完成`, 68);
 
-  // Module B: Power System (may fail, non-blocking)
-  await updateProgress(profileId, "power", "力量体系提取...", 70);
-  let powerSystem: PowerSystemResult | null = null;
-  try { powerSystem = await extractPowerSystem(annotations, text); console.log(`[Module B] Power system: ${powerSystem?.expectationNodes.length ?? 0} levels`); } catch (e) { console.warn("[Module B] Failed", e); }
-  await updateProgress(profileId, "power", "力量体系完成", 75);
-
   // Module C: Golden Finger (may fail, non-blocking)
-  await updateProgress(profileId, "gf", "金手指 + 进化时间线...", 78);
+  await updateProgress(profileId, "gf", "金手指 + 进化时间线...", 70);
   let goldenFinger: GoldenFingerAnalysis | null = null;
   try { goldenFinger = await extractGoldenFinger(text, annotations); console.log(`[Module C] GF: ${goldenFinger?.name ?? "none"} timeline=${goldenFinger?.evolutionTimeline.length ?? 0}`); } catch (e) { console.warn("[Module C] Failed", e); }
-  await updateProgress(profileId, "gf", "金手指完成", 83);
+  await updateProgress(profileId, "gf", "金手指完成", 78);
 
   // Module D: Writing + Expectations
-  await updateProgress(profileId, "writing", "写法技法 + 期待链...", 85);
+  await updateProgress(profileId, "writing", "写法技法 + 期待链...", 80);
   const techniques = await extractWritingTechniques(text, annotations);
   if (techniques) architectureProfile.writingTechniques = techniques;
-  const craftStats = computeCraftStats(annotations, text);
+  const craftStats = computeCraftStats(annotations);
   const expectations = await extractExpectationChains(annotations, narratives);
-  console.log(`[Module D] Writing: ${techniques ? "done" : "failed"}, craftStats: ${craftStats.dominantOpening}, expectations: ${expectations.length}`);
+  console.log(`[Module D] Writing: ${techniques ? "done" : "failed"}, opening: ${craftStats.dominantOpening}, expectations: ${expectations.length}`);
   await updateProgress(profileId, "writing", "写作分析完成", 95);
 
   // Assemble + Persist
   const result: AnalysisResultV3 = {
     totalChapters: chapters.length, completedAt: new Date().toISOString(), annotations,
     architecture: { loopBoundaries: boundaries, loopNarratives: narratives, rhythmProfile, architectureProfile },
-    powerSystem, goldenFinger,
+    goldenFinger,
     writing: { techniques, craftStats, expectations },
   };
 
