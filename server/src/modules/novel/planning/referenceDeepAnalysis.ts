@@ -117,7 +117,8 @@ function parseChineseNum(s: string): number | null {
 // Phase 2: Batched Chapter Annotation (AI)
 // ═══════════════════════════════════════════════════════════
 
-const BATCH_SIZE = 15;
+const BASE_BATCH_SIZE = 15;
+const MAX_CHARS_PER_BATCH = 60000; // ~15K tokens — keep within LLM context window
 
 const BatchAnnotationSchema = z.object({
   chapters: z.array(z.object({
@@ -137,15 +138,16 @@ async function annotateBatch(
   text: string,
   batchIndex: number,
   totalBatches: number,
+  batchSize: number,
 ): Promise<ChapterAnnotation[]> {
-  const startIdx = batchIndex * BATCH_SIZE;
-  const batchChapters = chapters.slice(startIdx, startIdx + BATCH_SIZE);
+  const startIdx = batchIndex * batchSize;
+  const batchChapters = chapters.slice(startIdx, startIdx + batchSize);
   if (batchChapters.length === 0) return [];
 
-  // Build prompt: provide chapter excerpts with clear boundaries
+  // Full chapter content — no truncation
   const excerpts = batchChapters.map(ch => {
-    const content = text.slice(ch.startChar, Math.min(ch.startChar + 2500, ch.endChar)).trim();
-    return `=== 第${ch.index}章 ${ch.title} ===\n${content.slice(0, 2000)}`;
+    const content = text.slice(ch.startChar, ch.endChar).trim();
+    return `=== 第${ch.index}章 ${ch.title} ===\n${content}`;
   }).join("\n\n");
 
   const raw = await aiInvoke({
@@ -172,14 +174,16 @@ export async function batchAnnotateChapters(
   text: string,
   onProgress?: (batch: number, total: number) => Promise<void>,
 ): Promise<ChapterAnnotation[]> {
-  const totalBatches = Math.ceil(chapters.length / BATCH_SIZE);
+  // Dynamic batch size: fit as many chapters as possible within MAX_CHARS_PER_BATCH
+  const avgChapterSize = chapters.reduce((s, c) => s + c.wordCount, 0) / chapters.length;
+  const batchSize = Math.max(5, Math.min(BASE_BATCH_SIZE, Math.floor(MAX_CHARS_PER_BATCH / avgChapterSize)));
+  const totalBatches = Math.ceil(chapters.length / batchSize);
   const results: ChapterAnnotation[] = [];
 
-  // Process batches sequentially to avoid overwhelming the LLM provider
   for (let i = 0; i < totalBatches; i++) {
-    const batch = await annotateBatch(chapters, text, i, totalBatches);
+    const batch = await annotateBatch(chapters, text, i, totalBatches, batchSize);
     results.push(...batch);
-    console.log(`[DeepAnalysis] Batch ${i + 1}/${totalBatches}: annotated ${batch.length} chapters`);
+    console.log(`[DeepAnalysis] Batch ${i + 1}/${totalBatches}: annotated ${batch.length} chapters (batch size: ${batchSize}, avg chapter: ${avgChapterSize} chars)`);
     if (onProgress) await onProgress(i + 1, totalBatches);
   }
 
@@ -471,7 +475,7 @@ export async function deepAnalyze(profileId: string): Promise<ArchitectureProfil
   await updateProgress(profileId, "parse", `发现 ${chapters.length} 章`, 10);
 
   // Phase 2
-  const totalBatches = Math.ceil(chapters.length / BATCH_SIZE);
+  const totalBatches = Math.ceil(chapters.length / BASE_BATCH_SIZE);
   await updateProgress(profileId, "annotate", `标注章节 (0/${totalBatches} 批)...`, 15);
   const annotations = await batchAnnotateChapters(chapters, text, async (batch, total) => {
     await updateProgress(profileId, "annotate", `标注章节 (${batch}/${total} 批)`, 15 + Math.round(batch / total * 40));
