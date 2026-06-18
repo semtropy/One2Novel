@@ -116,44 +116,65 @@ router.post("/profiles/:id/analyze", async (req: Request, res: Response, next: N
     let assetId: string;
     let schema: z.ZodType<any>;
     let userPrompt: string;
+    const updateData: Record<string, string> = {};
 
+    // All instructions live in the registered system prompts (referencePrompts.ts).
+    // userPrompt only provides the content — no inline instructions that compete with the registry.
     switch (dimension) {
-      case "architecture": {
+      case "architecture":
         assetId = "reference.architecture.detect";
         schema = z.object({ architectureType: z.string(), confidence: z.number(), reasoning: z.string(), observedPatterns: z.array(z.string()) });
-        userPrompt = `分析以下小说的章节片段，判断它属于哪种网文架构类型：\n\n${content.slice(0, 30000)}`;
         break;
-      }
-      case "hooks": {
+      case "loops":
+        assetId = "reference.loop.infer";
+        schema = z.object({ loopBoundaries: z.array(z.object({ chapterIndex: z.number(), type: z.enum(["start", "end"]) })) });
+        break;
+      case "coolpoints":
+        assetId = "reference.coolpoint.infer";
+        schema = z.object({ highCoolChapters: z.array(z.number()), lowCoolChapters: z.array(z.number()) });
+        break;
+      case "hooks":
         assetId = "reference.hook.extract";
         schema = z.object({ hookDistribution: z.record(z.string(), z.number()), avgHookStrength: z.number(), typicalHookStyle: z.string() });
-        userPrompt = `分析以下小说的章节结尾钩子风格：\n\n${content.slice(0, 50000)}`;
         break;
-      }
-      case "goldenFinger": {
+      case "goldenFinger":
         assetId = "reference.golden-finger.extract";
         schema = z.object({ abilities: z.array(z.string()), limits: z.array(z.string()), goldenFingerName: z.string().optional() });
-        userPrompt = `从以下小说内容中提取主角的金手指信息：\n\n${content.slice(0, 50000)}`;
         break;
-      }
-      case "timeline": {
+      case "timeline":
         assetId = "reference.setting-timeline.extract";
         schema = z.array(z.object({ chapterIndex: z.number(), settingName: z.string(), description: z.string(), category: z.string() }));
-        userPrompt = `提取以下小说的关键世界观设定首次揭示的章节节点：\n\n${content.slice(0, 50000)}`;
         break;
-      }
+      case "writing":
+        assetId = "reference.writing_assets.extract";
+        schema = ((t: z.ZodObject<any>) => z.object({
+          overallStyleDescription: z.string(),
+          narrativeAssets: z.array(t), languageAssets: z.array(t),
+          characterAssets: z.array(t), rhythmAssets: z.array(t), antiAiAssets: z.array(t),
+        }))(z.object({ category: z.string(), observation: z.string(), rule: z.string(), confidence: z.number() }));
+        break;
+      case "contentBeats":
+        assetId = "reference.content-beats.extract";
+        schema = z.object({ beatTypes: z.array(z.string()), overallDistribution: z.record(z.string(), z.number()), totalChapters: z.number() });
+        break;
       default:
         throw new AppError(400, `未知分析维度: ${dimension}`, "UNKNOWN_DIMENSION");
     }
 
+    // System prompt in registry has all instructions — userPrompt is just the content
+    userPrompt = content.slice(0, dimension === "writing" ? 80000 : 50000);
+
     const result = await aiInvoke({ assetId, userPrompt, schema, temperature: 0.5 });
 
     // Store result on profile
-    const updateData: Record<string, string> = {};
     if (dimension === "architecture") updateData.architectureType = (result as any).architectureType;
+    if (dimension === "loops") { const lb = (result as any).loopBoundaries; if (lb) updateData.loopBoundaries = JSON.stringify(lb); }
+    if (dimension === "coolpoints") updateData.coolPointDensity = JSON.stringify(result);
     if (dimension === "hooks") updateData.hookPatterns = JSON.stringify(result);
     if (dimension === "goldenFinger") updateData.goldenFingerBounds = JSON.stringify(result);
     if (dimension === "timeline") updateData.settingTimeline = JSON.stringify(result);
+    if (dimension === "writing") updateData.writingAssets = JSON.stringify(result);
+    if (dimension === "contentBeats") updateData.contentBeatPatterns = JSON.stringify(result);
 
     if (Object.keys(updateData).length > 0) {
       await getPrisma().referenceProfile.update({ where: { id: param(req, "id") }, data: updateData });
