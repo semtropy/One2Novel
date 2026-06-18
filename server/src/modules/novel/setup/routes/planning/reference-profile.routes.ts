@@ -205,7 +205,7 @@ router.delete("/profiles/:id/content", async (req: Request, res: Response, next:
 // Deep analysis pipeline (5-phase: parse → annotate → detect loops → synthesize → extract techniques)
 router.post("/profiles/:id/deep-analyze", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { deepAnalyze } = await import("../../../planning/referenceDeepAnalysis");
+    const { deepAnalyze } = await import("../../../planning/referenceDeepAnalysis/index");
     const result = await deepAnalyze(param(req, "id"));
     res.json({ data: result });
   } catch (e) { next(e); }

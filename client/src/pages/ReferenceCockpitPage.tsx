@@ -229,11 +229,11 @@ export function ReferenceCockpitPage() {
         {hasResult ? (
           <div className="space-y-3">
             {/* Loop Narratives */}
-            {r.loopNarratives?.length > 0 && (
+            {r.architecture.loopNarratives?.length > 0 && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><GitBranch size={14}/>回环叙事分析 ({r.loopNarratives.length}轮)</h3>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><GitBranch size={14}/>回环叙事分析 ({r.architecture.loopNarratives.length}轮)</h3>
                 <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {r.loopNarratives.map((l:any, i:number) => (
+                  {r.architecture.loopNarratives.map((l:any, i:number) => (
                     <details key={i} className="rounded-lg border border-slate-100 p-2 text-xs">
                       <summary className="cursor-pointer font-medium text-slate-600">
                         第{l.loopIndex}轮回环 (第{l.startChapter}-{l.endChapter}章) — {l.narrativeFunction}
@@ -253,34 +253,34 @@ export function ReferenceCockpitPage() {
             )}
 
             {/* Rhythm Profile */}
-            {r.rhythmProfile && (
+            {r.architecture.rhythmProfile && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><TrendingUp size={14}/>节奏曲线</h3>
-                <p className="text-xs text-slate-500 mb-2">{r.rhythmProfile.rhythmDescription}</p>
+                <p className="text-xs text-slate-500 mb-2">{r.architecture.rhythmProfile.rhythmDescription}</p>
                 <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">高潮间隔</span><p className="font-bold text-slate-700">{r.rhythmProfile.avgClimaxInterval}章</p></div>
-                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">冷却段</span><p className="font-bold text-slate-700">{r.rhythmProfile.avgCooldownLength}章</p></div>
-                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">节奏模板</span><p className="font-bold text-slate-700">{r.rhythmProfile.rhythmTemplate}</p></div>
+                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">高潮间隔</span><p className="font-bold text-slate-700">{r.architecture.rhythmProfile.avgClimaxInterval}章</p></div>
+                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">冷却段</span><p className="font-bold text-slate-700">{r.architecture.rhythmProfile.avgCooldownLength}章</p></div>
+                  <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">节奏模板</span><p className="font-bold text-slate-700">{r.architecture.rhythmProfile.rhythmTemplate}</p></div>
                 </div>
               </div>
             )}
 
             {/* Golden Finger Design Pattern */}
-            {r.goldenFingerAnalysis && (
+            {r.goldenFinger && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><Sparkles size={14}/>金手指：{r.goldenFingerAnalysis.name}</h3>
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><Sparkles size={14}/>金手指：{r.goldenFinger.name}</h3>
                 <div className="text-xs text-slate-500 space-y-1">
-                  <p><b>能力：</b>{r.goldenFingerAnalysis.abilities?.join(" · ")}</p>
-                  <p><b>限制：</b>{r.goldenFingerAnalysis.limits?.join(" · ")}</p>
-                  {r.goldenFingerAnalysis.designPattern && (
+                  <p><b>能力：</b>{r.goldenFinger.abilities?.join(" · ")}</p>
+                  <p><b>限制：</b>{r.goldenFinger.limits?.join(" · ")}</p>
+                  {r.goldenFinger.designPattern && (
                     <div className="mt-2 p-2 rounded bg-brand-50 border border-brand-100">
-                      <p className="font-medium text-brand-700 mb-1">设计模式：{r.goldenFingerAnalysis.designPattern.type} — {r.goldenFingerAnalysis.designPattern.typeDescription}</p>
-                      <p><b>核心机制：</b>{r.goldenFingerAnalysis.designPattern.coreMechanic}</p>
-                      <p><b>获取方式：</b>{r.goldenFingerAnalysis.designPattern.acquisitionPattern}</p>
-                      <p><b>进化路径：</b>{r.goldenFingerAnalysis.designPattern.evolutionPath?.join(" → ")}</p>
-                      <p><b>限制策略：</b>{r.goldenFingerAnalysis.designPattern.limitationStrategy}</p>
-                      <p><b>叙事融合：</b>{r.goldenFingerAnalysis.designPattern.narrativeIntegration}</p>
-                      <p><b>适用：</b>{r.goldenFingerAnalysis.designPattern.suitability?.genres?.join("、")} · {r.goldenFingerAnalysis.designPattern.suitability?.architectures?.join("、")}</p>
+                      <p className="font-medium text-brand-700 mb-1">设计模式：{r.goldenFinger.designPattern.type} — {r.goldenFinger.designPattern.typeDescription}</p>
+                      <p><b>核心机制：</b>{r.goldenFinger.designPattern.coreMechanic}</p>
+                      <p><b>获取方式：</b>{r.goldenFinger.designPattern.acquisitionPattern}</p>
+                      <p><b>进化路径：</b>{r.goldenFinger.designPattern.evolutionPath?.join(" → ")}</p>
+                      <p><b>限制策略：</b>{r.goldenFinger.designPattern.limitationStrategy}</p>
+                      <p><b>叙事融合：</b>{r.goldenFinger.designPattern.narrativeIntegration}</p>
+                      <p><b>适用：</b>{r.goldenFinger.designPattern.suitability?.genres?.join("、")} · {r.goldenFinger.designPattern.suitability?.architectures?.join("、")}</p>
                     </div>
                   )}
                 </div>
@@ -288,35 +288,35 @@ export function ReferenceCockpitPage() {
             )}
 
             {/* Craft Stats */}
-            {r.craftStats && (
+            {r.writing.craftStats && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><BookOpen size={14}/>写作手法统计</h3>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded bg-slate-50 p-2">
                     <span className="text-slate-400">开场方式</span>
-                    <p className="font-semibold text-slate-700">{r.craftStats.dominantOpening}</p>
+                    <p className="font-semibold text-slate-700">{r.writing.craftStats.dominantOpening}</p>
                     <div className="flex gap-1 mt-1 flex-wrap">
-                      {Object.entries(r.craftStats.openingPatterns as Record<string,number>).map(([k,v]) => (
+                      {Object.entries(r.writing.craftStats.openingPatterns as Record<string,number>).map(([k,v]) => (
                         <span key={k} className="text-[10px] bg-white rounded px-1 py-0 text-slate-500">{k} {v}章</span>
                       ))}
                     </div>
                   </div>
                   <div className="rounded bg-slate-50 p-2">
                     <span className="text-slate-400">对白密度</span>
-                    <p className="font-semibold text-slate-700">约 {r.craftStats.dialogueRatio}%</p>
-                    <p className="text-[10px] text-slate-400">每章约 {r.craftStats.avgDialoguePerChapter} 次对话</p>
+                    <p className="font-semibold text-slate-700">约 {r.writing.craftStats.dialogueRatio}%</p>
+                    <p className="text-[10px] text-slate-400">每章约 {r.writing.craftStats.avgDialoguePerChapter} 次对话</p>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Writing Techniques */}
-            {r.writingTechniques && (
+            {r.writing.techniques && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><BookOpen size={14}/>写法技法</h3>
-                <p className="text-xs text-slate-500 mb-2">{r.writingTechniques.overallStyleDescription}</p>
+                <p className="text-xs text-slate-500 mb-2">{r.writing.techniques.overallStyleDescription}</p>
                 {(["narrativeAssets","languageAssets","characterAssets","rhythmAssets","antiAiAssets"] as const).map(cat => {
-                  const items = r.writingTechniques[cat] as Array<{category:string;rule:string;confidence:number}> | undefined;
+                  const items = r.writing.techniques[cat] as Array<{category:string;rule:string;confidence:number}> | undefined;
                   if (!items?.length) return null;
                   const label: Record<string,string> = {narrativeAssets:"叙事技法",languageAssets:"语言风格",characterAssets:"角色塑造",rhythmAssets:"节奏控制",antiAiAssets:"反AI特征"};
                   return (
