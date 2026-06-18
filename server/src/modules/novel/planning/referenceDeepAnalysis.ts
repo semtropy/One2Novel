@@ -536,15 +536,31 @@ export async function deepAnalyze(profileId: string): Promise<ArchitectureProfil
   const prisma = getPrisma();
   const profile = await prisma.referenceProfile.findUnique({ where: { id: profileId } });
   if (!profile?.content) throw new Error("Profile has no content");
-  const text = profile.content;
+  let text = profile.content;
   const name = profile.name || "未命名参考书";
 
   console.log(`[DeepAnalysis] Starting for "${name}" (${text.length} chars)`);
 
-  // Phase 1
+  // Phase 1: chapter detection
   await updateProgress(profileId, "parse", "解析章节目录...", 5);
-  const chapters = parseChapters(text);
-  console.log(`[DeepAnalysis] Found ${chapters.length} chapters`);
+  let chapters: ParsedChapter[];
+  // Detect format: JSON array of {title, content} (epub) vs plain text (txt)
+  if (text.startsWith("[") && text.includes('"title"') && text.includes('"content"')) {
+    // Epub native chapters: each spine item is a chapter
+    const rawChapters = JSON.parse(text) as { title: string; content: string }[];
+    let pos = 0;
+    chapters = rawChapters.map((c, i) => {
+      const start = pos; pos += c.content.length + 2; // +2 for \n\n separator
+      return { index: i + 1, title: c.title, startChar: start, endChar: pos, wordCount: c.content.length };
+    });
+    // Reconstruct full text for AI calls (need contiguous text for slicing by char position)
+    text = rawChapters.map(c => c.content).join("\n\n");
+    console.log(`[DeepAnalysis] Found ${chapters.length} chapters (from epub spine)`);
+  } else {
+    // Plain text: regex chapter detection
+    chapters = parseChapters(text);
+    console.log(`[DeepAnalysis] Found ${chapters.length} chapters (from regex)`);
+  }
   await updateProgress(profileId, "parse", `发现 ${chapters.length} 章`, 10);
 
   // Phase 2

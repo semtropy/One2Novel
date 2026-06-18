@@ -246,23 +246,29 @@ export function ReferenceCockpitPage() {
             }
           }
         }
-        // Extract text from HTML files in spine order
+        // Each spine item = one chapter. Keep them as separate entries.
         const htmlFiles = spineOrder.length > 0 ? spineOrder : Object.keys(zip.files).filter(k => /\.x?html?$/i.test(k));
-        for (const path of htmlFiles) {
+        const chapters: { title: string; content: string }[] = [];
+        for (let i = 0; i < htmlFiles.length; i++) {
+          const path = htmlFiles[i];
           if (zip.files[path]) {
             const html = await zip.files[path].async("text");
-            // Strip HTML tags
             const text = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
               .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
               .replace(/<[^>]+>/g, "\n")
-              .replace(/&nbsp;/g, " ")
-              .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+              .replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
               .replace(/\n{3,}/g, "\n\n").trim();
-            if (text.length > 100) textFiles.push(text);
+            if (text.length > 100) {
+              // Extract title from first meaningful line
+              const lines = text.split("\n").filter(l => l.trim().length > 0);
+              const title = lines[0]?.trim().slice(0, 40) || `第${i + 1}章`;
+              chapters.push({ title, content: text });
+            }
           }
         }
-        const fullText = textFiles.join("\n\n");
-        setUploadMsg(`解析完成，${(fullText.length / 10000).toFixed(1)}万字`);
+        // Send as structured chapters, not concatenated blob
+        const fullText = JSON.stringify(chapters);
+        setUploadMsg(`解析完成，${chapters.length}章，${(chapters.reduce((s,c)=>s+c.content.length,0)/10000).toFixed(1)}万字`);
         await handleUpload(fullText, fname);
       } catch { setUploadMsg("epub 解析失败"); setUploading(false); }
     } else {
