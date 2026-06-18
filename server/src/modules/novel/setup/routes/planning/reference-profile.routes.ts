@@ -208,6 +208,15 @@ router.post("/profiles/:id/analyze", async (req: Request, res: Response, next: N
   } catch (e) { next(e); }
 });
 
+// Deep analysis pipeline (5-phase: parse → annotate → detect loops → synthesize → extract techniques)
+router.post("/profiles/:id/deep-analyze", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { deepAnalyze } = await import("../../../planning/referenceDeepAnalysis");
+    const result = await deepAnalyze(param(req, "id"));
+    res.json({ data: result });
+  } catch (e) { next(e); }
+});
+
 // Set active profile for a novel
 router.put("/:novelId/active-profile", async (req: Request, res: Response, next: NextFunction) => {
   try {

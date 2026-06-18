@@ -44,7 +44,8 @@ export const NovelUpdateSchema = z.object({
   loopSkeleton: z.string().optional(),                       // JSON: LoopSkeleton
   goldenFinger: z.string().optional(),                        // JSON: {goldenFingerName, abilities:string[], limits:string[]}
   powerSystemTree: z.string().optional(),                    // JSON: PowerNode[] — cultivation/sequence tree
-  expectationProfile: z.string().optional(),                  // JSON
+  expectationProfile: z.string().optional(),                  // JSON @deprecated
+  architectureProfile: z.string().optional(),                 // JSON: ArchitectureProfile — canonical structure blueprint
 });
 
 export type NovelUpdate = z.infer<typeof NovelUpdateSchema>;
@@ -236,6 +237,7 @@ export interface NovelDetail {
   loopSkeleton?: string | null;
   goldenFinger?: string | null;
   powerSystemTree?: string | null;
+  architectureProfile?: string | null;
   expectationProfile?: string | null;
   // Relations
   chapters: ChapterDetail[];

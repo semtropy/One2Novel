@@ -1,8 +1,12 @@
 /**
  * Architecture Registry — predefined loop-based architecture templates for long-form novels.
  * Each template encodes: loop phases, default cool-point recipe, hook profile, settlement types.
+ *
+ * Also provides toArchitectureProfile() to convert templates into the unified ArchitectureProfile
+ * format — the same format produced by reference book analysis and user customization.
  */
 import type { ArchitectureTemplate, ArchitectureType } from "./types";
+import type { ArchitectureProfile, LoopPhase } from "@one2novel/shared/types/architectureProfile";
 
 const SKILL_SLOT_TEMPLATE: ArchitectureTemplate = {
   id: "skill_slot",
@@ -426,4 +430,59 @@ export function buildExpectationProfile(architectureType: ArchitectureType): str
     hookProfile: t.defaultHookProfile,
     payoffWindow: 50,
   });
+}
+
+/** Convert a built-in ArchitectureTemplate to the unified ArchitectureProfile format */
+export function toArchitectureProfile(t: ArchitectureTemplate): ArchitectureProfile {
+  const beats: Record<string, number> = {};
+  for (const [key, def] of Object.entries(t.defaultContentBeats ?? {})) {
+    beats[key] = (def as { pct: number }).pct;
+  }
+
+  return {
+    name: t.name,
+    source: "builtin",
+    loopPhases: t.defaultLoop.phases.map(p => ({
+      phase: p.phase,
+      label: p.label,
+      description: p.description,
+      typicalChapterRange: [p.typicalChapterCount[0], p.typicalChapterCount[1]],
+    })),
+    chapterTypeDistribution: {
+      advance: 55, transition: 20, cooldown: 15, climax: 10,
+    },
+    avgChaptersPerLoop: {
+      min: t.defaultLoop.estimatedChaptersPerLoop[0],
+      max: t.defaultLoop.estimatedChaptersPerLoop[1],
+      avg: Math.round((t.defaultLoop.estimatedChaptersPerLoop[0] + t.defaultLoop.estimatedChaptersPerLoop[1]) / 2),
+    },
+    avgChapterWordCount: { min: 2500, max: 4000, avg: 3000 },
+    coolPointRecipe: {
+      collect: t.defaultCoolPointRecipe.collect ?? 20,
+      strategy: t.defaultCoolPointRecipe.strategy ?? 20,
+      verify: t.defaultCoolPointRecipe.verify ?? 20,
+      reveal: t.defaultCoolPointRecipe.reveal ?? 20,
+      upgrade: t.defaultCoolPointRecipe.upgrade ?? 15,
+      faceSlap: (t.defaultCoolPointRecipe as any).faceSlap ?? 5,
+    },
+    hookProfile: {
+      shortTermPerChapter: t.defaultHookProfile.shortTermPerChapter ?? 1,
+      mediumTermPerVolume: t.defaultHookProfile.mediumTermPerVolume ?? 3,
+      longTermLines: t.defaultHookProfile.longTermLines ?? 4,
+      hookDistribution: { suspense: 35, reversal: 25, preview: 25, emotional: 15 },
+    },
+    contentBeatProfile: beats,
+    characterSystem: {
+      avgTotal: 10,
+      roleDistribution: { protagonist: 1, antagonist: 2, supporting: 4, minor: 3 },
+      avgChaptersBetweenAppearances: 5,
+      avgCharactersPerChapter: 3,
+    },
+    payoffPatterns: {
+      avgSeedToPayoffChapters: 50,
+      seedsPerVolume: 5,
+      typicalPayoffWindow: 50,
+    },
+    writingTechniques: undefined,
+  };
 }

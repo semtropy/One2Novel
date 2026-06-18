@@ -69,7 +69,8 @@ model Novel {
   loopDefinition     String? // JSON: user-customized loop phase definitions
   goldenFinger       String? // JSON: {goldenFingerName, abilities:string[], limits:string[]}
   powerSystemTree    String? // JSON: PowerNode[] — cultivation level / sequence tree
-  expectationProfile String? // JSON: ExpectationProfile
+  expectationProfile String? // JSON (@deprecated — use architectureProfile instead)
+  architectureProfile String? // JSON: ArchitectureProfile — canonical structure blueprint: ExpectationProfile
   contentBeatProfile String?  // JSON: ContentBeatProfile — 内容节拍配方
 
   // Blueprint — volume→chapter structure
@@ -348,6 +349,7 @@ model ReferenceProfile {
   contentBeatPatterns String?// JSON: 内容节拍DNA
   writingAssets     String?  // JSON: 写法技法
   settingTimeline   String?  // JSON: 设定时间线
+  architectureProfile String?  // JSON: ArchitectureProfile — unified structure blueprint
   books             ReferenceBook[]         @relation("ProfileBooks")
   novels            Novel[]                @relation("ActiveProfile")
   createdAt         DateTime  @default(now())

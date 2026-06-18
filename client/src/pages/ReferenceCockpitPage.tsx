@@ -5,7 +5,7 @@
  */
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Upload, Sparkles, Check, RefreshCw, Target, BookOpen, Zap, GitBranch, TrendingUp, Eye, FileText, X, ArrowLeft } from "lucide-react";
+import { Upload, Sparkles, Check, RefreshCw, Zap, GitBranch, BookOpen, TrendingUp, Eye, FileText, X, ArrowLeft } from "lucide-react";
 import { useNovels } from "../api/novel";
 import { api } from "../app/api";
 import { cn } from "../lib/cn";
@@ -108,6 +108,7 @@ export function ReferenceCockpitPage() {
   const [done, setDone] = useState<AnalysisState>({});
   const [running, setRunning] = useState<string | null>(null);
   const [runAll, setRunAll] = useState(false);
+  const [deepRunning, setDeepRunning] = useState(false);
   const [runError, setRunError] = useState("");
   const [annotData, setAnnotData] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<{ totalChapters: number; totalLoops: number } | null>(null);
@@ -188,9 +189,19 @@ export function ReferenceCockpitPage() {
   }
 
   async function handleRunAll() {
-    setRunAll(true);
+    setRunAll(true); setRunError("");
     for (const k of KEYS) { if (!done[k as keyof AnalysisState]) await run(k); }
     setRunAll(false);
+  }
+
+  async function handleDeepAnalyze() {
+    if (!profId) return;
+    setDeepRunning(true); setRunError("");
+    try {
+      await api.post(`/profiles/${profId}/deep-analyze`);
+      await loadProfile(profId);
+    } catch (e: any) { setRunError(e?.response?.data?.error?.message || "深度分析失败"); }
+    finally { setDeepRunning(false); }
   }
 
   async function handleApplyArchitecture() {
@@ -273,13 +284,19 @@ export function ReferenceCockpitPage() {
         {/* Actions */}
         {((profId && doneCount < 8) || fileName) && (
           <div className="flex items-center gap-2">
-            {doneCount < 8 && (
-              <button onClick={handleRunAll} disabled={runAll} className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-white", runAll ? "bg-slate-400" : "bg-slate-800 hover:bg-slate-700")}>
-                {runAll ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}{runAll ? "分析中..." : "一键全部分析"}
-              </button>
-            )}
+            <button onClick={handleRunAll} disabled={runAll || deepRunning} className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-white", runAll ? "bg-slate-400" : "bg-slate-800 hover:bg-slate-700")}>
+              {runAll ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}{runAll ? "分析中..." : "一键八维分析"}
+            </button>
             <span className="text-xs text-slate-400">{doneCount}/8 项完成</span>
             {runError && <span className="text-xs text-red-500 ml-2">{runError}</span>}
+          </div>
+        )}
+        {profId && (
+          <div className="flex items-center gap-2">
+            <button onClick={handleDeepAnalyze} disabled={deepRunning || runAll} className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-white", deepRunning ? "bg-slate-400" : "bg-slate-800 hover:bg-slate-700")}>
+              {deepRunning ? <RefreshCw size={11} className="animate-spin" /> : <Sparkles size={11} />}{deepRunning ? "深度分析中..." : "全量深度分析"}
+            </button>
+            <span className="text-[10px] text-slate-400">全章统计 · 回环检测 · 技法提取</span>
           </div>
         )}
 
