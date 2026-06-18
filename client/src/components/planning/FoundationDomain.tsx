@@ -1,15 +1,12 @@
 /**
- * FoundationDomain — Step 1: 创作起点
+ * FoundationDomain — Step 1: 故事核心
  *
- * Consolidates: story core (inspiration + AI generation + creative params) +
- * golden finger + commercial positioning + world rules entry point.
- *
- * Single "AI 生成全部" button calls the unified story-core prompt (v3)
- * which produces ALL 13 fields in one shot.
+ * Inspiration input → AI unified story-core generation → creative params +
+ * commercial positioning. Golden finger moved to WorldDomain (Step 2).
  */
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Sparkles, Globe, Target } from "lucide-react";
-import { useNovel, useUpdateNovel, useGenerateStoryCore, useGenerateGoldenFinger } from "../../api/novel";
+import { RefreshCw, Sparkles, Globe } from "lucide-react";
+import { useNovel, useUpdateNovel, useGenerateStoryCore } from "../../api/novel";
 import { cn } from "../../lib/cn";
 
 interface Props {
@@ -38,14 +35,10 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
   const { data: novel, refetch } = useNovel(novelId);
   const updateNovel = useUpdateNovel();
   const genStoryCore = useGenerateStoryCore();
-  const genGoldenFinger = useGenerateGoldenFinger();
 
   // ── Local state ──
   const [inspiration, setInspiration] = useState("");
   const [genError, setGenError] = useState("");
-  const [gfAbilities, setGfAbilities] = useState("");
-  const [gfLimits, setGfLimits] = useState("");
-  const [gfName, setGfName] = useState("");
 
   // Commercial fields
   const [targetAudience, setTargetAudience] = useState("");
@@ -64,17 +57,6 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
     setCommercialTags(Array.isArray(novel?.commercialTags) ? (novel.commercialTags as string[]).join(", ") : (novel?.commercialTags ?? ""));
   }, [novel?.description, novel?.targetAudience, novel?.bookSellingPoint, novel?.first30ChapterPromise, novel?.competingFeel, novel?.commercialTags]);
 
-  useEffect(() => {
-    if (novel?.goldenFinger) {
-      try {
-        const gf = JSON.parse(novel.goldenFinger);
-        if (gf.goldenFingerName) setGfName(gf.goldenFingerName);
-        if (Array.isArray(gf.abilities)) setGfAbilities(gf.abilities.join("\n"));
-        if (Array.isArray(gf.limits)) setGfLimits(gf.limits.join("\n"));
-      } catch {}
-    }
-  }, [novel?.goldenFinger]);
-
   // ── Actions ──
   const handleSaveInspiration = useCallback(() => {
     if (inspiration !== novel?.description) {
@@ -86,26 +68,12 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
     setGenError("");
     try {
       await genStoryCore.mutateAsync(novelId);
-      // Also generate golden finger if not exists
-      if (!novel?.goldenFinger) {
-        try { await genGoldenFinger.mutateAsync(novelId); } catch {}
-      }
       refetch();
       onComplete?.();
     } catch (e) {
       setGenError(e instanceof Error ? e.message : "生成失败");
     }
-  }, [novelId, genStoryCore, genGoldenFinger, refetch, onComplete, novel?.goldenFinger]);
-
-  const handleSaveGoldenFinger = useCallback(async () => {
-    const gf = JSON.stringify({
-      goldenFingerName: gfName,
-      abilities: gfAbilities.split("\n").filter(Boolean),
-      limits: gfLimits.split("\n").filter(Boolean),
-    });
-    await updateNovel.mutateAsync({ id: novelId, goldenFinger: gf });
-    refetch();
-  }, [novelId, gfName, gfAbilities, gfLimits, updateNovel, refetch]);
+  }, [novelId, genStoryCore, refetch, onComplete]);
 
   const [saveError, setSaveError] = useState("");
 
@@ -237,46 +205,7 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
         </div>
       </section>
 
-      {/* ── 3. 金手指设定 ── */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-            <Target size={14} /> 金手指设定
-          </h3>
-          <button onClick={async () => {
-            try { const result = await genGoldenFinger.mutateAsync(novelId); setGfName(result.goldenFingerName); setGfAbilities(result.abilities.join("\n")); setGfLimits(result.limits.join("\n")); refetch(); } catch {}
-          }} disabled={genGoldenFinger.isPending}
-            className="flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50">
-            <Sparkles size={11} />{genGoldenFinger.isPending ? "生成中…" : "AI 生成金手指"}
-          </button>
-        </div>
-        <div className="space-y-2">
-          <div>
-            <label className="text-[10px] text-slate-400">名称</label>
-            <input value={gfName} onChange={e => setGfName(e.target.value)}
-              placeholder="如：技能图鉴、副本模拟器、古神血脉"
-              className="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:border-brand-300 focus:outline-none" />
-          </div>
-          <div>
-            <label className="text-[10px] text-slate-400">能力（一行一条）</label>
-            <textarea value={gfAbilities} onChange={e => setGfAbilities(e.target.value)}
-              placeholder="如：&#10;技能融合——将两个已装备技能融合为新技能&#10;技能复制——击败敌人后概率复制其技能"
-              className="w-full min-h-[60px] rounded border border-slate-200 px-2 py-1 text-xs resize-y focus:border-brand-300 focus:outline-none" rows={3} />
-          </div>
-          <div>
-            <label className="text-[10px] text-slate-400">限制（一行一条）</label>
-            <textarea value={gfLimits} onChange={e => setGfLimits(e.target.value)}
-              placeholder="如：&#10;每次融合冷却24小时&#10;复制技能消耗精神力"
-              className="w-full min-h-[60px] rounded border border-slate-200 px-2 py-1 text-xs resize-y focus:border-brand-300 focus:outline-none" rows={3} />
-          </div>
-          <button onClick={handleSaveGoldenFinger}
-            className="rounded-lg bg-slate-800 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700">
-            保存金手指设定
-          </button>
-        </div>
-      </section>
-
-      {/* ── 4. 商业定位 ── */}
+      {/* ── 3. 商业定位 ── */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-1.5">
           <Globe size={14} /> 商业定位

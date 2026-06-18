@@ -11,22 +11,20 @@ import {
   BookOpen, GitBranch, Users, Map,
   PenLine, ChevronRight, ChevronLeft, CheckCircle,
 } from "lucide-react";
+import { cn } from "../lib/cn";
 import { useNovel } from "../api/novel";
 import { api } from "../app/api";
 import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
-import { cn } from "../lib/cn";
-
 // Domain panels
 import { FoundationDomain } from "../components/planning/FoundationDomain";
-import { ArchitectureDomain } from "../components/planning/ArchitectureDomain";
-import { WorldPanel } from "../components/planning/WorldPanel";
+import { WorldDomain } from "../components/planning/WorldDomain";
 import { CharactersDomain } from "../components/planning/CharactersDomain";
 import { BlueprintDomain } from "../components/planning/BlueprintDomain";
 
 const STEPS = [
-  { id: "foundation",   label: "创作起点", icon: BookOpen,    hint: "故事核心 · 金手指 · 商业定位 · 世界规则" },
-  { id: "architecture", label: "架构选择", icon: GitBranch,   hint: "内置模板 + 参考书定制 · 回环阶段编辑 · 期待参数" },
+  { id: "foundation",   label: "故事核心", icon: BookOpen,    hint: "灵感 → 故事核心 · 创意参数 · 商业定位" },
+  { id: "architecture", label: "世界构建", icon: GitBranch,   hint: "架构选择 · 力量体系树 · 世界规则 · 金手指" },
   { id: "characters",   label: "角色阵容", icon: Users,       hint: "AI 生成角色 · 功能标签 · 关系网络 · 演化轨迹" },
   { id: "outline",      label: "章节大纲", icon: Map,         hint: "回环骨架 → 逐卷展开 · 设定释放计划" },
 ];
@@ -152,32 +150,14 @@ export function PlanningHubPage() {
           <div className="max-w-4xl mx-auto">
             <div className="rounded-xl border border-slate-200 bg-white p-6 min-h-[400px]">
 
-              {/* Step 0: 创作起点 — 统一的故事核心 + 金手指 + 商业定位 + 世界规则入口 */}
+              {/* Step 0: 故事核心 — 灵感输入 + AI 生成 + 创意参数 + 商业定位 */}
               {currentStep === 0 && (
-                <div className="space-y-4">
-                  <div className="flex gap-1 border-b border-slate-100 pb-2">
-                    <button onClick={() => setSubTab("foundation")}
-                      className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        subTab === "foundation" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
-                      <BookOpen size={12} />故事核心
-                    </button>
-                    <button onClick={() => setSubTab("world")}
-                      className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                        subTab === "world" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100")}>
-                      <Map size={12} />世界规则
-                    </button>
-                  </div>
-                  {subTab === "foundation" ? (
-                    <FoundationDomain novelId={novel.id} onComplete={() => onStepComplete(0)} />
-                  ) : (
-                    <WorldPanel novelId={novel.id} />
-                  )}
-                </div>
+                <FoundationDomain novelId={novel.id} onComplete={() => onStepComplete(0)} />
               )}
 
-              {/* Step 1: 架构选择 — 统一视图（内置模板 + 参考书定制架构）*/}
+              {/* Step 1: 世界构建 — 架构选择 + 力量体系树 + 世界规则 + 金手指 */}
               {currentStep === 1 && (
-                <ArchitectureDomain novelId={novel.id} onComplete={() => onStepComplete(1)} />
+                <WorldDomain novelId={novel.id} onComplete={() => onStepComplete(1)} />
               )}
 
               {/* Step 2: 角色阵容 */}
