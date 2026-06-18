@@ -331,17 +331,52 @@ export function ReferenceCockpitPage() {
               </div>
             )}
 
+            {/* Power System */}
+            {r.powerSystem && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><TrendingUp size={14}/>力量体系</h3>
+                {r.powerSystem.tree?.length > 0 && (
+                  <div className="space-y-1 text-xs mb-2">
+                    {r.powerSystem.tree.slice(0, 8).map((l:any,i:number) => (
+                      <div key={i} className="flex items-center gap-2"><span className="font-medium text-slate-600">{l.name}</span><span className="text-slate-400">—</span><span className="text-slate-500">{l.abilityUpgrade?.slice(0, 50)}</span></div>
+                    ))}
+                  </div>
+                )}
+                {r.powerSystem.expectationNodes?.length > 0 && (
+                  <div className="flex gap-1 flex-wrap">{r.powerSystem.expectationNodes.slice(0,6).map((n:any,i:number)=>(<span key={i} className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] text-brand-700">{n.name}:{n.expectation}</span>))}</div>
+                )}
+              </div>
+            )}
+
+            {/* Expectation Chain */}
+            {r.writing?.expectations?.length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><GitBranch size={14}/>读者期待链</h3>
+                {r.writing.expectations.slice(0, 10).map((e:any,i:number) => (
+                  <details key={i} className="rounded border border-slate-100 p-1.5 text-xs">
+                    <summary className="cursor-pointer text-slate-600">第{e.loopIndex}轮 — {e.expectationType}</summary>
+                    <div className="mt-1 pl-2 text-slate-500 space-y-0.5">
+                      <p>建立(第{e.establishmentChapter}章)：{e.establishmentMethod}</p>
+                      <p>维持：{e.maintenanceMethod}</p>
+                      <p>兑现(第{e.fulfillmentChapter}章)：{e.fulfillmentMethod}</p>
+                      <p>→ {e.nextExpectation}</p>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+
             {/* Architecture Profile summary */}
-            {r.architectureProfile && (
+            {r.architecture?.architectureProfile && (
               <div className="rounded-xl border border-brand-200 bg-brand-50/30 p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-2">架构蓝图</h3>
                 <div className="grid grid-cols-4 gap-1 text-[10px]">
                   <span className="text-slate-400">章节分布：</span>
-                  <span className="col-span-3 text-slate-600">推进 {r.architectureProfile.chapterTypeDistribution?.advance}% · 过渡 {r.architectureProfile.chapterTypeDistribution?.transition}% · 冷却 {r.architectureProfile.chapterTypeDistribution?.cooldown}% · 高潮 {r.architectureProfile.chapterTypeDistribution?.climax}%</span>
+                  <span className="col-span-3 text-slate-600">推进 {r.architecture.architectureProfile.chapterTypeDistribution?.advance}% · 过渡 {r.architecture.architectureProfile.chapterTypeDistribution?.transition}% · 冷却 {r.architecture.architectureProfile.chapterTypeDistribution?.cooldown}% · 高潮 {r.architecture.architectureProfile.chapterTypeDistribution?.climax}%</span>
                   <span className="text-slate-400">平均章数：</span>
-                  <span className="col-span-3 text-slate-600">{r.architectureProfile.avgChapterWordCount?.avg}字 · 每回环 {r.architectureProfile.avgChaptersPerLoop?.avg}章</span>
+                  <span className="col-span-3 text-slate-600">{r.architecture.architectureProfile.avgChapterWordCount?.avg}字 · 每回环 {r.architecture.architectureProfile.avgChaptersPerLoop?.avg}章</span>
                   <span className="text-slate-400">钩子密度：</span>
-                  <span className="col-span-3 text-slate-600">短期 {r.architectureProfile.hookProfile?.shortTermPerChapter} · 中期 {r.architectureProfile.hookProfile?.mediumTermPerVolume} · 长线 {r.architectureProfile.hookProfile?.longTermLines}</span>
+                  <span className="col-span-3 text-slate-600">短期 {r.architecture.architectureProfile.hookProfile?.shortTermPerChapter} · 中期 {r.architecture.architectureProfile.hookProfile?.mediumTermPerVolume} · 长线 {r.architecture.architectureProfile.hookProfile?.longTermLines}</span>
                 </div>
               </div>
             )}

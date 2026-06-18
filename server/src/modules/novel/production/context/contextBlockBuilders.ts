@@ -370,6 +370,18 @@ export async function assembleChapterBlocks(
               content: lines.join("\n"), conflictGroup: "style_contract", freshness: 1,
             }));
           }
+          // Expectation chain context (V3)
+          if (ar.writing?.expectations?.length) {
+            const relevant = ar.writing.expectations.slice(0, 6);
+            const expLines = ["【对标书读者期待链 — 回环结构的期待建立与兑现模式】"];
+            for (const e of relevant) {
+              expLines.push(`第${e.loopIndex}轮：${e.expectationType} | 建立(第${e.establishmentChapter}章)：${e.establishmentMethod} | 维持：${e.maintenanceMethod} | 兑现(第${e.fulfillmentChapter}章)：${e.fulfillmentMethod} | 新期待：${e.nextExpectation}`);
+            }
+            blocks.push(createContextBlock({
+              id: "expectation_chain", group: "chapter_mission", priority: 96,
+              content: expLines.join("\n"),
+            }));
+          }
         }
       }
     }
