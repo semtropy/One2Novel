@@ -664,7 +664,7 @@ export function createReferenceBookService(): ReferenceBookService {
           chapterIndex: z.number().int(),
           settingName: z.string(),
           description: z.string().max(200),
-          category: z.enum(["力量体系", "世界历史", "角色秘密", "势力格局", "地理环境", "其他"]),
+          category: z.enum(["力量规则", "世界历史", "角色秘密", "势力格局", "地理环境", "其他"]),
         })),
       });
 
