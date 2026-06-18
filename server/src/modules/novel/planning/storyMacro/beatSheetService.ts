@@ -81,7 +81,7 @@ export async function generateBeatSheet(
         `第${p.chapterOrder}章 ${p.title ?? ""}: ${p.summary ?? ""}`).join("\n");
       chapterPlans = vol.chapterPlans.map(p => ({ id: p.id, chapterOrder: p.chapterOrder }));
     } else if (options?.outlineChapters && options.outlineChapters.length > 0) {
-      // Fallback: use chapters from structuredOutline (preview mode, before apply)
+      /// @deprecated Fallback: structuredOutline is the legacy blueprint format. Use loopSkeleton + volumes for new novels.
       const outline = JSON.parse(novel?.structuredOutline ?? "{}");
       const vol = (outline.volumes as Array<{ sortOrder: number; title: string; summary: string }> | undefined)
         ?.find(v => v.sortOrder === volumeSortOrder);

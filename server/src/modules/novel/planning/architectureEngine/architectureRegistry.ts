@@ -432,7 +432,16 @@ export function buildExpectationProfile(architectureType: ArchitectureType): str
   });
 }
 
-/** Convert a built-in ArchitectureTemplate to the unified ArchitectureProfile format */
+/**
+ * Convert a built-in ArchitectureTemplate to the unified ArchitectureProfile format.
+ *
+ * NOTE: Built-in templates use EDUCATED ESTIMATES for chapterTypeDistribution,
+ * characterSystem, avgChapterWordCount, and payoffPatterns. These are NOT real
+ * statistics — they are sensible defaults for the template's genre convention.
+ *
+ * For real data, upload a reference book and run the deep analysis pipeline.
+ * The resulting ArchitectureProfile will have statistics from actual annotation data.
+ */
 export function toArchitectureProfile(t: ArchitectureTemplate): ArchitectureProfile {
   const beats: Record<string, number> = {};
   for (const [key, def] of Object.entries(t.defaultContentBeats ?? {})) {

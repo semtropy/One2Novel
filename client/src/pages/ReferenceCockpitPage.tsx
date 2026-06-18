@@ -95,8 +95,6 @@ function LoopDetail({ boundaries, total }: { boundaries: Array<{chapterIndex:num
     <div className="flex flex-wrap gap-1 text-xs">{loops.map((l,i) => <span key={i} className="rounded bg-brand-50 border border-brand-100 px-2 py-1 text-slate-600">第{i+1}轮: 第{l.start}-{l.end}章</span>)}</div>
   </div>;
 }
-const KEYS = ["loops","coolpoints","architecture","hooks","goldenFinger","timeline","writing","contentBeats"];
-
 export function ReferenceCockpitPage() {
   const { profileId } = useParams<{ profileId: string }>();
   const navigate = useNavigate();
@@ -110,8 +108,6 @@ export function ReferenceCockpitPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState("");
   const [done, setDone] = useState<AnalysisState>({});
-  const [running, setRunning] = useState<string | null>(null);
-  const [runAll, setRunAll] = useState(false);
   const [deepRunning, setDeepRunning] = useState(false);
   const [deepProgress, setDeepProgress] = useState<{phase:string;detail:string;pct:number}|null>(null);
   const [runError, setRunError] = useState("");
@@ -121,7 +117,7 @@ export function ReferenceCockpitPage() {
   const [appliedArch, setAppliedArch] = useState(false);
   const [profileCreated, setProfileCreated] = useState(false);
   const [applyTargetId, setApplyTargetId] = useState<string>("");
-  const doneCount = KEYS.filter(k => done[k as keyof AnalysisState]).length;
+  const doneCount = Object.values(done).filter(Boolean).length;
 
   useEffect(() => {
     if (profId) loadProfile(profId);
@@ -187,21 +183,6 @@ export function ReferenceCockpitPage() {
       if (pid) { setProfId(pid); setFileName(fname); setName(fname.replace(/\.txt$/i, "")); navigate(`/reference-profiles/${pid}`, { replace: true }); setUploadMsg(""); }
     } catch (e: any) { setUploadMsg(e?.response?.data?.error?.message || "上传失败"); }
     finally { setUploading(false); }
-  }
-
-  async function run(k: string) {
-    const pid = profId;
-    if (!pid) return;
-    setRunning(k);
-    try { setRunError(""); await api.post(`/profiles/${pid}/analyze`, { dimension: k }); await loadProfile(pid); }
-    catch { setRunError(`${k} 分析失败`); }
-    finally { setRunning(null); }
-  }
-
-  async function handleRunAll() {
-    setRunAll(true); setRunError("");
-    for (const k of KEYS) { if (!done[k as keyof AnalysisState]) await run(k); }
-    setRunAll(false);
   }
 
   async function handleDeepAnalyze() {
@@ -304,18 +285,9 @@ export function ReferenceCockpitPage() {
         )}
 
         {/* Actions */}
-        {((profId && doneCount < 8) || fileName) && (
-          <div className="flex items-center gap-2">
-            <button onClick={handleRunAll} disabled={runAll || deepRunning} className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-white", runAll ? "bg-slate-400" : "bg-slate-800 hover:bg-slate-700")}>
-              {runAll ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}{runAll ? "分析中..." : "一键八维分析"}
-            </button>
-            <span className="text-xs text-slate-400">{doneCount}/8 项完成</span>
-            {runError && <span className="text-xs text-red-500 ml-2">{runError}</span>}
-          </div>
-        )}
         {profId && (
           <div className="flex items-center gap-2">
-            <button onClick={handleDeepAnalyze} disabled={deepRunning || runAll} className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-white", deepRunning ? "bg-slate-400" : "bg-slate-800 hover:bg-slate-700")}>
+            <button onClick={handleDeepAnalyze} disabled={deepRunning} className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-white", deepRunning ? "bg-slate-400" : "bg-slate-800 hover:bg-slate-700")}>
               {deepRunning ? <RefreshCw size={11} className="animate-spin" /> : <Sparkles size={11} />}{deepRunning ? "深度分析中..." : "全量深度分析"}
             </button>
             {deepProgress && (
@@ -396,42 +368,42 @@ export function ReferenceCockpitPage() {
 
         {/* Analysis Results */}
         <div className="space-y-3">
-          <Section title="架构判定" icon={GitBranch} done={done.architecture} running={running === "architecture"} onRun={() => run("architecture")} hasFile={!!fileName || !!profId}
+          <Section title="架构判定" icon={GitBranch} done={done.architecture}
             detailContent={archData ? <ArchDetail data={archData} onApply={handleApplyArchitecture} applied={appliedArch} disabled={!applyTargetId} /> : null}>
             {done.architecture && <StatusLine label={ARCH_LABELS[archData?.type ?? ""] ?? archData?.type} />}
           </Section>
 
-          <Section title="钩子模式" icon={Eye} done={done.hooks} running={running === "hooks"} onRun={() => run("hooks")} hasFile={!!fileName || !!profId}
+          <Section title="钩子模式" icon={Eye} done={done.hooks}
             detailContent={hookData ? <HookDetail data={hookData} /> : null}>
             {done.hooks && <StatusLine label={`${Object.values(hookData?.distribution ?? {}).reduce((a:number,b:number)=>a+b,0)}章 · 平均钩力${((hookData?.avgHookStrength??0)*100).toFixed(0)}%`} />}
           </Section>
 
-          <Section title="金手指" icon={Sparkles} done={done.goldenFinger} running={running === "goldenFinger"} onRun={() => run("goldenFinger")} hasFile={!!fileName || !!profId}
+          <Section title="金手指" icon={Sparkles} done={done.goldenFinger} 
             detailContent={gfData ? <GFDetail data={gfData} /> : null}>
             {done.goldenFinger && <StatusLine label={`${gfData?.abilities?.length??0}项能力 · ${gfData?.limits?.length??0}条限制`} />}
           </Section>
 
-          <Section title="内容节拍DNA" icon={BookOpen} done={done.contentBeats} running={running === "contentBeats"} onRun={() => run("contentBeats")} hasFile={!!fileName || !!profId}
+          <Section title="内容节拍DNA" icon={BookOpen} done={done.contentBeats} 
             detailContent={beatData ? <BeatDetail data={beatData} onApply={handleApplyContentBeats} disabled={!applyTargetId} /> : null}>
             {done.contentBeats && <StatusLine label={`${beatData?.beatTypes?.length??0}种节拍 · ${beatData?.totalChapters??0}章`} />}
           </Section>
 
-          <Section title="爽点分布" icon={TrendingUp} done={done.coolpoints} running={running === "coolpoints"} onRun={() => run("coolpoints")} hasFile={!!fileName || !!profId}
+          <Section title="爽点分布" icon={TrendingUp} done={done.coolpoints} 
             detailContent={done.coolpoints ? <CoolPointDetail high={(annotData.highCoolChapters as number[])??[]} low={(annotData.lowCoolChapters as number[])??[]} /> : null}>
             {done.coolpoints && <StatusLine label={`高爽点${(annotData.highCoolChapters as any[])?.length??0}章 · 低爽点${(annotData.lowCoolChapters as any[])?.length??0}章`} />}
           </Section>
 
-          <Section title="设定释放时间线" icon={FileText} done={done.timeline} running={running === "timeline"} onRun={() => run("timeline")} hasFile={!!fileName || !!profId}
+          <Section title="设定释放时间线" icon={FileText} done={done.timeline} 
             detailContent={timelineData ? <TimelineDetail data={timelineData} /> : null}>
             {done.timeline && <StatusLine label={`${timelineData?.length??0}条设定`} />}
           </Section>
 
-          <Section title="写法技法" icon={BookOpen} done={done.writing} running={running === "writing"} onRun={() => run("writing")} hasFile={!!fileName || !!profId}
+          <Section title="写法技法" icon={BookOpen} done={done.writing} 
             detailContent={writingData ? <WritingDetail data={writingData} onApply={handleApplyStyle} applied={profileCreated} disabled={!applyTargetId} /> : null}>
             {done.writing && <StatusLine label={`${(writingData?.narrativeAssets?.length??0)+(writingData?.languageAssets?.length??0)+(writingData?.characterAssets?.length??0)+(writingData?.rhythmAssets?.length??0)+(writingData?.antiAiAssets?.length??0)}条技法`} />}
           </Section>
 
-          <Section title="回环推断" icon={GitBranch} done={done.loops} running={running === "loops"} onRun={() => run("loops")} hasFile={!!fileName || !!profId}
+          <Section title="回环推断" icon={GitBranch} done={done.loops} 
             detailContent={done.loops ? <LoopDetail boundaries={(annotData.loopBoundaries as Array<{chapterIndex:number;type:string}>)??[]} total={stats?.totalChapters??0} /> : null}>
             {done.loops && <StatusLine label={`${((annotData.loopBoundaries as any[])??[]).filter((b:any)=>b.type==="start").length}轮回环`} />}
           </Section>
@@ -441,9 +413,9 @@ export function ReferenceCockpitPage() {
   );
 }
 
-function Section({ title, icon: Icon, done, running, onRun, children, hasFile, onDetail, detailContent }: {
-  title: string; icon: any; done?: boolean; running?: boolean; onRun: () => void; children?: React.ReactNode; hasFile: boolean;
-  onDetail?: () => void; detailContent?: React.ReactNode;
+function Section({ title, icon: Icon, done, children, detailContent }: {
+  title: string; icon: any; done?: boolean; children?: React.ReactNode;
+  detailContent?: React.ReactNode;
 }) {
   const [showDetail, setShowDetail] = useState(false);
   return (
@@ -455,12 +427,6 @@ function Section({ title, icon: Icon, done, running, onRun, children, hasFile, o
           {done && <Check size={14} className="text-green-500" />}
         </div>
         <div className="flex items-center gap-1.5">
-          {!done && (
-            <button onClick={onRun} disabled={!!running || !hasFile}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed">
-              {running ? <RefreshCw size={12} className="animate-spin"/> : <Sparkles size={12} />}{running ? "分析中..." : "分析"}
-            </button>
-          )}
           {done && detailContent && (
             <button onClick={() => setShowDetail(true)}
               className="flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50">
@@ -469,7 +435,7 @@ function Section({ title, icon: Icon, done, running, onRun, children, hasFile, o
           )}
         </div>
       </div>
-      {children ?? (!hasFile && <p className="text-sm text-slate-300 italic">上传参考书后可分析</p>)}
+      {children ?? (!done && <p className="text-sm text-slate-300 italic">深度分析后可查看</p>)}
 
       {showDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowDetail(false)}>
