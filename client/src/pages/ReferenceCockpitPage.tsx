@@ -9,6 +9,7 @@ import { Upload, Sparkles, Check, RefreshCw, Zap, GitBranch, BookOpen, TrendingU
 import { useNovels } from "../api/novel";
 import { api } from "../app/api";
 import { cn } from "../lib/cn";
+import JSZip from "jszip";
 
 interface AnalysisState {
   loops?: boolean; coolpoints?: boolean; architecture?: boolean;
@@ -178,11 +179,74 @@ export function ReferenceCockpitPage() {
   async function handleUpload(text: string, fname: string) {
     setUploading(true); setUploadMsg("上传中...");
     try {
-      const { data } = await api.post("/profiles", { name: fname.replace(/\.txt$/i, ""), content: text });
+      const cleanName = fname.replace(/\.(txt|epub)$/i, "");
+      const { data } = await api.post("/profiles", { name: cleanName, content: text });
       const pid = data.data?.id;
-      if (pid) { setProfId(pid); setFileName(fname); setName(fname.replace(/\.txt$/i, "")); navigate(`/reference-profiles/${pid}`, { replace: true }); setUploadMsg(""); }
+      if (pid) { setProfId(pid); setFileName(fname); setName(cleanName); navigate(`/reference-profiles/${pid}`, { replace: true }); setUploadMsg(""); }
     } catch (e: any) { setUploadMsg(e?.response?.data?.error?.message || "上传失败"); }
     finally { setUploading(false); }
+  }
+
+  async function handleFile(file: File) {
+    const fname = file.name;
+    if (fname.endsWith(".epub")) {
+      setUploading(true); setUploadMsg("解析 epub...");
+      try {
+        const zip = await JSZip.loadAsync(file);
+        // Find all HTML/XHTML files in the epub, sorted by spine order
+        const textFiles: string[] = [];
+        // Try reading the OPF file for spine order first
+        const opfFile = Object.keys(zip.files).find(k => k.endsWith(".opf"));
+        let spineOrder: string[] = [];
+        if (opfFile) {
+          const opfContent = await zip.files[opfFile].async("text");
+          const spineMatch = opfContent.match(/<spine[^>]*>([\s\S]*?)<\/spine>/i);
+          if (spineMatch) {
+            const idrefs = spineMatch[1].match(/idref="([^"]+)"/g);
+            if (idrefs) {
+              const ids = idrefs.map(r => r.match(/idref="([^"]+)"/)![1]);
+              const manifest = opfContent.match(/<manifest>([\s\S]*?)<\/manifest>/i);
+              if (manifest) {
+                const hrefs = manifest[1].match(/<item[^>]*>/g);
+                if (hrefs) {
+                  const idToHref: Record<string, string> = {};
+                  for (const h of hrefs) {
+                    const idM = h.match(/id="([^"]+)"/);
+                    const hrefM = h.match(/href="([^"]+)"/);
+                    if (idM && hrefM) idToHref[idM[1]] = hrefM[1];
+                  }
+                  spineOrder = ids.map(id => idToHref[id]).filter(Boolean);
+                }
+              }
+            }
+          }
+        }
+        // Extract text from HTML files in spine order
+        const htmlFiles = spineOrder.length > 0 ? spineOrder : Object.keys(zip.files).filter(k => /\.x?html?$/i.test(k));
+        for (const path of htmlFiles) {
+          if (zip.files[path]) {
+            const html = await zip.files[path].async("text");
+            // Strip HTML tags
+            const text = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+              .replace(/<[^>]+>/g, "\n")
+              .replace(/&nbsp;/g, " ")
+              .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+              .replace(/\n{3,}/g, "\n\n").trim();
+            if (text.length > 100) textFiles.push(text);
+          }
+        }
+        const fullText = textFiles.join("\n\n");
+        setUploadMsg(`解析完成，${(fullText.length / 10000).toFixed(1)}万字`);
+        await handleUpload(fullText, fname);
+      } catch { setUploadMsg("epub 解析失败"); setUploading(false); }
+    } else {
+      // .txt or other: read as plain text
+      const r = new FileReader();
+      r.onload = ev => handleUpload(ev.target?.result as string, fname);
+      r.onerror = () => { setUploadMsg("文件读取失败"); setUploading(false); };
+      r.readAsText(file);
+    }
   }
 
   async function handleDeepAnalyze() {
@@ -271,13 +335,13 @@ export function ReferenceCockpitPage() {
         {!profId && (
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 py-8 text-center space-y-3">
             <Upload size={32} className="mx-auto text-slate-300" />
-            <p className="text-sm text-slate-600">上传对标网络小说 .txt 文件</p>
-            <p className="text-xs text-slate-400">支持百万字以上，AI 将分析架构类型、钩子风格、金手指等维度</p>
+            <p className="text-sm text-slate-600">上传对标网络小说 (epub / txt)</p>
+            <p className="text-xs text-slate-400">支持 .epub / .txt，百万字以上，AI 将分析架构类型、钩子风格、金手指等维度</p>
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-medium text-white">
               <Upload size={12} />{uploading ? "上传中..." : "选择文件"}
-              <input type="file" accept=".txt" className="hidden" onChange={e => {
+              <input type="file" accept=".txt,.epub" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
-                if (file) { const r = new FileReader(); r.onload = ev => handleUpload(ev.target?.result as string, file.name); r.readAsText(file); }
+                if (file) handleFile(file);
               }} />
             </label>
             {uploadMsg && <p className={cn("text-xs", uploadMsg.includes("失败") ? "text-red-500" : "text-green-600")}>{uploadMsg}</p>}
