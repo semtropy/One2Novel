@@ -26,6 +26,10 @@ function StatusLine({ label }: { label?: string }) {
   return <span className="text-sm text-slate-500">{label || "分析完成"}</span>;
 }
 
+function StatBadge({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">{label}</div><div className="font-bold text-slate-700">{value}</div></div>;
+}
+
 // ═══ Detail Components (modals) ═══
 
 function ArchDetail({ data, onApply, applied, disabled }: { data: { type: string; confidence?: number; reasoning?: string; observedPatterns?: string[] }; onApply: () => void; applied: boolean; disabled: boolean }) {
@@ -112,6 +116,7 @@ export function ReferenceCockpitPage() {
   const [runError, setRunError] = useState("");
   const [annotData, setAnnotData] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<{ totalChapters: number; totalLoops: number } | null>(null);
+  const [archProfile, setArchProfile] = useState<any>(null);
   const [appliedArch, setAppliedArch] = useState(false);
   const [profileCreated, setProfileCreated] = useState(false);
   const [applyTargetId, setApplyTargetId] = useState<string>("");
@@ -166,6 +171,10 @@ export function ReferenceCockpitPage() {
       setAnnotData(annot);
       setStats({ totalChapters: p.totalChapters ?? 0, totalLoops: (annot.loopBoundaries as any[])?.filter((b: any) => b.type === "start").length ?? 0 });
       setFileName(p.name ?? "");
+      // Load ArchitectureProfile from deep analysis
+      if (p.architectureProfile) {
+        try { setArchProfile(JSON.parse(p.architectureProfile)); } catch { setArchProfile(null); }
+      } else { setArchProfile(null); }
     } catch { setRunError("加载档案失败"); }
   }
 
@@ -307,6 +316,62 @@ export function ReferenceCockpitPage() {
           <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">已完成</div><div className="text-lg font-bold text-slate-700">{doneCount}/8</div></div>
           <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">档案</div><div className="text-lg font-bold text-slate-700">{profId ? "已保存" : "新建"}</div></div>
         </div>
+
+        {/* Architecture Profile (deep analysis result) */}
+        {archProfile && (
+          <div className="rounded-xl border border-brand-200 bg-brand-50/30 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-800">深度分析结果</h3>
+              <span className="text-[10px] text-brand-500 font-medium">{archProfile.totalChapters ?? stats?.totalChapters}章 · {archProfile.loops?.length ?? stats?.totalLoops}轮回环</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-xs">
+              <StatBadge label="推进章" value={`${archProfile.chapterTypeDistribution?.advance ?? 0}%`} />
+              <StatBadge label="过渡章" value={`${archProfile.chapterTypeDistribution?.transition ?? 0}%`} />
+              <StatBadge label="冷却章" value={`${archProfile.chapterTypeDistribution?.cooldown ?? 0}%`} />
+              <StatBadge label="高潮章" value={`${archProfile.chapterTypeDistribution?.climax ?? 0}%`} />
+            </div>
+            {archProfile.coolPointRecipe && (
+              <div>
+                <p className="text-[10px] text-slate-500 mb-1.5">爽点配方</p>
+                <div className="flex gap-1 h-4 rounded-full overflow-hidden bg-slate-200">
+                  {Object.entries(archProfile.coolPointRecipe as Record<string,number>).filter(([,v]) => v > 0).map(([k, v]) => (
+                    <div key={k} title={`${k}: ${v}%`} className="h-full" style={{ width: `${v}%`, backgroundColor: { collect: "#059669", strategy: "#2563eb", verify: "#7c3aed", reveal: "#ea580c", upgrade: "#e11d48", faceSlap: "#ca8a04" }[k] || "#94a3b8" }} />
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-1 flex-wrap">
+                  {Object.entries(archProfile.coolPointRecipe as Record<string,number>).filter(([,v]) => v > 0).map(([k, v]) => (
+                    <span key={k} className="text-[10px] text-slate-500">{({collect:"收集",strategy:"策略",verify:"验证",reveal:"揭示",upgrade:"升级",faceSlap:"打脸"} as Record<string,string>)[k]??k} {v}%</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {archProfile.hookProfile && (
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                <div className="rounded bg-white p-2">
+                  <span className="text-slate-400">钩子密度</span>
+                  <p className="font-semibold text-slate-700">每章 {archProfile.hookProfile.shortTermPerChapter} · 每卷 {archProfile.hookProfile.mediumTermPerVolume} · {archProfile.hookProfile.longTermLines}条长线</p>
+                </div>
+                <div className="rounded bg-white p-2">
+                  <span className="text-slate-400">伏笔窗口</span>
+                  <p className="font-semibold text-slate-700">约 {archProfile.payoffPatterns?.typicalPayoffWindow ?? "?"} 章</p>
+                </div>
+              </div>
+            )}
+            {archProfile.contentBeatProfile && (
+              <div>
+                <p className="text-[10px] text-slate-500 mb-1">内容节拍</p>
+                <div className="flex gap-1 flex-wrap">
+                  {Object.entries(archProfile.contentBeatProfile as Record<string,number>).sort(([,a],[,b])=>b-a).slice(0,6).map(([k, v]) => (
+                    <span key={k} className="rounded bg-white px-1.5 py-0.5 text-[10px] text-slate-600">{k} {v}%</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {archProfile.avgChapterWordCount && (
+              <div className="text-[10px] text-slate-400">平均章节 {archProfile.avgChapterWordCount.avg} 字 ({archProfile.avgChapterWordCount.min}-{archProfile.avgChapterWordCount.max}) · 平均每回环 {archProfile.avgChaptersPerLoop?.avg} 章</div>
+            )}
+          </div>
+        )}
 
         {/* Analysis Results */}
         <div className="space-y-3">
