@@ -4,6 +4,7 @@ import { createNovelRepo } from "../../../../platform/data/repositories";
 import { serializeTags, parseTags } from "../../../../platform/data/tagHelpers";
 import { NovelCreateSchema, NovelUpdateSchema } from "@one2novel/shared/types/novel";
 import { validate } from "../validate";
+import { AppError } from "../../../../platform/errors/AppError";
 import { generateTitles } from "../titleService";
 import { generateStoryCore } from "../../planning/storyCoreService";
 import { getPreferences, recordCreation } from "../../../settings/preferences";
@@ -52,9 +53,18 @@ router.get("/:id", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Known updateable fields — rejects typos before they hit the DB silently
+const NOVEL_FIELDS = new Set(Object.keys(NovelUpdateSchema.shape));
+
 // Update novel
 router.patch("/:id", async (req, res, next) => {
   try {
+    // Reject unknown field names early — prevents silent failures from typos
+    const unknownKeys = Object.keys(req.body).filter(k => !NOVEL_FIELDS.has(k) && k !== "id");
+    if (unknownKeys.length > 0) {
+      throw new AppError(400, "UNKNOWN_FIELDS", `未知字段: ${unknownKeys.join("、")}`);
+    }
+
     const repo = createNovelRepo(getPrisma());
     const input = validate(NovelUpdateSchema, req.body);
     // Serialize commercialTags (string[] in API → JSON string in DB)
