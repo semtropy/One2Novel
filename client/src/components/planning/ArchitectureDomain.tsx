@@ -30,8 +30,7 @@ interface PhaseDef {
 }
 
 interface ProfileItem {
-  id: string; name: string; architectureType?: string | null; totalChapters?: number | null;
-  loopBoundaries?: string | null; coolPointDensity?: string | null; hookPatterns?: string | null; createdAt: string;
+  id: string; name: string; createdAt: string;
 }
 
 export function ArchitectureDomain({ novelId, onComplete }: Props) {
@@ -92,7 +91,7 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
 
   const handleSelectProfile = async (profile: ProfileItem) => {
     setSelectedProfileId(profile.id);
-    if (profile.architectureType) setSelectedArch(profile.architectureType);
+    // Profile selected — no longer exposes architectureType directly (in analysisResult now)
     await api.put(`/novels/${novelId}/active-profile`, { profileId: profile.id }).catch(() => {});
     // If the profile has a deep analysis result, apply its ArchitectureProfile to the novel
     try {
@@ -173,7 +172,7 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
             <div className="grid grid-cols-3 gap-2.5 mb-4">
               {profiles.map(profile => {
                 const isSelected = selectedProfileId === profile.id;
-                const archLabel = profile.architectureType ? (ARCH_LABELS[profile.architectureType] ?? profile.architectureType) : "未检测";
+                const archLabel = "已分析";
                 return (
                 <button key={profile.id} onClick={() => handleSelectProfile(profile)}
                   className={cn("rounded-xl border text-left transition-all", isSelected ? "border-brand-600 bg-brand-50/30 ring-1 ring-brand-300" : "border-slate-200 bg-white hover:border-slate-300")}>
@@ -182,15 +181,13 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
                       <span className="text-[10px] rounded bg-brand-100 px-1 py-0 text-brand-700">参考书</span>
                       <span className={cn("text-sm font-semibold truncate", isSelected ? "text-brand-900" : "text-slate-700")}>{profile.name}</span>
                     </div>
-                    <div className="text-xs text-slate-500 mb-1.5">检测架构：{archLabel}{profile.totalChapters ? ` · ${profile.totalChapters}章` : ""}</div>
+                    <div className="text-xs text-slate-500 mb-1.5">架构：{archLabel}</div>
                     <div className="text-[10px] text-slate-400">{new Date(profile.createdAt).toLocaleDateString("zh-CN")} 分析</div>
                   </div>
                   {isSelected && (
                     <div className="border-t border-brand-100 p-3 space-y-1.5 text-xs bg-white">
-                      {profile.architectureType && <div><span className="font-medium text-slate-600">架构类型：</span><span className="text-slate-500">{ARCH_LABELS[profile.architectureType] ?? profile.architectureType}</span></div>}
-                      {profile.loopBoundaries && <div><span className="font-medium text-slate-600">回环边界：</span><span className="text-slate-500">已提取</span></div>}
-                      {profile.coolPointDensity && <div><span className="font-medium text-slate-600">爽点分布：</span><span className="text-slate-500">已分析</span></div>}
-                      {profile.hookPatterns && <div><span className="font-medium text-slate-600">钩子模式：</span><span className="text-slate-500">已提取</span></div>}
+                      <div><span className="font-medium text-slate-600">状态：</span><span className="text-slate-500">已分析，查看驾驶舱获取完整架构蓝图</span></div>
+                      <div><span className="font-medium text-slate-600">分析维度：</span><span className="text-slate-500">回环叙事 · 节奏曲线 · 金手指 · 写法技法 · 写作统计</span></div>
                     </div>
                   )}
                 </button>
