@@ -299,22 +299,38 @@ export async function expandLoopToVolume(
     contentBeatHint = `内容节拍配比（共${chapterCount}章）：\n${beatAssignments}`;
   }
 
+  // ArchitectureProfile context for chapter type distribution (from reference book or template)
+  let volumeArchContext = "";
+  try {
+    const ap = JSON.parse(novel.architectureProfile || "{}");
+    if (ap.chapterTypeDistribution) {
+      volumeArchContext = `\n【对标书章节类型分布】推进:${ap.chapterTypeDistribution.advance}% 过渡:${ap.chapterTypeDistribution.transition}% 冷却:${ap.chapterTypeDistribution.cooldown}% 高潮:${ap.chapterTypeDistribution.climax}%`;
+    }
+    if (ap.coolPointRecipe) {
+      volumeArchContext += `\n【对标书爽点配比】收集:${ap.coolPointRecipe.collect}% 策略:${ap.coolPointRecipe.strategy}% 验证:${ap.coolPointRecipe.verify}% 揭示:${ap.coolPointRecipe.reveal}% 升级:${ap.coolPointRecipe.upgrade}% 打脸:${ap.coolPointRecipe.faceSlap}%`;
+    }
+    if (ap.hookProfile) {
+      volumeArchContext += `\n【对标书钩子密度】每章${ap.hookProfile.shortTermPerChapter}个短期 每卷${ap.hookProfile.mediumTermPerVolume}个中期 ${ap.hookProfile.longTermLines}条长线`;
+    }
+  } catch {}
+
   const systemPrompt = arch
     ? [
         `你是资深网文分章策划师。将一回环（第${loopIndex}轮）展开为详细的卷章结构。`,
         "",
         `【架构阶段顺序】${effectivePhaseOrder}`,
         `【本章数限制】${loopItem.estimatedChapters}章（可±2章浮动）`,
+        volumeArchContext,
         "",
         `【展开要求】`,
         `1. 按阶段顺序分配章节——不得跳过任何阶段`,
         `2. 每章填写：标题（≤8字）、摘要、阶段标签、核心事件、章尾钩子、章节类型`,
-        `3. 章节类型规则：`,
-        `   - advance（推进章）：有实质剧情推进，占比约60%`,
-        `   - transition（过渡章）：日常/修炼/旅行，占比约20%`,
+        `3. 章节类型规则（若有对标书数据，优先参考对标书分布）：`,
+        `   - advance（推进章）：有实质剧情推进`,
+        `   - transition（过渡章）：日常/修炼/旅行`,
         `   - cooldown（冷却章）：高潮后的情绪缓冲，每轮回环至少1章`,
         `   - climax（高潮章）：决战/揭示/仪式，每轮回环1-2章`,
-        `4. 爽点类型按节奏自然分配：collect/strategy/verify/reveal/upgrade/face_slap`,
+        `4. 爽点类型按节奏分配（若有对标书数据，参考其配比）：collect/strategy/verify/reveal/upgrade/face_slap`,
         `5. 每章结尾必须有钩子（15-30字），推动读者继续阅读`,
         `6. 章与章之间要有因果推进关系`,
         `7. 每章标注内容节拍(contentBeat)，从以下类型中选择并按配比分配：`,

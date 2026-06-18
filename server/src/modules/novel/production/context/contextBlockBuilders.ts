@@ -298,6 +298,35 @@ export async function assembleChapterBlocks(
     }
   } catch { /* best-effort */ }
 
+  // ── writing_techniques (from ArchitectureProfile, applied to chapter writing) ──
+  try {
+    const archProfileRaw = (await prisma.novel.findUnique({ where: { id: novelId }, select: { architectureProfile: true } }))?.architectureProfile;
+    if (archProfileRaw) {
+      const ap = JSON.parse(archProfileRaw);
+      const wt = ap.writingTechniques;
+      if (wt?.overallStyleDescription) {
+        const lines = [`【对标书风格参考】${wt.overallStyleDescription}`];
+        const cats = [
+          { key: "narrativeAssets" as const, label: "叙事技法" },
+          { key: "languageAssets" as const, label: "语言风格" },
+          { key: "characterAssets" as const, label: "角色塑造" },
+          { key: "rhythmAssets" as const, label: "节奏控制" },
+          { key: "antiAiAssets" as const, label: "反AI特征" },
+        ];
+        for (const { key, label } of cats) {
+          const techniques = (wt[key] as Array<{ rule: string }> | undefined) ?? [];
+          if (techniques.length > 0) {
+            lines.push(`\n${label}：${techniques.map((t: { rule: string }) => t.rule).join("；")}`);
+          }
+        }
+        blocks.push(createContextBlock({
+          id: "writing_techniques", group: "style_contract", priority: 76,
+          content: lines.join("\n"), conflictGroup: "style_contract", freshness: 1,
+        }));
+      }
+    }
+  } catch { /* best-effort */ }
+
   // ── content_beat_mission ──
   if (chapterPlan?.contentBeat) {
     const beatGuide = getContentBeatGuide(chapterPlan.contentBeat);

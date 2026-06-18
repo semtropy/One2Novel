@@ -170,6 +170,7 @@ async function annotateBatch(
 export async function batchAnnotateChapters(
   chapters: ParsedChapter[],
   text: string,
+  onProgress?: (batch: number, total: number) => Promise<void>,
 ): Promise<ChapterAnnotation[]> {
   const totalBatches = Math.ceil(chapters.length / BATCH_SIZE);
   const results: ChapterAnnotation[] = [];
@@ -179,6 +180,7 @@ export async function batchAnnotateChapters(
     const batch = await annotateBatch(chapters, text, i, totalBatches);
     results.push(...batch);
     console.log(`[DeepAnalysis] Batch ${i + 1}/${totalBatches}: annotated ${batch.length} chapters`);
+    if (onProgress) await onProgress(i + 1, totalBatches);
   }
 
   return results.sort((a, b) => a.chapterIndex - b.chapterIndex);
@@ -444,6 +446,15 @@ export async function extractWritingTechniques(
  * Run the full 5-phase deep analysis pipeline on a ReferenceProfile.
  * Stores the resulting ArchitectureProfile on the profile.
  */
+async function updateProgress(profileId: string, phase: string, detail: string, pct: number) {
+  try {
+    await getPrisma().referenceProfile.update({
+      where: { id: profileId },
+      data: { deepAnalysisProgress: JSON.stringify({ phase, detail, pct }) },
+    });
+  } catch {}
+}
+
 export async function deepAnalyze(profileId: string): Promise<ArchitectureProfile> {
   const prisma = getPrisma();
   const profile = await prisma.referenceProfile.findUnique({ where: { id: profileId } });
@@ -454,30 +465,38 @@ export async function deepAnalyze(profileId: string): Promise<ArchitectureProfil
   console.log(`[DeepAnalysis] Starting for "${name}" (${text.length} chars)`);
 
   // Phase 1
-  console.log("[DeepAnalysis] Phase 1: parsing chapters...");
+  await updateProgress(profileId, "parse", "解析章节目录...", 5);
   const chapters = parseChapters(text);
   console.log(`[DeepAnalysis] Found ${chapters.length} chapters`);
+  await updateProgress(profileId, "parse", `发现 ${chapters.length} 章`, 10);
 
   // Phase 2
-  console.log("[DeepAnalysis] Phase 2: annotating chapters in batches...");
-  const annotations = await batchAnnotateChapters(chapters, text);
+  const totalBatches = Math.ceil(chapters.length / BATCH_SIZE);
+  await updateProgress(profileId, "annotate", `标注章节 (0/${totalBatches} 批)...`, 15);
+  const annotations = await batchAnnotateChapters(chapters, text, async (batch, total) => {
+    await updateProgress(profileId, "annotate", `标注章节 (${batch}/${total} 批)`, 15 + Math.round(batch / total * 40));
+  });
   console.log(`[DeepAnalysis] Annotated ${annotations.length} chapters`);
+  await updateProgress(profileId, "annotate", `完成 ${annotations.length} 章标注`, 55);
 
   // Phase 3
-  console.log("[DeepAnalysis] Phase 3: detecting loop boundaries...");
+  await updateProgress(profileId, "loops", "检测回环边界...", 60);
   const loops = await detectLoopBoundaries(annotations);
   console.log(`[DeepAnalysis] Detected ${loops.length} loops`);
+  await updateProgress(profileId, "loops", `发现 ${loops.length} 轮回环`, 70);
 
   // Phase 4
-  console.log("[DeepAnalysis] Phase 4: synthesizing profile...");
+  await updateProgress(profileId, "synthesize", "合成统计分布...", 75);
   const architectureProfile = synthesizeProfile(chapters, annotations, loops, name, profileId);
+  await updateProgress(profileId, "synthesize", "统计合成完成", 85);
 
   // Phase 5
-  console.log("[DeepAnalysis] Phase 5: extracting writing techniques...");
+  await updateProgress(profileId, "writing", "提取写法技法...", 90);
   try {
     const techniques = await extractWritingTechniques(text, annotations);
     architectureProfile.writingTechniques = techniques;
     console.log("[DeepAnalysis] Writing techniques extracted");
+    await updateProgress(profileId, "writing", "技法提取完成", 95);
   } catch (e) {
     console.warn("[DeepAnalysis] Writing technique extraction failed (non-fatal)", e);
   }

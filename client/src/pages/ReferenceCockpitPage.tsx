@@ -113,6 +113,7 @@ export function ReferenceCockpitPage() {
   const [running, setRunning] = useState<string | null>(null);
   const [runAll, setRunAll] = useState(false);
   const [deepRunning, setDeepRunning] = useState(false);
+  const [deepProgress, setDeepProgress] = useState<{phase:string;detail:string;pct:number}|null>(null);
   const [runError, setRunError] = useState("");
   const [annotData, setAnnotData] = useState<Record<string, any>>({});
   const [stats, setStats] = useState<{ totalChapters: number; totalLoops: number } | null>(null);
@@ -205,11 +206,23 @@ export function ReferenceCockpitPage() {
 
   async function handleDeepAnalyze() {
     if (!profId) return;
-    setDeepRunning(true); setRunError("");
+    setDeepRunning(true); setRunError(""); setDeepProgress(null);
+    // Poll progress while analysis runs
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data } = await api.get(`/profiles/${profId}`);
+        const prog = data?.data?.deepAnalysisProgress;
+        if (prog) {
+          try { setDeepProgress(JSON.parse(prog)); } catch {}
+        }
+      } catch {}
+    }, 2000);
     try {
       await api.post(`/profiles/${profId}/deep-analyze`);
+      clearInterval(pollInterval);
       await loadProfile(profId);
-    } catch (e: any) { setRunError(e?.response?.data?.error?.message || "深度分析失败"); }
+      setDeepProgress(null);
+    } catch (e: any) { clearInterval(pollInterval); setDeepProgress(null); setRunError(e?.response?.data?.error?.message || "深度分析失败"); }
     finally { setDeepRunning(false); }
   }
 
@@ -305,7 +318,15 @@ export function ReferenceCockpitPage() {
             <button onClick={handleDeepAnalyze} disabled={deepRunning || runAll} className={cn("flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-white", deepRunning ? "bg-slate-400" : "bg-slate-800 hover:bg-slate-700")}>
               {deepRunning ? <RefreshCw size={11} className="animate-spin" /> : <Sparkles size={11} />}{deepRunning ? "深度分析中..." : "全量深度分析"}
             </button>
-            <span className="text-[10px] text-slate-400">全章统计 · 回环检测 · 技法提取</span>
+            {deepProgress && (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                  <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${deepProgress.pct}%` }} />
+                </div>
+                <span className="text-[10px] text-slate-500">{deepProgress.detail}</span>
+              </div>
+            )}
+            {!deepProgress && <span className="text-[10px] text-slate-400">全章统计 · 回环检测 · 技法提取</span>}
           </div>
         )}
 
