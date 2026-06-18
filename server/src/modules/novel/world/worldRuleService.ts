@@ -69,10 +69,18 @@ export async function batchGenerateRules(novelId: string): Promise<WorldRuleData
   if (!novel) throw new Error("Novel not found");
 
   
+  // Step 1 context injection: story core → world rules
+  let storyCoreContext = "";
+  if (novel.storySummary) storyCoreContext += `\n【故事简介】${novel.storySummary}`;
+  if (novel.centralQuestion) storyCoreContext += `\n【核心悬念】${novel.centralQuestion}`;
+  if (novel.endingDirection) storyCoreContext += `\n【结局方向】${novel.endingDirection}`;
+  if (novel.tonePitch) storyCoreContext += `\n【语气基调】${novel.tonePitch}`;
+
   const context = [
     `书名：《${novel.title}》`,
     novel.genre ? `题材：${novel.genre}` : "",
     novel.description ? `概述：${novel.description}` : "",
+    storyCoreContext,
     `大纲：${(novel.structuredOutline ?? "").slice(0, 3000)}`,
   ].filter(Boolean).join("\n");
 

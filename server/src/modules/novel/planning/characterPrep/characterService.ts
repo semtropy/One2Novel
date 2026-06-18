@@ -115,9 +115,30 @@ export async function generateCharacters(novelId: string): Promise<CharacterExtr
   if (novel.targetAudience) storyCoreContext += `\n【目标读者】${novel.targetAudience}`;
   if (novel.bookSellingPoint) storyCoreContext += `\n【核心卖点】${novel.bookSellingPoint}`;
 
+  // Build world context (Step 2 output → Step 3 input)
+  let worldContext = "";
+  // World rules summary
+  const worldRules = await prisma.worldRule.findMany({
+    where: { novelId, status: "active" },
+    select: { category: true, title: true, content: true },
+    take: 15,
+  });
+  if (worldRules.length > 0) {
+    worldContext += `\n【世界规则】\n${worldRules.map(r => `[${r.category}] ${r.title}: ${r.content}`).join("\n")}`;
+  }
+  // Golden finger summary
+  if (novel.goldenFinger) {
+    try {
+      const gf = JSON.parse(novel.goldenFinger);
+      if (gf.goldenFingerName) worldContext += `\n【金手指】${gf.goldenFingerName}`;
+      if (gf.abilities?.length) worldContext += `\n能力：${gf.abilities.join("、")}`;
+      if (gf.limits?.length) worldContext += `\n限制：${gf.limits.join("、")}`;
+    } catch {}
+  }
+
   const raw = await aiInvoke({
     assetId: "novel.character.extract", skillModules: ["character","fatal_flaw"],
-    userPrompt: [`书名：《${novel.title}》`, novel.genre ? `题材：${novel.genre}` : null, storyCoreContext, `章节：${chList}`, outline ? `大纲：${outline.slice(0, 4000)}` : null, descriptionText, archContext, "请基于以上信息生成角色阵容，确保角色在架构中承担明确的功能标签（副本触发器/奖励来源/伏笔载体/长期威胁/情感锚点），不要凭空创造与大纲/灵感冲突的角色。"].filter(Boolean).join("\n"),
+    userPrompt: [`书名：《${novel.title}》`, novel.genre ? `题材：${novel.genre}` : null, storyCoreContext, worldContext, `章节：${chList}`, outline ? `大纲：${outline.slice(0, 4000)}` : null, descriptionText, archContext, "请基于以上信息生成角色阵容，确保角色在架构中承担明确的功能标签（副本触发器/奖励来源/伏笔载体/长期威胁/情感锚点），不要凭空创造与大纲/灵感冲突的角色。"].filter(Boolean).join("\n"),
     schema: LLMCharExtractSchema, temperature: 0.85,
   });
 
