@@ -214,7 +214,7 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
         {saving ? <RefreshCw size={14} className="animate-spin inline mr-1" /> :
          saveSuccess ? <CheckCircle size={14} className="inline mr-1" /> :
          <Sparkles size={14} className="inline mr-1" />}
-        {saving ? "保存中..." : saveSuccess ? "架构已确认 ✓" : "确认架构（生成回环骨架 + 保存金手指）"}
+        {saving ? "保存中..." : saveSuccess ? "架构已确认 ✓" : "确认架构"}
       </button>
       {saveError && <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-600">{saveError}</div>}
     </div>
