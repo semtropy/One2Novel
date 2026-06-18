@@ -147,6 +147,17 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
         `4. 最终回环指向全书最大悬念和最终敌人`,
       ].join("\n");
 
+  // World rules context (Step 2 output → Step 4 input)
+  const worldRules = await prisma.worldRule.findMany({
+    where: { novelId: input.novelId, status: "active" },
+    select: { category: true, title: true, content: true },
+    take: 12,
+  });
+  let worldRulesContext = "";
+  if (worldRules.length > 0) {
+    worldRulesContext = `\n【世界规则】\n${worldRules.map(r => `[${r.category}] ${r.title}: ${r.content}`).join("\n")}`;
+  }
+
   const userPrompt = [
     `书名：《${novel.title}》`,
     novel.description ? `灵感：${novel.description.slice(0, 2000)}` : null,
@@ -155,6 +166,7 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
       ? `金手指能力：${gfAbilities.join("、")}` : null,
     Array.isArray(gfLimits) && gfLimits.length > 0
       ? `金手指限制：${gfLimits.join("、")}` : null,
+    worldRulesContext,
   ].filter(Boolean).join("\n");
 
   // Feed reference book analysis as supplementary context
