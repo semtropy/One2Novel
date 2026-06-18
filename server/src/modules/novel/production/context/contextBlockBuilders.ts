@@ -353,10 +353,15 @@ export async function assembleChapterBlocks(
         const ar = JSON.parse(refProfile.analysisResult);
         const exemplars = (ar.annotations as Array<{chapterIndex:number;chapterType:string;coolPointLevel:string;hookType:string;exemplarOpening?:string;exemplarEnding?:string;summary?:string}> | undefined);
         if (exemplars?.length) {
-          // Match: same chapterType, similar coolPointLevel
+          // Match: same loopPhase + chapterType (preferred), fallback to same chapterType only
           const targetType = chapterPlan?.chapterType ?? "advance";
-          const targetCool = "medium"; // match by chapterType regardless of coolPointLevel
-          const matches = exemplars.filter(e => e.chapterType === targetType || e.coolPointLevel === targetCool).slice(0, 3);
+          const targetPhase = chapterPlan?.loopPhase;
+          let matches = targetPhase ? exemplars.filter(e => (e as any).loopPhase === targetPhase && (e as any).chapterType === targetType) : [];
+          if (matches.length < 2) {
+            matches = [...matches, ...exemplars.filter(e => e.chapterType === targetType && !matches.includes(e))].slice(0, 3);
+          } else {
+            matches = matches.slice(0, 3);
+          }
           if (matches.length > 0) {
             const lines = ["【对标书写作范例 — 相同结构位置的章节是怎么写的】"];
             for (const m of matches) {

@@ -326,23 +326,6 @@ export function ReferenceCockpitPage() {
               </div>
             )}
 
-            {/* Power System */}
-            {r.powerSystem && (
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><TrendingUp size={14}/>力量体系</h3>
-                {r.powerSystem.tree?.length > 0 && (
-                  <div className="space-y-1 text-xs mb-2">
-                    {r.powerSystem.tree.slice(0, 8).map((l:any,i:number) => (
-                      <div key={i} className="flex items-center gap-2"><span className="font-medium text-slate-600">{l.name}</span><span className="text-slate-400">—</span><span className="text-slate-500">{l.abilityUpgrade?.slice(0, 50)}</span></div>
-                    ))}
-                  </div>
-                )}
-                {r.powerSystem.expectationNodes?.length > 0 && (
-                  <div className="flex gap-1 flex-wrap">{r.powerSystem.expectationNodes.slice(0,6).map((n:any,i:number)=>(<span key={i} className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] text-brand-700">{n.name}:{n.expectation}</span>))}</div>
-                )}
-              </div>
-            )}
-
             {/* Expectation Chain */}
             {r.writing?.expectations?.length > 0 && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
