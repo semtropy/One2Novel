@@ -218,9 +218,7 @@ export function ReferenceCockpitPage() {
       setUploading(true); setUploadMsg("解析 epub...");
       try {
         const zip = await JSZip.loadAsync(file);
-        // Find all HTML/XHTML files in the epub, sorted by spine order
-        const textFiles: string[] = [];
-        // Try reading the OPF file for spine order first
+        // Read the OPF file for spine order
         const opfFile = Object.keys(zip.files).find(k => k.endsWith(".opf"));
         let spineOrder: string[] = [];
         if (opfFile) {
