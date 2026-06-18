@@ -131,9 +131,10 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
       const refProfile = await prisma.referenceProfile.findUnique({ where: { id: activeProfileId }, select: { analysisResult: true } });
       if (refProfile?.analysisResult) {
         const ar = JSON.parse(refProfile.analysisResult);
-        if (ar.rhythmProfile) {
-          archProfileStats += `\n【对标书节奏曲线】${ar.rhythmProfile.rhythmDescription}`;
-          archProfileStats += `\n高潮间隔≈${ar.rhythmProfile.avgClimaxInterval}章 冷却段≈${ar.rhythmProfile.avgCooldownLength}章 周期≈${ar.rhythmProfile.tensionCycleLength}章`;
+        const rp = ar.architecture?.rhythmProfile || ar.rhythmProfile; // V3+V2 compat
+        if (rp) {
+          archProfileStats += `\n【对标书节奏曲线】${rp.rhythmDescription}`;
+          archProfileStats += `\n高潮间隔≈${rp.avgClimaxInterval}章 冷却段≈${rp.avgCooldownLength}章 周期≈${rp.tensionCycleLength}章`;
         }
       }
     }
@@ -376,10 +377,31 @@ export async function expandLoopToVolume(
     prevVolContext,
   ].filter(Boolean).join("\n");
 
+  // Expectation chain from reference analysis (V3)
+  let expectationContext = "";
+  try {
+    const activeProfileId = (await prisma.novel.findUnique({ where: { id: novelId }, select: { activeProfileId: true } }))?.activeProfileId;
+    if (activeProfileId) {
+      const refProfile = await prisma.referenceProfile.findUnique({ where: { id: activeProfileId }, select: { analysisResult: true } });
+      if (refProfile?.analysisResult) {
+        const ar = JSON.parse(refProfile.analysisResult);
+        const expectations = ar.writing?.expectations;
+        if (expectations?.length) {
+          // Find the closest matching loop from the reference book
+          const match = expectations.find((e: any) => e.loopIndex === loopIndex) || expectations[loopIndex % expectations.length];
+          if (match) {
+            expectationContext = `\n【对标书同等位置回环的期待链】期待类型=${match.expectationType} | 建立方式=${match.establishmentMethod} | 维持方式=${match.maintenanceMethod} | 兑现方式=${match.fulfillmentMethod}`;
+          }
+        }
+      }
+    }
+  } catch {}
+  const fullUserPrompt = [userPrompt, expectationContext].filter(Boolean).join("\n");
+
   const raw = await Promise.race([
     aiInvoke({
       assetId: "novel.volume.expand",
-      userPrompt,
+      userPrompt: fullUserPrompt,
       schema: ExpandedVolumeSchema,
       temperature: 0.8,
       novelId,

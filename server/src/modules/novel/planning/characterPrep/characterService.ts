@@ -144,8 +144,9 @@ export async function generateCharacters(novelId: string): Promise<CharacterExtr
       const refProfile = await prisma.referenceProfile.findUnique({ where: { id: activeProfileId }, select: { analysisResult: true } });
       if (refProfile?.analysisResult) {
         const ar = JSON.parse(refProfile.analysisResult);
-        if (ar.loopNarratives?.length > 0) {
-          loopContext = `\n【对标书回环角色变化】\n${ar.loopNarratives.slice(0, 8).map((l: any) => `第${l.loopIndex}轮回环：核心冲突=${l.coreConflict} | 主角变化=${l.protagonistChange} | 叙事功能=${l.narrativeFunction}`).join("\n")}`;
+        const loops = ar.architecture?.loopNarratives || ar.loopNarratives; // V3+V2 compat
+        if (loops?.length > 0) {
+          loopContext = `\n【对标书回环角色变化】\n${loops.slice(0, 8).map((l: any) => `第${l.loopIndex}轮回环：核心冲突=${l.coreConflict} | 主角变化=${l.protagonistChange} | 叙事功能=${l.narrativeFunction}`).join("\n")}`;
         }
       }
     }

@@ -83,8 +83,29 @@ export function WorldDomain({ novelId, onComplete }: Props) {
     refetch();
   }, [novelId, gfName, gfAbilities, gfLimits, updateNovel, refetch]);
 
+  const [genAllPending, setGenAllPending] = useState(false);
+
+  const handleGenerateAllWorld = async () => {
+    setGenAllPending(true); setSaveError("");
+    try {
+      // Generate world rules + golden finger in parallel
+      await Promise.all([
+        api.post(`/novels/${novelId}/world-rules/generate`).catch(() => {}),
+        genGoldenFinger.mutateAsync(novelId).catch(() => {}),
+      ]);
+      refetch();
+    } catch { setSaveError("生成失败"); }
+    finally { setGenAllPending(false); }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Unified generate button */}
+      <button onClick={handleGenerateAllWorld} disabled={genAllPending}
+        className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 shadow-sm transition-colors">
+        <Sparkles size={16} className={genAllPending ? "animate-spin" : ""} />
+        {genAllPending ? "生成中..." : "AI 生成世界框架（世界规则 + 金手指）"}
+      </button>
       {saveError && (
         <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-600">{saveError}</div>
       )}

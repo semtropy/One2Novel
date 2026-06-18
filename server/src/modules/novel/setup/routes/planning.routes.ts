@@ -213,7 +213,7 @@ router.post("/:novelId/golden-finger/generate", async (req, res, next) => {
       if (refProfile?.analysisResult) {
         try {
           const ar = JSON.parse(refProfile.analysisResult);
-          const dp = ar.goldenFingerAnalysis?.designPattern;
+          const dp = (ar.goldenFinger || ar.goldenFingerAnalysis)?.designPattern; // V3+V2 compat
           if (dp) {
             designPatternContext = `\n【参考书设计模式（few-shot）】\n类型：${dp.type} — ${dp.typeDescription}\n核心机制：${dp.coreMechanic}\n获取方式：${dp.acquisitionPattern}\n进化路径：${dp.evolutionPath?.join(" → ") ?? ""}\n限制策略：${dp.limitationStrategy}\n叙事融合：${dp.narrativeIntegration}`;
           }
