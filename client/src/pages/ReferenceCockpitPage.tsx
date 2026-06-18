@@ -117,48 +117,87 @@ export function ReferenceCockpitPage() {
       if (!p) return;
       setName(p.name ?? "");
       const annot: Record<string, any> = {};
-      // Array fields: parse JSON string → array (NOT Object.assign which corrupts arrays)
-      if (p.loopBoundaries) {
-        try { const arr = JSON.parse(p.loopBoundaries); annot.loopBoundaries = Array.isArray(arr) ? arr : []; } catch { annot.loopBoundaries = []; }
+      let ap: any = null;
+      if (p.architectureProfile) {
+        try { ap = JSON.parse(p.architectureProfile); } catch {}
       }
-      if (p.coolPointDensity) {
-        try { const cp = JSON.parse(p.coolPointDensity); annot.highCoolChapters = cp.highCoolChapters ?? []; annot.lowCoolChapters = cp.lowCoolChapters ?? []; } catch {}
+
+      // Unified data source: ArchitectureProfile (deep analysis) or fallback to individual columns
+      if (ap) {
+        setArchProfile(ap);
+        // Populate annotData from ArchitectureProfile for Section display
+        annot.loopBoundaries = p.loopBoundaries ? (() => { try { return JSON.parse(p.loopBoundaries); } catch { return []; } })() : [];
+        annot.highCoolChapters = p.coolPointDensity ? (() => { try { const cp = JSON.parse(p.coolPointDensity); return cp.highCoolChapters ?? []; } catch { return []; } })() : [];
+        annot.lowCoolChapters = p.coolPointDensity ? (() => { try { const cp = JSON.parse(p.coolPointDensity); return cp.lowCoolChapters ?? []; } catch { return []; } })() : [];
+        // hookPatterns: ArchitectureProfile stores hookProfile, convert to display format
+        if (ap.hookProfile) {
+          annot.hookPatterns = {
+            distribution: ap.hookProfile.hookDistribution ?? {},
+            avgHookStrength: 0.7,
+            typicalHookStyle: `每章${ap.hookProfile.shortTermPerChapter ?? "?"}个短期钩子 · 每卷${ap.hookProfile.mediumTermPerVolume ?? "?"}个中期 · ${ap.hookProfile.longTermLines ?? "?"}条长线`,
+          };
+        }
+        // goldenFinger: from ArchitectureProfile or individual column
+        if (p.goldenFingerBounds) {
+          try { annot.goldenFingerBounds = JSON.parse(p.goldenFingerBounds); } catch {}
+        }
+        // contentBeatProfile → display format
+        if (ap.contentBeatProfile) {
+          const beats = ap.contentBeatProfile as Record<string, number>;
+          annot.contentBeatPatterns = {
+            beatTypes: Object.keys(beats),
+            overallDistribution: beats,
+            totalChapters: p.totalChapters ?? 100,
+          };
+        }
+        // settingTimeline from individual column
+        if (p.settingTimeline) {
+          try { annot.keySettings = JSON.parse(p.settingTimeline); } catch {}
+        }
+        // architectureType from profile
+        if (p.architectureType) {
+          annot.detectedArchitecture = { type: p.architectureType };
+        }
+      } else {
+        // Fallback: load from individual columns (old analysis data, no ArchitectureProfile)
+        if (p.loopBoundaries) {
+          try { const arr = JSON.parse(p.loopBoundaries); annot.loopBoundaries = Array.isArray(arr) ? arr : []; } catch { annot.loopBoundaries = []; }
+        }
+        if (p.coolPointDensity) {
+          try { const cp = JSON.parse(p.coolPointDensity); annot.highCoolChapters = cp.highCoolChapters ?? []; annot.lowCoolChapters = cp.lowCoolChapters ?? []; } catch {}
+        }
+        if (p.hookPatterns) {
+          try { annot.hookPatterns = JSON.parse(p.hookPatterns); } catch {}
+        }
+        if (p.goldenFingerBounds) {
+          try { annot.goldenFingerBounds = JSON.parse(p.goldenFingerBounds); } catch {}
+        }
+        if (p.contentBeatPatterns) {
+          try { annot.contentBeatPatterns = JSON.parse(p.contentBeatPatterns); } catch {}
+        }
+        if (p.settingTimeline) {
+          try { annot.keySettings = JSON.parse(p.settingTimeline); } catch {}
+        }
+        if (p.writingAssets) {
+          try { annot.writingAssets = JSON.parse(p.writingAssets); } catch {}
+        }
       }
-      if (p.hookPatterns) {
-        try { annot.hookPatterns = JSON.parse(p.hookPatterns); } catch {}
-      }
-      if (p.goldenFingerBounds) {
-        try { annot.goldenFingerBounds = JSON.parse(p.goldenFingerBounds); } catch {}
-      }
-      if (p.contentBeatPatterns) {
-        try { annot.contentBeatPatterns = JSON.parse(p.contentBeatPatterns); } catch {}
-      }
-      if (p.settingTimeline) {
-        try { annot.keySettings = JSON.parse(p.settingTimeline); } catch {}
-      }
-      if (p.architectureType) {
-        annot.detectedArchitecture = { type: p.architectureType };
-      }
-      if (p.writingAssets) {
+      if (p.writingAssets && !annot.writingAssets) {
         try { annot.writingAssets = JSON.parse(p.writingAssets); } catch {}
       }
+
       const nd: AnalysisState = {};
-      if (annot.loopBoundaries) nd.loops = true;
+      if ((annot.loopBoundaries as any[])?.length > 0) nd.loops = true;
       if ((annot.highCoolChapters ?? []).length > 0 || (annot.lowCoolChapters ?? []).length > 0) nd.coolpoints = true;
-      if (annot.detectedArchitecture) nd.architecture = true;
       if (annot.hookPatterns) nd.hooks = true;
       if (annot.goldenFingerBounds) nd.goldenFinger = true;
-      if (annot.keySettings) nd.timeline = true;
+      if ((annot.keySettings as any[])?.length > 0) nd.timeline = true;
       if (annot.writingAssets) nd.writing = true;
       if (annot.contentBeatPatterns) nd.contentBeats = true;
       setDone(nd);
       setAnnotData(annot);
       setStats({ totalChapters: p.totalChapters ?? 0, totalLoops: (annot.loopBoundaries as any[])?.filter((b: any) => b.type === "start").length ?? 0 });
       setFileName(p.name ?? "");
-      // Load ArchitectureProfile from deep analysis
-      if (p.architectureProfile) {
-        try { setArchProfile(JSON.parse(p.architectureProfile)); } catch { setArchProfile(null); }
-      } else { setArchProfile(null); }
     } catch { setRunError("加载档案失败"); }
   }
 
