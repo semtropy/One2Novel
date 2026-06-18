@@ -11,15 +11,6 @@ import { cn } from "../../lib/cn";
 
 interface Props { novelId: string; onComplete?: () => void }
 
-const ARCH_TEMPLATES = [
-  { id: "skill_slot", name: "技能栏搭配", desc: "力量体系有固定槽位限制，主角获得更多槽位或自由组合能力。每次解锁新槽位或合成新技能都是一次'开奖'，持续制造稀缺感和期待感。", genres: "御兽/游戏/竞技", works: "《不科学御兽》", phases: "触发→解锁槽位→收集技能→搭配验证→战斗→结算", coolPoints: "策略搭配(40%) > 验证战(30%) > 收集(20%) > 升级(10%)", hookStyle: "以'下一个槽位解锁什么'为长期钩子，每章以战斗悬念或新技能线索收尾" },
-  { id: "sequence_promotion", name: "序列晋升", desc: "力量体系呈序列/途径树状。晋升需要材料+仪式+扮演，每个序列有独特能力和隐藏职业。晋升不是数值提升而是行为艺术。", genres: "克苏鲁/诡秘/超凡", works: "《诡秘之主》", phases: "触发→收集材料→完成仪式→扮演消化→新能力探索→结算", coolPoints: "揭示(35%) > 策略(25%) > 收集(20%) > 升级(20%)", hookStyle: "以'下一个序列是什么'为核心驱动，章尾常用信息揭示或世界观扩展收尾" },
-  { id: "case_driven", name: "超凡办案", desc: "主角隶属于超凡执法机构，通过办案积累功绩和资源。案件背后有核心阴谋串联，单元剧结构天然适配网文追读。", genres: "悬疑/探案/都市", works: "《大奉打更人》", phases: "接案→调查→遭遇超凡→推理→收网→论功行赏", coolPoints: "策略(35%) > 打脸(25%) > 揭示(20%) > 收集(20%)", hookStyle: "案件谜题+体制内晋升双线驱动，章尾以新线索或权力博弈收尾" },
-  { id: "cultivation_planning", name: "修真规划", desc: "传统修真体系，金手指放大资源获取效率。主角在每个境界完美规划/补齐辅修，同阶无敌+越级挑战的极致满足感。", genres: "仙侠/修真/古典", works: "《凡人修仙传》", phases: "触发→资源收集→闭关突破→出关验证→碾压对手→结算收获", coolPoints: "升级(35%) > 收集(30%) > 打脸(20%) > 策略(15%)", hookStyle: "以'下一个境界是什么'为长期钩子，章尾以突破预兆或敌人逼近收尾" },
-  { id: "hexagon_godhood", name: "六边形成神", desc: "主角需在武力/精神/势力/财富/知识/声望六维度逐一补全短板。每一步都从泥泞中爬起，反差感贯穿全书，最终登临神座。", genres: "西幻/史诗/黑暗", works: "《亵渎》", phases: "触发→受挫暴露短板→补全某维度→新能力形成→验证→结算", coolPoints: "策略(30%) > 升级(25%) > 揭示(20%) > 打脸(15%) > 收集(10%)", hookStyle: "以'下一个要补全的维度是什么'为驱动，章尾常用反转或代价揭示收尾" },
-  { id: "historical_transmigration", name: "穿越历史", desc: "穿越到特定历史时期，用前世知识+金手指改变历史进程、进行社会实验。五级递进舞台：个人→家族→地区→国家→文明方向。", genres: "历史/都市/科幻", works: "《庆余年》", phases: "触发→知识变现→势力崛起→改变格局→文明重建→结算", coolPoints: "策略(35%) > 打脸(25%) > 揭示(20%) > 升级(20%)", hookStyle: "以'主角的身世秘密'为长期钩子，章尾以政治博弈或身份揭示收尾" },
-];
-
 const ARCH_LABELS: Record<string, string> = {
   skill_slot:"技能栏搭配", sequence_promotion:"序列晋升", case_driven:"超凡办案",
   cultivation_planning:"修真规划", hexagon_godhood:"六边形成神", historical_transmigration:"穿越历史",
@@ -75,20 +66,6 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
 
   // ── Handlers ─────────────────────────────────────
 
-  const handleSelectBuiltin = async (archId: string) => {
-    setSelectedArch(archId);
-    setSelectedProfileId("");
-    // Clear reference profile binding
-    if (novel?.activeProfileId) {
-      await api.put(`/novels/${novelId}/active-profile`, { profileId: null }).catch(() => {});
-    }
-    try {
-      const { data } = await api.get(`/novels/${novelId}/architecture/templates`);
-      const tmpl = (data.data ?? []).find((t: { id: string }) => t.id === archId);
-      if (tmpl?.defaultLoop?.phases) setPhases(tmpl.defaultLoop.phases.map((p: PhaseDef) => ({ ...p })));
-    } catch {}
-  };
-
   const handleSelectProfile = async (profile: ProfileItem) => {
     setSelectedProfileId(profile.id);
     // Profile selected — no longer exposes architectureType directly (in analysisResult now)
@@ -127,39 +104,11 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
   // ── Render ───────────────────────────────────────
 
   const hasProfileArchs = profiles.length > 0;
-  const selectedTemplate = ARCH_TEMPLATES.find(t => t.id === selectedArch && !selectedProfileId);
-
   return (
     <div className="space-y-5">
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-medium text-slate-700 mb-3">选择长篇架构</h3>
-        <p className="text-xs text-slate-400 mb-4">选择一种架构模板作为小说的结构骨架。内置模板覆盖主流网文类型，参考书分析结果则为你的对标书提供定制架构。</p>
-
-        {/* Built-in templates */}
-        <div className="grid grid-cols-3 gap-2.5 mb-4">
-          {ARCH_TEMPLATES.map(arch => {
-            const isSelected = selectedArch === arch.id && !selectedProfileId;
-            return (
-            <button key={arch.id} onClick={() => handleSelectBuiltin(arch.id)}
-              className={cn("rounded-xl border text-left transition-all", isSelected ? "border-slate-900 bg-slate-50 ring-1 ring-slate-300" : "border-slate-200 bg-white hover:border-slate-300")}>
-              <div className="p-3.5">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] rounded bg-slate-200 px-1 py-0 text-slate-500">内置</span>
-                  <span className={cn("text-sm font-semibold", isSelected ? "text-slate-900" : "text-slate-700")}>{arch.name}</span>
-                </div>
-                <div className="text-xs text-slate-500 leading-relaxed mb-1.5">{arch.desc}</div>
-                <div className="flex items-center gap-2 text-[10px] text-slate-400"><span>{arch.genres}</span><span className="text-slate-400">·</span><span className="italic">{arch.works}</span></div>
-              </div>
-              {isSelected && (
-                <div className="border-t border-slate-200 p-3 space-y-2 text-xs bg-white">
-                  <div><span className="font-medium text-slate-600">回环阶段：</span><span className="text-slate-500">{arch.phases}</span></div>
-                  <div><span className="font-medium text-slate-600">爽点配比：</span><span className="text-slate-500">{arch.coolPoints}</span></div>
-                  <div><span className="font-medium text-slate-600">钩子策略：</span><span className="text-slate-500">{arch.hookStyle}</span></div>
-                </div>
-              )}
-            </button>
-          )})}
-        </div>
+        <p className="text-xs text-slate-400 mb-4">上传参考书进行深度分析，获得对标书的真实架构数据作为蓝图。</p>
 
         {/* Reference profiles as architecture cards */}
         {hasProfileArchs && (

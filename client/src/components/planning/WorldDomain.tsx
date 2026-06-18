@@ -88,9 +88,10 @@ export function WorldDomain({ novelId, onComplete }: Props) {
   const handleGenerateAllWorld = async () => {
     setGenAllPending(true); setSaveError("");
     try {
-      // Generate world rules + golden finger in parallel
+      // Generate world rules + power system + golden finger in parallel
       await Promise.all([
         api.post(`/novels/${novelId}/world-rules/generate`).catch(() => {}),
+        api.post(`/novels/${novelId}/power-system/generate`).catch(() => {}),
         genGoldenFinger.mutateAsync(novelId).catch(() => {}),
       ]);
       refetch();
