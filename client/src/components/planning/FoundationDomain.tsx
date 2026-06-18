@@ -81,7 +81,7 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
     try {
       if (field === "commercialTags") {
         const tags = value.split(",").map(s => s.trim()).filter(Boolean);
-        await updateNovel.mutateAsync({ id: novelId, commercialTags: tags as unknown as string });
+        await updateNovel.mutateAsync({ id: novelId, commercialTags: tags } as any);
       } else {
         await updateNovel.mutateAsync({ id: novelId, [field]: value });
       }
