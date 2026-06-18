@@ -10,6 +10,20 @@ import {
   type ZodDefInner,
 } from "./zodIntrospect";
 
+/** Recursively replace null with undefined in objects/arrays. AI models frequently return null for missing optional fields, but Zod's .optional() only accepts undefined. */
+function nullToUndefined(v: unknown): unknown {
+  if (v === null) return undefined;
+  if (Array.isArray(v)) return v.map(nullToUndefined);
+  if (typeof v === "object" && v !== null) {
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(v as Record<string, unknown>)) {
+      out[key] = nullToUndefined(val);
+    }
+    return out;
+  }
+  return v;
+}
+
 // ─── Usage Extraction ──────────────────────────────────────
 
 /**
@@ -350,8 +364,11 @@ export async function invokeStructuredLlm<T extends z.ZodType>(
       const wrapped = tryWrapRawArray(parsed, opts.schema);
       if (wrapped !== null) return { result: wrapped as z.output<T>, usage };
 
+      // Normalize null → undefined for optional fields (AI often returns null for missing data)
+      const normalized = nullToUndefined(parsed);
+
       // Try relaxed parse
-      const first = runtimeSchema.safeParse(parsed);
+      const first = runtimeSchema.safeParse(normalized);
       if (first.success) return { result: first.data, usage };
 
       // Try oversized array trim

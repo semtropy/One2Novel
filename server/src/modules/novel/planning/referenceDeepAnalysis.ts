@@ -39,7 +39,7 @@ export interface ChapterAnnotation {
   coolPointLevel: "high" | "medium" | "low";
   hookType: "suspense" | "reversal" | "preview" | "emotional";
   contentBeat: string;           // primary beat type (修炼/显圣/赚钱/恋爱/日常/过渡/说明/调查/推理/战斗)
-  secondaryBeat?: string | null;  // secondary beat if mixed
+  secondaryBeat?: string;         // secondary beat if mixed
   conflictIntensity: number;     // 1-10
   summary: string;               // one-line summary (15-30 chars)
 }
@@ -127,7 +127,7 @@ const BatchAnnotationSchema = z.object({
     coolPointLevel: z.enum(["high", "medium", "low"]),
     hookType: z.enum(["suspense", "reversal", "preview", "emotional"]),
     contentBeat: z.string(),
-    secondaryBeat: z.string().nullable().optional(),
+    secondaryBeat: z.string().optional(),
     conflictIntensity: z.number().int().min(1).max(10),
     summary: z.string(),
   })),
