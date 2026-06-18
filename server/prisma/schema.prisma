@@ -67,7 +67,8 @@ model Novel {
   architectureType   String? // skill_slot | sequence_promotion | case_driven | cultivation_planning | historical_transmigration | custom
   loopSkeleton       String? // JSON: LoopSkeleton
   loopDefinition     String? // JSON: user-customized loop phase definitions
-  goldenFinger       String? // JSON: {abilities:string[], limits:string[]}
+  goldenFinger       String? // JSON: {goldenFingerName, abilities:string[], limits:string[]}
+  powerSystemTree    String? // JSON: PowerNode[] — cultivation level / sequence tree
   expectationProfile String? // JSON: ExpectationProfile
   contentBeatProfile String?  // JSON: ContentBeatProfile — 内容节拍配方
 

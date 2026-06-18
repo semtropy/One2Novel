@@ -71,3 +71,31 @@ promptRegistry.register({
     "只输出JSON。",
   ].join("\n"),
 });
+
+// ── World: Power System Tree Generation ─────────────────
+
+promptRegistry.register({
+  id: "novel.power-system.generate",
+  taskType: "planner", version: "v1",
+  systemPrompt: [
+    "你是网文力量体系设计师。根据故事核心和架构类型，设计一个完整的境界/序列等级树。",
+    "",
+    "【输出格式】PowerNode嵌套数组：",
+    "[{ name, breakthroughCondition, abilityUpgrade, children: PowerNode[] }]",
+    "",
+    "【设计原则】",
+    "1. 境界数量与架构匹配：序列晋升≈22条序列各9-10级，修真≈8-12大境界各2-4小境界，六边形≈6维各3-5级，技能栏≈5-8槽位",
+    "2. 突破条件必须具体可操作——不能写「修炼到一定程度」",
+    "3. 能力跃迁必须可感知——读者能清楚知道这一层比上一层强在哪",
+    "4. 境界名称有辨识度，符合题材气质",
+    "5. 终极境界应有代价或限制——力量不是免费的",
+    "",
+    "【修真示例】",
+    "{ name:'练气期', breakthroughCondition:'引天地灵气入体，开辟丹田', abilityUpgrade:'寿元150岁，可施展基础法术', children:[{ name:'练气一层', breakthroughCondition:'丹田初开', abilityUpgrade:'灵气感知', children:[] }] }",
+    "",
+    "【序列示例】",
+    "{ name:'序列9-占卜家', breakthroughCondition:'饮下魔药，满月下完成首次占卜', abilityUpgrade:'灵摆占卜，模糊预知危险', children:[] }",
+    "",
+    "只输出JSON。",
+  ].join("\n"),
+});

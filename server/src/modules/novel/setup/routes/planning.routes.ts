@@ -240,6 +240,57 @@ router.post("/:novelId/golden-finger/generate", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ─── Power System Tree Generation ──────────────────────
+
+router.post("/:novelId/power-system/generate", async (req, res, next) => {
+  try {
+    const novelId = req.params.novelId;
+    const prisma = getPrisma();
+    const novel = await prisma.novel.findUnique({
+      where: { id: novelId },
+      select: { storySummary: true, centralQuestion: true, endingDirection: true, genre: true, architectureType: true, tonePitch: true },
+    });
+    if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+
+    const { aiInvoke } = await import("../../../../platform/llm/aiService");
+    const { z } = await import("zod");
+
+    const PowerNodeSchema: z.ZodType<any> = z.lazy(() =>
+      z.object({
+        name: z.string(),
+        breakthroughCondition: z.string(),
+        abilityUpgrade: z.string(),
+        children: z.array(PowerNodeSchema).default([]),
+      })
+    );
+    const PowerSystemOutput = z.object({ levels: z.array(PowerNodeSchema) });
+
+    const context = [
+      novel.storySummary ? `故事简介：${novel.storySummary}` : "",
+      novel.centralQuestion ? `核心悬念：${novel.centralQuestion}` : "",
+      novel.endingDirection ? `结局方向：${novel.endingDirection}` : "",
+      novel.genre ? `题材：${novel.genre}` : "",
+      novel.architectureType ? `架构类型：${novel.architectureType}` : "",
+      novel.tonePitch ? `语气基调：${novel.tonePitch}` : "",
+    ].filter(Boolean).join("\n");
+
+    const result = await aiInvoke({
+      assetId: "novel.power-system.generate",
+      userPrompt: context,
+      schema: PowerSystemOutput,
+      temperature: 0.7,
+      novelId,
+    });
+
+    // Persist to Novel
+    await prisma.novel.update({
+      where: { id: novelId },
+      data: { powerSystemTree: JSON.stringify(result.levels) },
+    });
+    res.json({ data: result.levels });
+  } catch (e) { next(e); }
+});
+
 // ─── World Reference (Phase 2.7) ─────────────────────
 
 router.post("/:novelId/world-rules/reference", async (req, res, next) => {

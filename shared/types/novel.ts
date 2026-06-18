@@ -42,7 +42,8 @@ export const NovelUpdateSchema = z.object({
   writingScale: z.literal("long").optional(),
   architectureType: z.enum(["skill_slot", "sequence_promotion", "case_driven", "cultivation_planning", "historical_transmigration", "hexagon_godhood", "custom"]).optional(),
   loopSkeleton: z.string().optional(),                       // JSON: LoopSkeleton
-  goldenFinger: z.string().optional(),                        // JSON: {abilities:string[], limits:string[]}
+  goldenFinger: z.string().optional(),                        // JSON: {goldenFingerName, abilities:string[], limits:string[]}
+  powerSystemTree: z.string().optional(),                    // JSON: PowerNode[] — cultivation/sequence tree
   expectationProfile: z.string().optional(),                  // JSON
 });
 
@@ -234,6 +235,7 @@ export interface NovelDetail {
   activeProfileId?: string | null;
   loopSkeleton?: string | null;
   goldenFinger?: string | null;
+  powerSystemTree?: string | null;
   expectationProfile?: string | null;
   // Relations
   chapters: ChapterDetail[];
