@@ -95,7 +95,6 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
       });
       refetch();
       setSaveSuccess(true);
-      onComplete?.();
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e) { setSaveError(e instanceof Error ? e.message : "保存失败"); }
     finally { setSaving(false); }
@@ -146,9 +145,9 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
         )}
 
         {/* CTA: analyze new reference book */}
-        <button onClick={() => navigate("/reference-profiles")}
+        <button onClick={() => navigate("/reference-profiles/new")}
           className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500 hover:border-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors w-full justify-center">
-          <BookOpen size={12} />分析新的参考书，提取定制架构 <ArrowRight size={10} />
+          <BookOpen size={12} />上传新的参考书 <ArrowRight size={10} />
         </button>
       </section>
 

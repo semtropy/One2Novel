@@ -122,7 +122,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
               <h3 className="text-sm font-medium text-slate-700">角色阵容 ({characters.length}人)</h3>
               <button onClick={handleGenerateCharacters} disabled={generating}
                 className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg disabled:opacity-50">
-                <RefreshCw size={12} className={generating ? "animate-spin" : ""} /> 重新生成
+                <RefreshCw size={12} className={generating ? "animate-spin" : ""} /> 重新生成全部
               </button>
               <button onClick={() => setAddCharOpen(!addCharOpen)}
                 className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg">
