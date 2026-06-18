@@ -102,7 +102,7 @@ export function WorldDomain({ novelId, onComplete }: Props) {
       <button onClick={handleGenerateAllWorld} disabled={genAllPending}
         className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 shadow-sm transition-colors">
         <Sparkles size={16} className={genAllPending ? "animate-spin" : ""} />
-        {genAllPending ? "生成中..." : "AI 生成世界框架（世界规则 + 金手指）"}
+        {genAllPending ? "生成中..." : "AI 生成世界框架（世界规则 → 力量体系 → 金手指）"}
       </button>
       {saveError && (
         <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-600">{saveError}</div>
