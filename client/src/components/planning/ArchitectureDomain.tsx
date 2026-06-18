@@ -263,66 +263,6 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
         {saving ? "保存中..." : saveSuccess ? "架构已确认 ✓" : "确认架构（生成回环骨架 + 保存金手指）"}
       </button>
       {saveError && <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-600">{saveError}</div>}
-
-      {/* ── Expectation Profile (moved from PositioningDomain) ── */}
-      {(() => {
-        const profile = (() => { if (!novel?.expectationProfile) return null; try { return JSON.parse(novel.expectationProfile); } catch { return null; } })();
-        if (!profile) return null;
-        const recipeAnalogy = (() => {
-          if (!profile?.coolPointRecipe) return null;
-          const r = profile.coolPointRecipe;
-          const dominant = Object.entries(r as Record<string, number>).sort(([, a], [, b]) => (b as number) - (a as number))[0];
-          const analogies: Record<string, string> = {
-            collect: "类似《不科学御兽》的技能收集快感——每次获得新能力都像解锁图鉴徽章。",
-            strategy: "类似《诡秘之主》的策略推演——读者和主角一起分析序列路径、推演敌人弱点。",
-            verify: "类似《凡人修仙传》的底牌揭露——每次掀开一张底牌，敌人就绝望一层。",
-            reveal: "类似《大奉打更人》的解谜快感——案件背后的大阴谋徐徐展开。",
-            upgrade: "类似《赘婿》的文明种田——从个人命运到家国兴亡再到文明方向。",
-          };
-          return dominant ? analogies[dominant[0]] ?? null : null;
-        })();
-        return (
-          <div className="rounded-lg border border-slate-200 bg-white p-4 mt-4">
-            <h3 className="text-sm font-medium text-slate-700 mb-3">期待管理</h3>
-            <div className="space-y-3 text-xs">
-              <div>
-                <p className="font-medium text-slate-600 mb-1.5">爽点配方</p>
-                {profile.coolPointRecipe ? (
-                  <div className="space-y-1">
-                    {Object.entries(profile.coolPointRecipe as Record<string, number>).map(([type, pct]) => (
-                      <div key={type} className="flex items-center gap-2">
-                        <span className="w-12 text-slate-500 shrink-0">{({ collect: "收集", strategy: "策略", verify: "验证", reveal: "揭示", upgrade: "升级" } as Record<string, string>)[type] ?? type}</span>
-                        <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-brand-400" style={{ width: `${pct}%` }} /></div>
-                        <span className="w-10 text-right text-slate-400">{pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : <p className="text-slate-400">未设置</p>}
-                {recipeAnalogy && <p className="text-[10px] text-brand-500 italic mt-1.5 leading-relaxed">{recipeAnalogy}</p>}
-              </div>
-              {profile.hookProfile && (
-                <div>
-                  <p className="font-medium text-slate-600 mb-1">钩子密度目标</p>
-                  <div className="flex gap-4">
-                    <span className="text-slate-500">每章{profile.hookProfile.shortTermPerChapter}个短期钩子</span>
-                    <span className="text-slate-500">每卷{profile.hookProfile.mediumTermPerVolume}个中期钩子</span>
-                    <span className="text-slate-500">{profile.hookProfile.longTermLines}条长期钩子线</span>
-                  </div>
-                </div>
-              )}
-              {profile.payoffWindow && (
-                <div>
-                  <p className="font-medium text-slate-600 mb-1">伏笔回收窗口</p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-accent-400" style={{ width: "100%" }} /></div>
-                    <span className="text-slate-500">{profile.payoffWindow}章</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
