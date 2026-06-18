@@ -573,26 +573,61 @@ export async function deepAnalyze(profileId: string): Promise<ArchitectureProfil
   const architectureProfile = synthesizeProfile(chapters, annotations, loops, name, profileId);
   await updateProgress(profileId, "synthesize", "统计合成完成", 85);
 
-  // Phase 5
-  await updateProgress(profileId, "writing", "提取写法技法...", 90);
+  // Phase 5: Writing techniques
+  await updateProgress(profileId, "writing", "提取写法技法...", 75);
   try {
     const techniques = await extractWritingTechniques(text, annotations);
     architectureProfile.writingTechniques = techniques;
     console.log("[DeepAnalysis] Writing techniques extracted");
-    await updateProgress(profileId, "writing", "技法提取完成", 95);
-  } catch (e) {
-    console.warn("[DeepAnalysis] Writing technique extraction failed (non-fatal)", e);
-  }
+  } catch (e) { console.warn("[DeepAnalysis] Writing technique extraction failed (non-fatal)", e); }
 
-  // Clear transient state, persist results
+  // Phase 6: Golden finger extraction (book-level, not chapter-level)
+  await updateProgress(profileId, "goldenFinger", "提取金手指...", 82);
+  let goldenFingerBounds: any = null;
+  try {
+    const { aiInvoke } = await import("../../../platform/llm/aiService");
+    const { z } = await import("zod");
+    const gfSchema = z.object({ abilities: z.array(z.string()), limits: z.array(z.string()), goldenFingerName: z.string().optional() });
+    goldenFingerBounds = await aiInvoke({
+      assetId: "reference.golden-finger.extract",
+      userPrompt: text.slice(0, 80000),
+      schema: gfSchema, temperature: 0.5,
+    });
+    console.log("[DeepAnalysis] Golden finger extracted");
+  } catch (e) { console.warn("[DeepAnalysis] Golden finger extraction failed (non-fatal)", e); }
+
+  // Phase 7: Setting timeline extraction
+  await updateProgress(profileId, "timeline", "提取设定时间线...", 88);
+  let settingTimeline: any = null;
+  try {
+    const { aiInvoke } = await import("../../../platform/llm/aiService");
+    const { z } = await import("zod");
+    const tlSchema = z.array(z.object({ chapterIndex: z.number(), settingName: z.string(), description: z.string(), category: z.string() }));
+    settingTimeline = await aiInvoke({
+      assetId: "reference.setting-timeline.extract",
+      userPrompt: text.slice(0, 80000),
+      schema: tlSchema, temperature: 0.5,
+    });
+    console.log("[DeepAnalysis] Setting timeline extracted");
+  } catch (e) { console.warn("[DeepAnalysis] Setting timeline extraction failed (non-fatal)", e); }
+
+  // Build loop boundaries in client-compatible format {chapterIndex, type: start|end}
+  const loopBoundariesClient = loops.flatMap(l => [
+    { chapterIndex: l.startChapter, type: "start" as const, loopIndex: l.loopIndex },
+    { chapterIndex: l.endChapter, type: "end" as const, loopIndex: l.loopIndex },
+  ]).sort((a, b) => a.chapterIndex - b.chapterIndex);
+
+  await updateProgress(profileId, "persist", "保存结果...", 95);
+
+  // Persist all results
   await prisma.referenceProfile.update({
     where: { id: profileId },
     data: {
-      deepAnalysisProgress: null,       // clear transient progress
-      chapterAnnotations: null,         // clear resume data (analysis complete)
+      deepAnalysisProgress: null,
+      chapterAnnotations: null,
       architectureProfile: JSON.stringify(architectureProfile),
       totalChapters: chapters.length,
-      loopBoundaries: JSON.stringify(loops),
+      loopBoundaries: JSON.stringify(loopBoundariesClient),
       coolPointDensity: JSON.stringify({
         highCoolChapters: annotations.filter(a => a.coolPointLevel === "high").map(a => a.chapterIndex),
         lowCoolChapters: annotations.filter(a => a.coolPointLevel === "low").map(a => a.chapterIndex),
@@ -600,10 +635,12 @@ export async function deepAnalyze(profileId: string): Promise<ArchitectureProfil
       hookPatterns: JSON.stringify(architectureProfile.hookProfile),
       contentBeatPatterns: JSON.stringify(architectureProfile.contentBeatProfile),
       writingAssets: architectureProfile.writingTechniques ? JSON.stringify(architectureProfile.writingTechniques) : undefined,
+      goldenFingerBounds: goldenFingerBounds ? JSON.stringify(goldenFingerBounds) : undefined,
+      settingTimeline: settingTimeline ? JSON.stringify(settingTimeline) : undefined,
     },
   });
 
-  console.log(`[DeepAnalysis] Complete — ${chapters.length} chapters, ${loops.length} loops`);
+  console.log(`[DeepAnalysis] Complete — ${chapters.length} chapters, ${loops.length} loops, ${loopBoundariesClient.length} boundaries`);
   return architectureProfile;
 }
 
