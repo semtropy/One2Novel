@@ -33,7 +33,7 @@ async function loadNovelData(novelId: string) {
     where: { id: novelId },
     include: {
       chapters: { orderBy: { order: "asc" } },
-      characters: { take: 30 },
+      characters: true, // All characters for long-form novels
       volumes: { orderBy: { sortOrder: "asc" } },
     },
   });
@@ -117,20 +117,20 @@ function buildJson(novel: Awaited<ReturnType<typeof loadNovelData>>) {
     targetAudience: novel.targetAudience,
     bookSellingPoint: novel.bookSellingPoint,
     competingFeel: novel.competingFeel,
-    chapters: novel.chapters.map(ch => ({
+    chapters: (novel.chapters as Array<{ order: number; title: string; content: string | null; chapterStatus: string; qualityScore: number | null; hook: string | null }>).map(ch => ({
       order: ch.order,
       title: ch.title,
       content: stripHtml(ch.content),
       qualityScore: ch.qualityScore,
       hook: ch.hook,
     })),
-    characters: novel.characters.map(c => ({
+    characters: (novel.characters as Array<{ name: string; role: string; personality: string | null; currentGoal: string | null }>).map(c => ({
       name: c.name,
       role: c.role,
       personality: c.personality,
       currentGoal: c.currentGoal,
     })),
-    volumes: novel.volumes.map(v => ({
+    volumes: (novel.volumes as Array<{ sortOrder: number; title: string; summary: string | null }>).map(v => ({
       sortOrder: v.sortOrder,
       title: v.title,
       summary: v.summary,
@@ -182,7 +182,7 @@ ${spineItems}
 }
 
 function buildNcx(novel: Awaited<ReturnType<typeof loadNovelData>>): string {
-  const navPoints = novel.chapters.map((ch, i) =>
+  const navPoints = (novel.chapters as Array<{ order: number; title: string }>).map((ch, i) =>
     `    <navPoint id="navpoint-${i + 1}" playOrder="${i + 1}">
       <navLabel><text>第${ch.order}章 ${escapeXml(ch.title)}</text></navLabel>
       <content src="chapter${i + 1}.xhtml"/>
@@ -205,7 +205,7 @@ ${navPoints}
 }
 
 function buildNavXhtml(novel: Awaited<ReturnType<typeof loadNovelData>>): string {
-  const tocItems = novel.chapters.map((ch, i) =>
+  const tocItems = (novel.chapters as Array<{ order: number; title: string }>).map((ch, i) =>
     `      <li><a href="chapter${i + 1}.xhtml">第${ch.order}章 ${escapeXml(ch.title)}</a></li>`
   ).join("\n");
 
@@ -261,7 +261,7 @@ function buildEpub(novel: Awaited<ReturnType<typeof loadNovelData>>): Buffer {
   chunks.push({ name: "mimetype", content: "application/epub+zip" });
   chunks.push({ name: "META-INF/container.xml", content: buildEpubContainer() });
 
-  const chapterIds = novel.chapters.map(ch => ch.id);
+  const chapterIds = (novel.chapters as Array<{ id: string }>).map(ch => ch.id);
 
   chunks.push({ name: "OEBPS/content.opf", content: buildOpf(novel, chapterIds) });
   chunks.push({ name: "OEBPS/toc.ncx", content: buildNcx(novel) });

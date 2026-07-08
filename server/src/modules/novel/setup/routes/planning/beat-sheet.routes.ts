@@ -1,6 +1,7 @@
 /** Beat Sheet routes — generate and retrieve beat sheets for volume chapter rhythms. */
 import { Router } from "express";
 import { getPrisma } from "../../../../../platform/db/client";
+import { createNovelRepo } from "../../../../../platform/data/repositories";
 import { generateBeatSheet } from "../../../planning/storyMacro/beatSheetService";
 
 const router = Router();
@@ -20,27 +21,25 @@ router.get("/:novelId/volumes/:sortOrder/beats", async (req, res, next) => {
       return;
     }
     // Fallback: read from structuredOutline (blueprint)
-    const novel = await getPrisma().novel.findUnique({ where: { id: novelId } });
-    if (novel?.structuredOutline) {
-      try {
-        const outline = JSON.parse(novel.structuredOutline);
-        const vol = (outline.volumes as Array<{ sortOrder: number; chapters: Array<{ order: number; coreEvent?: string; summary?: string; conflictLevel?: number; revealLevel?: number }> }>)
-          ?.find(v => v.sortOrder === sortOrder);
-        if (vol?.chapters) {
-          const outlineBeats = vol.chapters.map(ch => ({
-            chapterOrder: ch.order,
-            purpose: ch.coreEvent || ch.summary || "",
-            conflictLevel: ch.conflictLevel ?? 5,
-            revealLevel: ch.revealLevel ?? 5,
-            exclusiveEvent: null,
-            endingState: null,
-            mustAvoid: null,
-            targetWordCount: null,
-          }));
-          res.json({ data: outlineBeats });
-          return;
-        }
-      } catch {}
+    const repo = createNovelRepo(getPrisma());
+    const outline = await repo.getStructuredOutline(novelId);
+    if (outline) {
+      const vols = (outline as { volumes?: Array<{ sortOrder: number; chapters: Array<{ order: number; coreEvent?: string; summary?: string; conflictLevel?: number; revealLevel?: number }> }> }).volumes;
+      const vol = vols?.find(v => v.sortOrder === sortOrder);
+      if (vol?.chapters) {
+        const outlineBeats = vol.chapters.map(ch => ({
+          chapterOrder: ch.order,
+          purpose: ch.coreEvent || ch.summary || "",
+          conflictLevel: ch.conflictLevel ?? 5,
+          revealLevel: ch.revealLevel ?? 5,
+          exclusiveEvent: null,
+          endingState: null,
+          mustAvoid: null,
+          targetWordCount: null,
+        }));
+        res.json({ data: outlineBeats });
+        return;
+      }
     }
     res.json({ data: beats });
   } catch (e) { next(e); }
@@ -54,14 +53,15 @@ router.post("/:novelId/volumes/:sortOrder/beats", async (req, res, next) => {
     const novel = await getPrisma().novel.findUnique({ where: { id: novelId } });
     let outlineChapters: Array<{ order: number; title: string; summary: string }> | undefined;
     if (novel?.structuredOutline) {
-      try {
-        const outline = JSON.parse(novel.structuredOutline);
-        const vol = (outline.volumes as Array<{ sortOrder: number; chapters: Array<{ order: number; title: string; summary: string }> }>)
-          ?.find(v => v.sortOrder === sortOrder);
+      const repo = createNovelRepo(getPrisma());
+      const outline = await repo.getStructuredOutline(novelId);
+      if (outline) {
+        const vols = (outline as { volumes?: Array<{ sortOrder: number; chapters: Array<{ order: number; title: string; summary: string }> }> }).volumes;
+        const vol = vols?.find(v => v.sortOrder === sortOrder);
         if (vol?.chapters) {
           outlineChapters = vol.chapters.map(c => ({ order: c.order, title: c.title, summary: c.summary ?? "" }));
         }
-      } catch {}
+      }
     }
     res.json({ data: await generateBeatSheet(novelId, sortOrder, { outlineChapters }) });
   } catch (e) { next(e); }

@@ -13,6 +13,9 @@ export interface PromptContextBlock {
   required: boolean;
   estimatedTokens: number;
   content: string;
+  /** Optional instruction header rendered before content. Tells the LLM HOW to use this block's data.
+   *  Example: "【人物硬事实 - 不可违背。角色行为必须符合以下设定】" */
+  instructionHeader?: string;
   conflictGroup?: string;
   freshness?: number;
   allowSummary?: boolean;

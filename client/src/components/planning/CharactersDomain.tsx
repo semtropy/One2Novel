@@ -4,7 +4,9 @@
  */
 import { useState } from "react";
 import { Sparkles, RefreshCw, GitBranch, X, Save, Plus } from "lucide-react";
-import { useNovel, useDraftRelationshipGraph, useUpsertDraftRelation } from "../../api/novel";
+import { NovelCharacterCreateSchema } from "@one2novel/shared/types/novel";
+import { useNovel } from "../../api/novel";
+import { useDraftRelationshipGraph, useUpsertDraftRelation } from "../../api/characters";
 import { api } from "../../app/api";
 import { cn } from "../../lib/cn";
 import { RelationshipNetwork } from "../pipeline/RelationshipNetwork";
@@ -57,9 +59,10 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
   };
 
   const handleAddChar = async () => {
-    if (!addCharName.trim()) return;
+    const result = NovelCharacterCreateSchema.safeParse({ name: addCharName.trim(), role: addCharRole });
+    if (!result.success) return; // Silently reject invalid input (field-level validation in JSX)
     try {
-      await api.post(`/novels/${novelId}/characters`, { name: addCharName.trim(), role: addCharRole });
+      await api.post(`/novels/${novelId}/characters`, result.data);
       refetchNovel();
       setAddCharName("");
       setAddCharRole("supporting");
@@ -73,11 +76,21 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
     catch {} finally { setUpdatingTag(null); }
   };
 
+  const [genError, setGenError] = useState("");
+  const [genSuccess, setGenSuccess] = useState(false);
+
   const handleGenerateCharacters = async () => {
     if (characters.length > 0 && !window.confirm("重新生成将覆盖当前所有角色和关系，是否继续？")) return;
-    setGenerating(true);
-    try { await api.post(`/novels/${novelId}/pipeline/step/characters`); refetchNovel(); refetchRel(); onComplete?.(); }
-    catch {} finally { setGenerating(false); }
+    setGenerating(true); setGenError(""); setGenSuccess(false);
+    try {
+      // Force regeneration via direct endpoint (pipeline step skips if chars exist)
+      await api.post(`/novels/${novelId}/characters/generate`);
+      await refetchNovel(); refetchRel();
+      setGenSuccess(true);
+      setTimeout(() => setGenSuccess(false), 3000);
+      onComplete?.();
+    } catch (e) { setGenError(e instanceof Error ? e.message : "生成失败，请重试"); }
+    finally { setGenerating(false); }
   };
 
   const handleSaveCharField = async (charId: string) => {
@@ -94,14 +107,14 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
     setEditCharId(char.id);
     setEditCharFields({
       personality: char.personality ?? "",
+      coreMotivation: char.coreMotivation ?? "",
       background: char.background ?? "",
       appearance: char.appearance ?? "",
       voiceTexture: char.voiceTexture ?? "",
-      currentGoal: char.currentGoal ?? "",
-      currentStatus: char.currentStatus ?? "",
       quirks: char.quirks ?? "",
       factionLabel: char.factionLabel ?? "",
       flaw: char.prohibitions ?? "",
+      characterArc: (char as any).characterArc ?? "",
     });
   };
 
@@ -110,9 +123,12 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
       {characters.length === 0 ? (
         <section className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 py-10 text-center">
           <p className="text-sm text-slate-500">暂无角色</p>
+          {genError && <p className="text-xs text-red-500 mt-2">{genError}</p>}
           <button onClick={handleGenerateCharacters} disabled={generating}
-            className="mt-3 rounded-lg bg-slate-800 px-4 py-2 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50">
-            <Sparkles size={13} className="inline mr-1" /> AI 生成角色
+            className={cn("mt-3 rounded-lg px-4 py-2 text-xs font-medium text-white disabled:opacity-50",
+              genSuccess ? "bg-green-600" : "bg-slate-800 hover:bg-slate-700")}>
+            {generating ? <RefreshCw size={13} className="animate-spin inline mr-1" /> : <Sparkles size={13} className="inline mr-1" />}
+            {generating ? "生成中（约30秒）…" : genSuccess ? "生成完成 ✓" : "AI 生成角色"}
           </button>
         </section>
       ) : (
@@ -121,9 +137,13 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-slate-700">角色阵容 ({characters.length}人)</h3>
               <button onClick={handleGenerateCharacters} disabled={generating}
-                className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg disabled:opacity-50">
-                <RefreshCw size={12} className={generating ? "animate-spin" : ""} /> 重新生成全部
+                className={cn(
+                  "flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50",
+                  genSuccess ? "bg-green-600 border-green-600 text-white" : "bg-slate-800 border-slate-800 text-white hover:bg-slate-700",
+                )}>
+                <RefreshCw size={12} className={generating ? "animate-spin" : ""} /> {generating ? "生成中（约30秒）…" : genSuccess ? "生成完成 ✓" : "重新生成全部"}
               </button>
+              {genError && <p className="text-xs text-red-500 mt-1">{genError}</p>}
               <button onClick={() => setAddCharOpen(!addCharOpen)}
                 className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg">
                 <Plus size={12} /> 手动添加
@@ -174,11 +194,21 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
 
                       {editCharId === char.id ? (
                         <div className="space-y-1.5 mt-2">
-                          {["personality","background","appearance","voiceTexture","currentGoal","currentStatus","quirks","factionLabel","flaw"].map(field => (
-                            <div key={field}>
-                              <label className="text-[10px] text-slate-400">{field === "personality" ? "性格" : field === "background" ? "背景" : field === "appearance" ? "外貌" : field === "voiceTexture" ? "语气" : field === "currentGoal" ? "当前目标" : field === "currentStatus" ? "当前状态" : field === "quirks" ? "习惯动作" : field === "factionLabel" ? "所属阵营" : "致命缺陷"}</label>
+                          {[
+                            {k:"personality",l:"性格"},
+                            {k:"coreMotivation",l:"核心动机"},
+                            {k:"background",l:"背景"},
+                            {k:"appearance",l:"外貌"},
+                            {k:"voiceTexture",l:"语气"},
+                            {k:"quirks",l:"习惯动作"},
+                            {k:"factionLabel",l:"所属阵营"},
+                            {k:"flaw",l:"致命缺陷"},
+                            {k:"characterArc",l:"成长弧线"},
+                          ].map(({k,l}) => (
+                            <div key={k}>
+                              <label className="text-[10px] text-slate-400">{l}</label>
                               <input className="w-full rounded border border-slate-200 px-1.5 py-0.5 text-xs focus:border-brand-300 focus:outline-none"
-                                value={editCharFields[field] ?? ""} onChange={e => setEditCharFields(prev => ({ ...prev, [field]: e.target.value }))} />
+                                value={editCharFields[k] ?? ""} onChange={e => setEditCharFields(prev => ({ ...prev, [k]: e.target.value }))} />
                             </div>
                           ))}
                           <div className="flex gap-1 pt-1">
@@ -188,10 +218,15 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
                         </div>
                       ) : (
                         <>
-                          {char.personality && <p className="text-xs text-slate-500 mb-1 line-clamp-2">性格：{char.personality}{char.identityLabel ? ` · ${char.identityLabel}` : ""}{char.factionLabel ? ` · ${char.factionLabel}` : ""}</p>}
-                          {char.currentStatus && <p className="text-xs text-slate-400 mb-0.5">状态：{char.currentStatus}</p>}
-                          {char.quirks && <p className="text-xs text-slate-400 mb-0.5">习惯：{char.quirks}</p>}
+                          <p className="text-xs text-slate-500 mb-1 line-clamp-2">
+                            {char.personality && <>性格：{char.personality}</>}
+                            {char.identityLabel && <> · {char.identityLabel}</>}
+                            {char.factionLabel && <> · {char.factionLabel}</>}
+                          </p>
+                          {char.coreMotivation && <p className="text-xs text-brand-700 mb-0.5 font-medium">动机：{char.coreMotivation}</p>}
+                          {char.background && <p className="text-xs text-slate-400 mb-0.5 truncate">背景：{char.background}</p>}
                           {char.prohibitions && <p className="text-xs text-amber-600 mb-0.5">缺陷：{char.prohibitions}</p>}
+                          {char.currentStatus && <p className="text-[10px] text-slate-400 mb-0.5">状态：{char.currentStatus}</p>}
                           <div className="mt-2 flex items-center justify-between">
                             <select value={char.loopFunctionTag ?? ""} onChange={e => handleTagChange(char.id, e.target.value)} disabled={updatingTag === char.id}
                               className="rounded border border-slate-200 px-2 py-0.5 text-xs focus:border-brand-300 focus:outline-none max-w-[160px]">

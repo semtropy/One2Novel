@@ -9,7 +9,7 @@ export const NovelCreateSchema = z.object({
   writingScale: z.literal("long").default("long"),
   narrativePov: z.enum(["first_person", "third_person", "mixed"]).optional(),
   pacePreference: z.enum(["slow", "balanced", "fast"]).optional(),
-  styleTone: z.string().max(200).optional(),
+  tonePitch: z.string().max(200).optional(),
   defaultChapterLength: z.number().int().min(500).max(50000).optional(),
   estimatedChapterCount: z.number().int().min(1).max(1000).optional(),
 });
@@ -27,7 +27,7 @@ export const NovelUpdateSchema = z.object({
   commercialTags: z.array(z.string()).optional(),
   narrativePov: z.enum(["first_person", "third_person", "mixed"]).optional(),
   pacePreference: z.enum(["slow", "balanced", "fast"]).optional(),
-  styleTone: z.string().max(200).optional(),
+  tonePitch: z.string().max(200).optional(),
   emotionIntensity: z.enum(["low", "medium", "high"]).optional(),
   defaultChapterLength: z.number().int().min(500).max(50000).optional(),
   estimatedChapterCount: z.number().int().min(1).max(1000).optional(),
@@ -96,7 +96,7 @@ export interface StorySeedSnapshot {
   genre: string | null;
   narrativePov: string | null;
   pacePreference: string | null;
-  styleTone: string | null;
+  tonePitch: string | null;
   emotionIntensity: string | null;
   targetAudience: string | null;
   bookSellingPoint: string | null;
@@ -109,7 +109,7 @@ export interface StorySeedSnapshot {
 export interface CharacterSnapshot {
   characters: Array<{
     name: string; role: string;
-    personality: string | null; background: string | null;
+    personality: string | null; background: string | null; coreMotivation: string | null;
     appearance: string | null; quirks: string | null; currentStatus: string | null;
     currentGoal: string | null; voiceTexture: string | null;
     identityLabel: string | null; factionLabel: string | null;
@@ -211,7 +211,7 @@ export interface NovelDetail {
   status: string;
   narrativePov?: NarrativePov | null;
   pacePreference?: PacePreference | null;
-  styleTone?: string | null;
+  tonePitch?: string | null;
   emotionIntensity?: EmotionIntensity | null;
   defaultChapterLength?: number | null;
   estimatedChapterCount?: number | null;
@@ -243,7 +243,8 @@ export interface NovelDetail {
   chapters: ChapterDetail[];
   characters: Array<{
     id: string; name: string; role: string; personality?: string | null;
-    background?: string | null; appearance?: string | null; quirks?: string | null;
+    background?: string | null; coreMotivation?: string | null;
+        appearance?: string | null; quirks?: string | null;
     currentStatus?: string | null; currentGoal?: string | null; voiceTexture?: string | null;
     identityLabel?: string | null; factionLabel?: string | null;
     prohibitions?: string | null; loopFunctionTag?: string | null;

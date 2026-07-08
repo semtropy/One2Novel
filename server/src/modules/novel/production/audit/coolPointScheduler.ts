@@ -4,6 +4,7 @@
  * the prescribed satisfaction rhythm from the architecture template.
  */
 import { getPrisma } from "../../../../platform/db/client";
+import { createNovelRepo } from "../../../../platform/data/repositories";
 import type { CoolPointType } from "../../planning/architectureEngine/types";
 
 // ─── Types ─────────────────────────────────────────────
@@ -41,17 +42,18 @@ export async function getCoolPointStatus(novelId: string, volumeOrder: number): 
 
   // Use architecture recipe or default
   const defaultRecipe: Record<CoolPointType, number> = {
-    collect: 25, strategy: 25, verify: 20, reveal: 20, upgrade: 10, face_slap: 0,
+    collect: 20, strategy: 20, verify: 15, reveal: 15, upgrade: 15, face_slap: 15,
   };
-  let recipe: Record<CoolPointType, number>;
-  if (novel.expectationProfile) {
-    try {
-      const profile = JSON.parse(novel.expectationProfile);
-      recipe = profile.coolPointRecipe ?? defaultRecipe;
-    } catch { recipe = defaultRecipe; }
-  } else {
-    recipe = defaultRecipe;
-  }
+  const repo = createNovelRepo(prisma);
+  const ep = await repo.getExpectationProfile(novelId);
+  const recipe: Record<CoolPointType, number> = {
+    collect: ep?.coolPointRecipe?.collect ?? defaultRecipe.collect,
+    strategy: ep?.coolPointRecipe?.strategy ?? defaultRecipe.strategy,
+    verify: ep?.coolPointRecipe?.verify ?? defaultRecipe.verify,
+    reveal: ep?.coolPointRecipe?.reveal ?? defaultRecipe.reveal,
+    upgrade: ep?.coolPointRecipe?.upgrade ?? defaultRecipe.upgrade,
+    face_slap: ep?.coolPointRecipe?.face_slap ?? defaultRecipe.face_slap,
+  };
 
   // Get all chapters in this volume
   const volume = await prisma.volume.findFirst({
@@ -97,8 +99,10 @@ export async function getCoolPointStatus(novelId: string, volumeOrder: number): 
     const last = lastUsed[type];
     const chaptersSince = last ? lastChapterOrder - last : lastChapterOrder;
 
-    // Alert if a type hasn't appeared in too many chapters
-    const maxGap = type === "verify" || type === "upgrade" ? 8 : type === "reveal" ? 6 : 5;
+    // Alert if a type hasn't appeared in too many chapters (ratio-based: 2% of estimated total)
+    const totalExpected = (novel?.estimatedChapterCount ?? 0) > 0 ? novel!.estimatedChapterCount! : completedChapters.length;
+    const baseGap = Math.max(3, Math.round(totalExpected * 0.02)); // 2% of total
+    const maxGap = type === "verify" || type === "upgrade" ? Math.round(baseGap * 1.6) : type === "reveal" ? Math.round(baseGap * 1.2) : baseGap;
     if (chaptersSince >= maxGap && completedChapters.length > 0) {
       alerts.push({
         type, severity: chaptersSince >= maxGap * 1.5 ? "high" : "medium",

@@ -1,7 +1,14 @@
 import { useState } from "react";
-import { useWorldRules, useCreateWorldRule, useUpdateWorldRule, useDeleteWorldRule, useGenerateWorldRules, useCheckWorldConflicts, useResolveWorldConflict, type WorldRule, type ConflictResult } from "../../api/novel";
+import { z } from "zod";
+import { useWorldRules, useCreateWorldRule, useUpdateWorldRule, useDeleteWorldRule, useGenerateWorldRules, useCheckWorldConflicts, useResolveWorldConflict, type WorldRule, type ConflictResult } from "../../api/world";
 
 const CATEGORIES = ["势力格局", "力量规则", "资源规则", "社会结构", "地理环境", "历史背景"] as const;
+
+const WorldRuleCreateSchema = z.object({
+  title: z.string().min(1, "标题不能为空").max(100, "标题最多100字"),
+  content: z.string().min(1, "内容不能为空").max(5000, "内容最多5000字"),
+  category: z.string().min(1),
+});
 
 interface Props { novelId: string }
 
@@ -23,7 +30,15 @@ export function WorldPanel({ novelId }: Props) {
   const filtered = rules ?? [];
   const activeCount = filtered.filter(r => r.status === "active").length;
 
+  const [ruleError, setRuleError] = useState("");
+
   const handleCreate = async () => {
+    const validation = WorldRuleCreateSchema.safeParse(editForm);
+    if (!validation.success) {
+      setRuleError(validation.error.issues[0].message);
+      return;
+    }
+    setRuleError("");
     await createMutation.mutateAsync({ novelId, ...editForm });
     setShowCreate(false);
     setEditForm({ title: "", content: "", category: "势力格局" });
@@ -135,14 +150,12 @@ export function WorldPanel({ novelId }: Props) {
                 {editing === rule.id ? (
                   <div className="space-y-1">
                     <input value={editForm.title} onChange={e => setEditForm(p => ({ ...p, title: e.target.value }))}
+                      onBlur={async () => { await updateMutation.mutateAsync({ novelId, ruleId: rule.id, title: editForm.title, content: editForm.content }).catch(() => {}); setEditing(null); }}
                       className="w-full px-2 py-0.5 border rounded text-xs" placeholder="标题" />
                     <input value={editForm.content} onChange={e => setEditForm(p => ({ ...p, content: e.target.value }))}
+                      onBlur={async () => { await updateMutation.mutateAsync({ novelId, ruleId: rule.id, title: editForm.title, content: editForm.content }).catch(() => {}); setEditing(null); }}
                       className="w-full px-2 py-0.5 border rounded text-xs" placeholder="内容" />
-                    <div className="flex gap-1">
-                      <button onClick={async () => { await updateMutation.mutateAsync({ novelId, ruleId: rule.id, title: editForm.title, content: editForm.content }); setEditing(null); }}
-                        className="text-green-600 hover:underline">保存</button>
-                      <button onClick={() => setEditing(null)} className="text-gray-400 hover:underline">取消</button>
-                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1">失焦自动保存</div>
                   </div>
                 ) : (
                   <>

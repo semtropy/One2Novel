@@ -134,7 +134,7 @@ export async function getQualityTrend(novelId: string): Promise<QualityTrend[]> 
     },
   });
 
-  return chapters.map(ch => ({
+  return (chapters as Array<{ order: number; title: string; chapterStatus: string; qualityScore: number | null; content: string | null; openingScore: number | null; plotScore: number | null; characterScore: number | null; dialogueScore: number | null; suspenseScore: number | null; pacingScore: number | null; languageScore: number | null; genreScore: number | null }>).map(ch => ({
     chapterOrder: ch.order,
     title: ch.title,
     totalScore: ch.qualityScore ?? 0,

@@ -57,5 +57,20 @@ export function registerRoutes(app: Express) {
     try { res.json({ data: await getStateSnapshots(req.params.id) }); } catch (e) { next(e); }
   });
 
+  // ── RAG Stats ──
+  api.get("/rag/stats", async (_req, res, next) => {
+    try {
+      const { getRAGService } = await import("../platform/rag/ragService");
+      const rag = getRAGService();
+      const stats = rag.getStats();
+      res.json({ data: {
+        ...stats,
+        degradedSince: rag.getDegradedSince(),
+        lastError: rag.getLastError(),
+        hasEverDegraded: rag.hasEverDegraded(),
+      }});
+    } catch (e) { next(e); }
+  });
+
   app.use("/api", api);
 }

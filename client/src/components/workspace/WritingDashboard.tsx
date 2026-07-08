@@ -6,7 +6,9 @@
 import { useState, useMemo } from "react";
 import { Zap, Target, AlertTriangle, Users } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { useNovel, useCoolPointStatus, useHookDensity, useVolumeRhythmReport, useHookCheck, useLongAbsentCharacters } from "../../api/novel";
+import { useNovel } from "../../api/novel";
+import { useCoolPointStatus, useHookDensity, useVolumeRhythmReport, useHookCheck } from "../../api/rhythm";
+import { useLongAbsentCharacters } from "../../api/characters";
 
 interface Props {
   novelId: string;

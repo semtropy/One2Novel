@@ -16,7 +16,7 @@ export function ReferenceCockpitPage() {
   const navigate = useNavigate();
   const isNew = profileId === "new";
 
-  const { data: novelsList } = useNovels();
+  const { data: novelsList, refetch: refetchNovels } = useNovels();
   const novels = (novelsList ?? []) as Array<{ id: string; title: string }>;
   const [name, setName] = useState("");
   const [profId, setProfId] = useState<string | null>(isNew ? null : profileId ?? null);
@@ -28,6 +28,21 @@ export function ReferenceCockpitPage() {
   const [runError, setRunError] = useState("");
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [applyTargetId, setApplyTargetId] = useState<string>("");
+  const [applyMsg, setApplyMsg] = useState("");
+
+  async function handleApplyProfile(targetNovelId: string) {
+    if (!targetNovelId || !profId) return;
+    setApplyTargetId(targetNovelId);
+    setApplyMsg("应用中...");
+    try {
+      await api.post(`/profiles/${profId}/apply`, { novelId: targetNovelId });
+      refetchNovels();
+      setApplyMsg("已应用");
+      setTimeout(() => setApplyMsg(""), 2000);
+    } catch (e: any) {
+      setApplyMsg(e?.response?.data?.error?.message || "应用失败");
+    }
+  }
   useEffect(() => {
     if (profId) loadProfile(profId);
   }, [profId]);
@@ -46,6 +61,11 @@ export function ReferenceCockpitPage() {
   }
 
   async function handleUpload(text: string, fname: string) {
+    // Size check: warn if >20MB (10M+ characters), extreme for web novel
+    if (text.length > 20_000_000) {
+      setUploadMsg("文件过大（>20MB），建议先用文本工具分割后再上传。当前长度：" + (text.length / 1_000_000).toFixed(1) + "M字符");
+      return;
+    }
     setUploading(true); setUploadMsg("上传中...");
     try {
       const cleanName = fname.replace(/\.(txt|epub)$/i, "");
@@ -165,9 +185,10 @@ export function ReferenceCockpitPage() {
 
           <div className="flex items-center gap-2">
             {r && (
-              <select value={applyTargetId} onChange={e => setApplyTargetId(e.target.value)}
+              <select value={applyTargetId}
+                onChange={e => handleApplyProfile(e.target.value)}
                 className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 focus:border-slate-400 focus:outline-none">
-                <option value="">目标小说</option>
+                <option value="">{applyMsg || "应用到小说"}</option>
                 {novels.map(n => <option key={n.id} value={n.id}>{n.title}</option>)}
               </select>
             )}
@@ -221,8 +242,8 @@ export function ReferenceCockpitPage() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2 text-xs">
           <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">总章数</div><div className="text-lg font-bold text-slate-700">{r?.totalChapters ?? "—"}</div></div>
-          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">回环数</div><div className="text-lg font-bold text-slate-700">{r?.loopNarratives?.length ?? "—"}</div></div>
-          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">节奏</div><div className="text-lg font-bold text-slate-700">{r?.rhythmProfile?.rhythmTemplate ?? "—"}</div></div>
+          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">回环数</div><div className="text-lg font-bold text-slate-700">{r?.architecture?.loopNarratives?.length ?? "—"}</div></div>
+          <div className="rounded-lg border border-slate-200 bg-white p-2 text-center"><div className="text-slate-400">节奏</div><div className="text-lg font-bold text-slate-700">{r?.architecture?.rhythmProfile?.rhythmTemplate ?? "—"}</div></div>
         </div>
 
         {/* Analysis Results V2 */}
@@ -261,6 +282,29 @@ export function ReferenceCockpitPage() {
                   <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">高潮间隔</span><p className="font-bold text-slate-700">{r.architecture?.rhythmProfile.avgClimaxInterval}章</p></div>
                   <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">冷却段</span><p className="font-bold text-slate-700">{r.architecture?.rhythmProfile.avgCooldownLength}章</p></div>
                   <div className="rounded bg-slate-50 p-2 text-center"><span className="text-slate-400">节奏模板</span><p className="font-bold text-slate-700">{r.architecture?.rhythmProfile.rhythmTemplate}</p></div>
+                </div>
+              </div>
+            )}
+
+            {/* Chapter Annotation Heatmap */}
+            {(r.chapterAnnotations?.length > 0) && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><TrendingUp size={14}/>章节结构热力图 ({r.chapterAnnotations.length}章)</h3>
+                <div className="text-[10px] text-slate-400 mb-2 flex flex-wrap gap-3">
+                  <span>■绿=high爽点 ■黄=mid ■灰=low</span>
+                  <span>■推进 ■过渡 ■冷却 ■高潮</span>
+                </div>
+                <div className="flex flex-wrap gap-0.5 max-h-48 overflow-y-auto">
+                  {r.chapterAnnotations.slice(0, 200).map((a: any) => {
+                    const coolColors: Record<string, string> = { high: "bg-emerald-400", medium: "bg-amber-300", low: "bg-slate-300" };
+                    const typeBorders: Record<string, string> = { advance: "border-l-2 border-slate-600", transition: "border-l-2 border-slate-400", cooldown: "border-l-2 border-blue-400", climax: "border-l-2 border-red-500" };
+                    return (
+                      <div key={a.chapterIndex} className="relative group" title={`第${a.chapterIndex}章: ${a.chapterType} | ${a.coolPointLevel}爽 | ${a.hookType}钩子 | ${a.contentBeat || ""}`}>
+                        <div className={`w-6 h-6 rounded ${coolColors[a.coolPointLevel] || "bg-slate-200"} ${typeBorders[a.chapterType] || ""} hover:ring-1 hover:ring-slate-500`} />
+                        {a.chapterIndex % 10 === 0 && <span className="absolute -bottom-3 left-0 text-[8px] text-slate-400">{a.chapterIndex}</span>}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

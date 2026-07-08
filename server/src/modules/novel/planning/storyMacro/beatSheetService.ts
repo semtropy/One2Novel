@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
+import { createNovelRepo } from "../../../../platform/data/repositories";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 
 const BeatSheetOutput = z.object({
@@ -82,9 +83,10 @@ export async function generateBeatSheet(
       chapterPlans = vol.chapterPlans.map(p => ({ id: p.id, chapterOrder: p.chapterOrder }));
     } else if (options?.outlineChapters && options.outlineChapters.length > 0) {
       /// @deprecated Fallback: structuredOutline is the legacy blueprint format. Use loopSkeleton + volumes for new novels.
-      const outline = JSON.parse(novel?.structuredOutline ?? "{}");
-      const vol = (outline.volumes as Array<{ sortOrder: number; title: string; summary: string }> | undefined)
-        ?.find(v => v.sortOrder === volumeSortOrder);
+      const repo = createNovelRepo(prisma);
+      const outline = await repo.getStructuredOutline(novelId);
+      const vols = (outline as { volumes?: Array<{ sortOrder: number; title: string; summary: string }> })?.volumes;
+      const vol = vols?.find(v => v.sortOrder === volumeSortOrder);
       volTitle = vol?.title ?? `第${volumeSortOrder}卷`;
       volSummary = vol?.summary ?? "";
       chapters = options.outlineChapters.map(c =>

@@ -57,7 +57,7 @@ export async function processChapter(
     }),
   ]);
   const previousChapterSummary = prevChapter?.chapterSummary?.summary ?? null;
-  const previousChapterEnding = prevChapter?.content?.slice(-200) ?? null;
+  const previousChapterEnding = prevChapter?.content ?? null; // Full previous chapter for coherence
   const characterStateSnapshot = prevCharStates
     .filter(c => c.currentStatus || c.currentLocation)
     .map(c => `${c.name}：${[c.currentStatus, c.currentLocation, c.currentGoal].filter(Boolean).join("；")}`)

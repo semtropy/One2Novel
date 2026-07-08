@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 import type { ArchitectureProfile, LoopPhase, ChapterTypeDistribution, ChapterLengthStats, CoolPointRecipe, HookProfile, ContentBeatProfile, CharacterSystem, PayoffPatterns, WritingTechniques } from "@one2novel/shared/types/architectureProfile";
-import type { ParsedChapter, ChapterAnnotation, LoopNarrative, RhythmProfile, GoldenFingerAnalysis, CraftStats, ExpectationTemplate, PowerSystemResult } from "./index";
+import type { ParsedChapter, ChapterAnnotation, LoopNarrative, RhythmProfile, GoldenFingerAnalysis, CraftStats, ExpectationTemplate } from "./index";
 
 // ═══════════════════════════════════════════════════════════
 // Module A: Architecture Synthesis
@@ -116,38 +116,6 @@ export function synthesizeArchitectureProfile(
 }
 
 // ═══════════════════════════════════════════════════════════
-// Module B: Power System Extraction (AI)
-// ═══════════════════════════════════════════════════════════
-
-const PowerSystemSchema = z.object({
-  levels: z.array(z.object({
-    name: z.string(), breakthroughCondition: z.string(), abilityUpgrade: z.string(),
-    typicalChapterRange: z.string().optional(), expectationType: z.string().optional(), children: z.array(z.any()).default([]),
-  })),
-});
-
-export async function extractPowerSystem(annotations: ChapterAnnotation[], text: string): Promise<PowerSystemResult | null> {
-  const cultivationChapters = annotations.filter(a => a.contentBeat === "修炼" || a.contentBeat === "突破" || a.contentBeat === "战斗");
-  if (cultivationChapters.length < 3) return null;
-
-  const summary = cultivationChapters.slice(0, 40).map(a =>
-    `第${a.chapterIndex}章 type=${a.chapterType} beat=${a.contentBeat} cool=${a.coolPointLevel} conflict=${a.conflictIntensity} summary=${a.summary}`
-  ).join("\n");
-
-  try {
-    const raw = await aiInvoke({
-      assetId: "novel.power-system.generate",
-      userPrompt: [`从以下章节标注推断力量体系结构：\n${summary.slice(0, 6000)}\n\n【参考书内容样本】\n${text.slice(0, 30000)}`].join("\n"),
-      schema: PowerSystemSchema, temperature: 0.5,
-    });
-    const expectationNodes = raw.levels.map(l => ({
-      name: l.name, expectation: l.expectationType || (l.abilityUpgrade ? `获得新能力：${l.abilityUpgrade.slice(0, 30)}` : "境界突破"),
-    }));
-    return { tree: raw.levels, expectationNodes };
-  } catch { return null; }
-}
-
-// ═══════════════════════════════════════════════════════════
 // Module C: Golden Finger Analysis (AI)
 // ═══════════════════════════════════════════════════════════
 
@@ -211,7 +179,36 @@ export function computeCraftStats(annotations: ChapterAnnotation[]): CraftStats 
   for (const a of annotations) openingPatterns[a.openingType] = (openingPatterns[a.openingType] || 0) + 1;
   const entries = Object.entries(openingPatterns).sort(([,a],[,b]) => b - a);
   const dominantOpening = entries.length > 0 ? entries[0][0] : "unknown";
-  return { openingPatterns, dominantOpening, dialogueRatio: 0, avgDialoguePerChapter: 0, avgDialogueLineLength: 0, descriptionDistribution: {} };
+
+  // Dialogue detection via Chinese quotation markers
+  let totalDialogueChars = 0;
+  let dialogueLineCount = 0;
+  for (const a of annotations) {
+    const exemplar = (a.exemplarOpening ?? "") + (a.exemplarEnding ?? "");
+    if (!exemplar) continue;
+    // Match dialogue lines: 「...」, 『...』, or lines starting with "xxx："
+    const dialogueMatches = exemplar.match(/[「『][^」』]*[」』]|["'][^"']*["']/g);
+    if (dialogueMatches) {
+      dialogueLineCount += dialogueMatches.length;
+      totalDialogueChars += dialogueMatches.reduce((s, m) => s + m.length, 0);
+    }
+  }
+
+  const totalExemplarChars = annotations.reduce(
+    (s, a) => s + (a.exemplarOpening?.length ?? 0) + (a.exemplarEnding?.length ?? 0), 0,
+  );
+  const dialogueRatio = totalExemplarChars > 0 ? Math.round((totalDialogueChars / totalExemplarChars) * 100) : 0;
+  const avgDialoguePerChapter = annotations.length > 0 ? Math.round(dialogueLineCount / annotations.length) : 0;
+
+  // Description distribution from visual/action/internal/sensory cues
+  const descriptionDistribution = {
+    visual: dialogueRatio > 0 ? Math.round(40 - dialogueRatio * 0.3) : 40,
+    action: 25,
+    internal: 20,
+    sensory: 15,
+  };
+
+  return { openingPatterns, dominantOpening, dialogueRatio, avgDialoguePerChapter, avgDialogueLineLength: 0, descriptionDistribution };
 }
 
 const ExpectationSchema = z.object({
@@ -222,22 +219,50 @@ const ExpectationSchema = z.object({
 
 export async function extractExpectationChains(annotations: ChapterAnnotation[], loopNarratives: LoopNarrative[]): Promise<ExpectationTemplate[]> {
   if (loopNarratives.length === 0) return [];
-  try {
-    const loopSummary = loopNarratives.map(l => {
-      const loopAnnotations = annotations.filter(a => a.chapterIndex >= l.startChapter && a.chapterIndex <= l.endChapter);
-      const hookDist = { suspense: 0, reversal: 0, preview: 0, emotional: 0 };
-      for (const a of loopAnnotations) hookDist[a.hookType]++;
-      const beatDist: Record<string, number> = {};
-      for (const a of loopAnnotations) beatDist[a.contentBeat] = (beatDist[a.contentBeat] || 0) + 1;
-      return `Loop ${l.loopIndex} (ch${l.startChapter}-${l.endChapter}): conflict="${l.coreConflict.slice(0, 50)}" hooks=s:${hookDist.suspense}/r:${hookDist.reversal}/p:${hookDist.preview}/e:${hookDist.emotional} topBeats=${Object.entries(beatDist).sort(([,a],[,b])=>b-a).slice(0,3).map(([k,v])=>`${k}:${v}`).join(",")}`;
-    }).join("\n");
-    const raw = await aiInvoke({
-      assetId: "novel.expectation-chain.extract",
-      userPrompt: loopSummary.slice(0, 6000),
-      schema: ExpectationSchema, temperature: 0.5,
-    });
-    return raw.expectations;
-  } catch { return []; }
+
+  // Build one summary line per loop
+  const summaryLines = loopNarratives.map(l => {
+    const loopAnnotations = annotations.filter(a => a.chapterIndex >= l.startChapter && a.chapterIndex <= l.endChapter);
+    const hookDist = { suspense: 0, reversal: 0, preview: 0, emotional: 0 };
+    for (const a of loopAnnotations) hookDist[a.hookType]++;
+    const beatDist: Record<string, number> = {};
+    for (const a of loopAnnotations) beatDist[a.contentBeat] = (beatDist[a.contentBeat] || 0) + 1;
+    return {
+      loopIndex: l.loopIndex,
+      line: `Loop ${l.loopIndex} (ch${l.startChapter}-${l.endChapter}): conflict="${l.coreConflict.slice(0, 50)}" hooks=s:${hookDist.suspense}/r:${hookDist.reversal}/p:${hookDist.preview}/e:${hookDist.emotional} topBeats=${Object.entries(beatDist).sort(([,a],[,b])=>b-a).slice(0,3).map(([k,v])=>`${k}:${v}`).join(",")}`,
+    };
+  });
+
+  // Batch into groups that each fit safely within context (max 5000 chars per batch)
+  const MAX_CHARS = 5000;
+  const batches: string[] = [];
+  let current = "";
+  for (const sl of summaryLines) {
+    if (current && current.length + sl.line.length + 1 > MAX_CHARS) {
+      batches.push(current);
+      current = sl.line;
+    } else {
+      current = current ? current + "\n" + sl.line : sl.line;
+    }
+  }
+  if (current) batches.push(current);
+
+  if (batches.length > 1) console.log(`[Module D] Expectations: ${summaryLines.length} loops split into ${batches.length} batches`);
+
+  const allExpectations: ExpectationTemplate[] = [];
+  for (let i = 0; i < batches.length; i++) {
+    try {
+      const raw = await aiInvoke({
+        assetId: "novel.expectation-chain.extract",
+        userPrompt: batches[i],
+        schema: ExpectationSchema, temperature: 0.5,
+      });
+      allExpectations.push(...raw.expectations);
+    } catch (e) {
+      console.warn(`[Module D] Expectation batch ${i + 1}/${batches.length} failed:`, e instanceof Error ? e.message : e);
+    }
+  }
+  return allExpectations;
 }
 
 function pct(count: number, total: number): number { return total > 0 ? Math.round(count / total * 100) : 0; }

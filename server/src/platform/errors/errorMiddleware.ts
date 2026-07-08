@@ -28,8 +28,8 @@ function toUserMessage(err: Error): string {
     return "无法连接到 AI 服务，请检查网络或 API Key 配置。";
   }
 
-  // Rate limit
-  if (msg.includes("429") || msg.includes("rate") || msg.includes("quota")) {
+  // Rate limit — match whole-word patterns only (not substrings like "generate"/"strategy")
+  if (msg.includes("429") || msg.includes("rate_limit") || msg.includes("rate limit") || msg.includes("quota") || msg.includes("Too Many Requests")) {
     return "AI 服务请求过于频繁，请稍后再试。";
   }
 

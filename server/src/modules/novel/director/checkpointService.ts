@@ -12,6 +12,11 @@ export interface DirectorCheckpoint {
   startedAt: string;
   lastCheckpointAt: string;
   stage: "running" | "blocked" | "completed" | "paused";
+  /** Content snapshot of the most recently generated chapter (crash recovery) */
+  pendingChapterContent?: string | null;
+  pendingChapterTitle?: string | null;
+  /** Whether a stop was requested (persisted across restarts) */
+  stopRequested?: boolean;
 }
 
 // ─── Public API ────────────────────────────────────

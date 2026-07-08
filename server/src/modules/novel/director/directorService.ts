@@ -23,9 +23,18 @@ export interface DirectorProgress {
 const progressMap = new Map<string, DirectorProgress>();
 const stopFlags = new Map<string, boolean>();
 
-export function stopDirector(novelId: string): boolean {
+export async function stopDirector(novelId: string): Promise<boolean> {
   const p = progressMap.get(novelId);
-  if (p?.stage === "running") { stopFlags.set(novelId, true); return true; }
+  if (p?.stage === "running") {
+    stopFlags.set(novelId, true);
+    // Persist stop flag to checkpoint for crash recovery
+    const { saveCheckpoint, loadCheckpoint } = await import("./checkpointService");
+    const cp = await loadCheckpoint(novelId);
+    if (cp) {
+      await saveCheckpoint(novelId, { ...cp, stopRequested: true }).catch(() => {});
+    }
+    return true;
+  }
   return false;
 }
 
@@ -60,7 +69,7 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
   });
   if (!novel) throw new Error("Novel not found");
 
-  const startIdx = novel.chapters.findIndex(c => c.chapterStatus !== "completed");
+  const startIdx = novel.chapters.findIndex((c: { chapterStatus: string }) => c.chapterStatus !== "completed");
   const batchLimit = maxChapters ?? 30; // Cap at 30 chapters per director run for long-form
   const chaptersToWrite = startIdx >= 0 ? novel.chapters.slice(startIdx, startIdx + batchLimit) : [];
 
@@ -98,12 +107,22 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
       stage: "running",
     });
 
+    // Check persisted stop flag from previous run
+    const existingCp = await loadCheckpoint(novelId);
+    if (existingCp?.stopRequested) {
+      progress.stage = "paused";
+      progress.message = `检测到已请求停止，跳过执行`;
+      await clearCheckpoint(novelId).catch(e => logEventError("director.clearCheckpoint", { novelId }, e));
+      return progress;
+    }
+
     for (const chapter of chaptersToWrite) {
       if (stopFlags.get(novelId)) {
         stopFlags.delete(novelId);
         progress.stage = "paused";
         progress.message = `已在第${progress.currentChapter}章停止`;
-        clearCheckpoint(novelId).catch(e => logEventError("director.clearCheckpoint", { novelId }, e));
+        await saveCp("paused", { stopRequested: true });
+        await clearCheckpoint(novelId).catch(e => logEventError("director.clearCheckpoint", { novelId }, e));
         return progress;
       }
       progress.currentChapter = chapter.order;
@@ -126,6 +145,9 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
           clearTimeout(timeoutId);
         }
 
+        // Save content snapshot to checkpoint BEFORE persisting (crash recovery)
+        await saveCp("running", { pendingChapterContent: content, pendingChapterTitle: chapter.title }).catch(() => {});
+
         await prisma.chapter.update({
           where: { id: chapter.id },
           data: { content, chapterStatus: "drafted", actualWordCount: content.length },
@@ -133,6 +155,8 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
 
         // Run full chapter pipeline: quality → repair → persist → hooks
         const pipelineResult = await processChapter(novelId, chapter.id, content, chapter.order);
+        // Clear pending content after successful pipeline completion
+        await saveCp("running", { pendingChapterContent: null, pendingChapterTitle: null }).catch(() => {});
         const finalStatus = pipelineResult.status;
         const finalScore = pipelineResult.score;
 

@@ -15,8 +15,8 @@ router.post("/novels/:novelId/director/run", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post("/novels/:novelId/director/stop", (req, res) => {
-  const stopped = stopDirector(req.params.novelId);
+router.post("/novels/:novelId/director/stop", async (req, res) => {
+  const stopped = await stopDirector(req.params.novelId);
   res.json({ data: { stopped } });
 });
 

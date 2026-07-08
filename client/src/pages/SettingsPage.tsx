@@ -227,8 +227,8 @@ export function SettingsPage() {
             <div>
               <div className="text-xs text-slate-500 font-medium mb-1.5">目标总章数</div>
               <input type="number" min={50} max={1000}
-                value={(prefs.estimatedChapterCount as number) ?? 333}
-                onChange={e => { const v = parseInt(e.target.value) || 333; setPrefs(p => ({ ...p, estimatedChapterCount: v })); }}
+                value={(prefs.estimatedChapterCount as number) ?? 500}
+                onChange={e => { const v = parseInt(e.target.value) || 500; setPrefs(p => ({ ...p, estimatedChapterCount: v })); }}
                 onBlur={() => savePref("estimatedChapterCount", prefs.estimatedChapterCount)}
                 className="w-1/3 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none"
               />

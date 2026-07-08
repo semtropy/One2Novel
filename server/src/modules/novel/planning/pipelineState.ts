@@ -4,14 +4,16 @@
  * State is stored as JSON on the Novel record.
  */
 import { getPrisma } from "../../../platform/db/client";
+import { createNovelRepo } from "../../../platform/data/repositories/novelRepository";
+import type { PipelineStateData } from "../../../platform/data/repositories/novelRepository";
 
 // ─── Types ─────────────────────────────────────────────
 
 export type StepName =
   | "foundation"   // Step 1: 创作起点 (story core + golden finger + commercial + world rules)
-  | "architecture" // Step 2: 架构选择 (template + reference + loop phases + expectation profile)
+  | "architecture" // Step 2: 架构选择 (template + reference + expectation profile)
   | "characters"   // Step 3: 角色阵容 (AI generation + relationship graph)
-  | "outline";      // Step 4: 章节大纲 (loop skeleton → volume expansion → chapter detail)
+  | "outline";      // Step 4: 章节大纲 (loop skeleton generation → volume expansion → chapter detail)
 
 export type StepStatus = "pending" | "generating" | "completed" | "skipped" | "error";
 
@@ -52,25 +54,15 @@ export function createInitialPipelineState(
 // ─── Persistence ────────────────────────────────────────
 
 export async function getPipelineState(novelId: string): Promise<PipelineState | null> {
-  const prisma = getPrisma();
-  const novel = await prisma.novel.findUnique({
-    where: { id: novelId },
-    select: { pipelineState: true },
-  });
-  if (!novel?.pipelineState) return null;
-  try {
-    return JSON.parse(novel.pipelineState) as PipelineState;
-  } catch {
-    return null;
-  }
+  const novelRepo = createNovelRepo(getPrisma());
+  const data = await novelRepo.getPipelineState(novelId);
+  if (!data) return null;
+  return data as unknown as PipelineState;
 }
 
 export async function savePipelineState(state: PipelineState): Promise<void> {
-  const prisma = getPrisma();
-  await prisma.novel.update({
-    where: { id: state.novelId },
-    data: { pipelineState: JSON.stringify(state) },
-  });
+  const novelRepo = createNovelRepo(getPrisma());
+  await novelRepo.setPipelineState(state.novelId, state as unknown as PipelineStateData);
 }
 
 export async function updateStepState(

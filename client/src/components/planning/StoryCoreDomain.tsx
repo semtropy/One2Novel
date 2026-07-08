@@ -4,7 +4,8 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Sparkles } from "lucide-react";
-import { useNovel, useUpdateNovel, useGenerateStoryCore } from "../../api/novel";
+import { useNovel, useUpdateNovel } from "../../api/novel";
+import { useGenerateStoryCore } from "../../api/story-core";
 import { cn } from "../../lib/cn";
 
 interface Props {
@@ -12,7 +13,7 @@ interface Props {
   onComplete?: () => void;
 }
 
-const GENRE_OPTIONS = ["悬疑", "言情", "奇幻", "科幻", "历史", "都市", "武侠", "恐怖", "游戏", "其他"];
+const GENRE_OPTIONS = ["仙侠", "玄幻", "修真", "悬疑", "言情", "奇幻", "科幻", "历史", "都市", "武侠", "穿越", "重生", "系统/无限流", "末世", "竞技", "恐怖", "游戏", "轻小说", "其他"];
 const POV_OPTIONS = [
   { value: "first_person", label: "第一人称" },
   { value: "third_person", label: "第三人称" },

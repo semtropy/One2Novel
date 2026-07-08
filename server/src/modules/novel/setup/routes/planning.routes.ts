@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
 import { generateStoryCore } from "../../planning/storyCoreService";
 import { generateCharacters, persistCharacters } from "../../planning/characterPrep/characterService";
@@ -7,6 +6,9 @@ import { generateChapterDynamics, compileDynamicsContext } from "../../planning/
 import { generateChapterExecutionContract } from "../../planning/storyMacro/chapterDetailService";
 import { generateWorldRulesFromReference } from "../../world/worldReferenceService";
 import { CreationPipeline } from "../../planning/creationPipeline";
+import { generateGoldenFinger } from "../../planning/goldenFingerService";
+import { generatePowerSystem } from "../../planning/powerSystemService";
+import { generateWorldFramework } from "../../planning/worldFrameworkService";
 import {
   getPipelineState,
   savePipelineState,
@@ -70,27 +72,26 @@ router.post("/:novelId/pipeline/step/:stepName", async (req, res, next) => {
 
     switch (stepName) {
       case "foundation":
-        result = await pipeline.step1_foundation();
+        result = await pipeline.runFoundation();
         break;
       case "architecture":
-        result = await pipeline.step2_architecture({
-          architectureType: req.body?.architectureType,
+        result = await pipeline.runArchitecture({
           goldenFinger: req.body?.goldenFinger,
           centralQuestion: req.body?.centralQuestion,
           endingDirection: req.body?.endingDirection,
         });
         break;
       case "characters":
-        result = await pipeline.step3_characters();
+        result = await pipeline.runCharacters();
         break;
       case "outline": {
         const mode = req.body?.mode ?? "per_volume";
         if (req.body?.skeletonOnly) {
-          result = await pipeline.step4a_generateLoopSkeleton();
+          result = await pipeline.generateLoopSkeleton();
         } else if (req.body?.volumeOrder) {
-          result = await pipeline.step4b_expandVolume(req.body.volumeOrder);
+          result = await pipeline.expandVolume(req.body.volumeOrder);
         } else {
-          result = await pipeline.step4_outline(mode);
+          result = await pipeline.runOutline(mode);
         }
         break;
       }
@@ -109,7 +110,7 @@ router.post("/:novelId/pipeline/step/:stepName", async (req, res, next) => {
 router.post("/:novelId/pipeline/generate-skeleton", async (req, res, next) => {
   try {
     const pipeline = new CreationPipeline(req.params.novelId);
-    const skeleton = await pipeline.step4a_generateLoopSkeleton();
+    const skeleton = await pipeline.generateLoopSkeleton();
     res.json({ data: skeleton });
   } catch (e) { next(e); }
 });
@@ -118,7 +119,7 @@ router.post("/:novelId/pipeline/generate-skeleton", async (req, res, next) => {
 router.post("/:novelId/pipeline/expand-volume/:volumeOrder", async (req, res, next) => {
   try {
     const pipeline = new CreationPipeline(req.params.novelId);
-    const expanded = await pipeline.step4b_expandVolume(
+    const expanded = await pipeline.expandVolume(
       parseInt(req.params.volumeOrder),
     );
     res.json({ data: expanded });
@@ -129,7 +130,7 @@ router.post("/:novelId/pipeline/expand-volume/:volumeOrder", async (req, res, ne
 router.post("/:novelId/pipeline/generate-all-volumes", async (req, res, next) => {
   try {
     const pipeline = new CreationPipeline(req.params.novelId);
-    const result = await pipeline.step4_outline("full");
+    const result = await pipeline.runOutline("full");
     res.json({ data: result });
   } catch (e) { next(e); }
 });
@@ -193,66 +194,7 @@ router.post("/:novelId/volumes/:volumeId/chapters/:chapterOrder/contract", async
 
 router.post("/:novelId/golden-finger/generate", async (req, res, next) => {
   try {
-    const novelId = req.params.novelId;
-    const prisma = getPrisma();
-    const novel = await prisma.novel.findUnique({
-      where: { id: novelId },
-      select: {
-        storySummary: true, centralQuestion: true, endingDirection: true,
-        genre: true, architectureType: true, description: true,
-        worldRules: { select: { category: true, title: true, content: true }, where: { status: "active" } },
-      },
-    });
-    if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Novel not found" } }); return; }
-
-    // Reference profile design pattern injection (Step 2 → golden finger)
-    let designPatternContext = "";
-    const activeProfileId = (await prisma.novel.findUnique({ where: { id: novelId }, select: { activeProfileId: true } }))?.activeProfileId;
-    if (activeProfileId) {
-      const refProfile = await prisma.referenceProfile.findUnique({ where: { id: activeProfileId }, select: { analysisResult: true } });
-      if (refProfile?.analysisResult) {
-        try {
-          const ar = JSON.parse(refProfile.analysisResult);
-          const dp = (ar.goldenFinger || ar.goldenFingerAnalysis)?.designPattern; // V3+V2 compat
-          if (dp) {
-            designPatternContext = `\n【参考书设计模式（few-shot）】\n类型：${dp.type} — ${dp.typeDescription}\n核心机制：${dp.coreMechanic}\n获取方式：${dp.acquisitionPattern}\n进化路径：${dp.evolutionPath?.join(" → ") ?? ""}\n限制策略：${dp.limitationStrategy}\n叙事融合：${dp.narrativeIntegration}`;
-          }
-        } catch {}
-      }
-    }
-
-    const { aiInvoke } = await import("../../../../platform/llm/aiService");
-    const { z } = await import("zod");
-
-    const GoldenFingerOutput = z.object({
-      goldenFingerName: z.string(),
-      abilities: z.array(z.string()),
-      limits: z.array(z.string()),
-    });
-
-    const result = await aiInvoke({
-      assetId: "novel.golden-finger.generate",
-      userPrompt: [
-        novel.storySummary ? `故事简介：${novel.storySummary}` : "",
-        novel.centralQuestion ? `核心悬念：${novel.centralQuestion}` : "",
-        novel.endingDirection ? `结局方向：${novel.endingDirection}` : "",
-        novel.genre ? `题材：${novel.genre}` : "",
-        novel.architectureType ? `架构类型：${novel.architectureType}` : "",
-        novel.description ? `灵感描述：${novel.description}` : "",
-        novel.worldRules.length > 0 ? `世界规则：${novel.worldRules.map(r => `[${r.category}] ${r.title}: ${r.content}`).join("\n")}` : "",
-        designPatternContext,
-      ].filter(Boolean).join("\n"),
-      schema: GoldenFingerOutput,
-      temperature: 0.8,
-      novelId,
-    });
-
-    // Persist to DB
-    await prisma.novel.update({
-      where: { id: novelId },
-      data: { goldenFinger: JSON.stringify(result) },
-    });
-
+    const result = await generateGoldenFinger(req.params.novelId);
     res.json({ data: result });
   } catch (e) { next(e); }
 });
@@ -261,50 +203,8 @@ router.post("/:novelId/golden-finger/generate", async (req, res, next) => {
 
 router.post("/:novelId/power-system/generate", async (req, res, next) => {
   try {
-    const novelId = req.params.novelId;
-    const prisma = getPrisma();
-    const novel = await prisma.novel.findUnique({
-      where: { id: novelId },
-      select: { storySummary: true, centralQuestion: true, endingDirection: true, genre: true, architectureType: true, tonePitch: true },
-    });
-    if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
-
-    const { aiInvoke } = await import("../../../../platform/llm/aiService");
-    const { z } = await import("zod");
-
-    const PowerNodeSchema: z.ZodType<any> = z.lazy(() =>
-      z.object({
-        name: z.string(),
-        breakthroughCondition: z.string(),
-        abilityUpgrade: z.string(),
-        children: z.array(PowerNodeSchema).default([]),
-      })
-    );
-    const PowerSystemOutput = z.object({ levels: z.array(PowerNodeSchema) });
-
-    const context = [
-      novel.storySummary ? `故事简介：${novel.storySummary}` : "",
-      novel.centralQuestion ? `核心悬念：${novel.centralQuestion}` : "",
-      novel.endingDirection ? `结局方向：${novel.endingDirection}` : "",
-      novel.genre ? `题材：${novel.genre}` : "",
-      novel.architectureType ? `架构类型：${novel.architectureType}` : "",
-      novel.tonePitch ? `语气基调：${novel.tonePitch}` : "",
-    ].filter(Boolean).join("\n");
-
-    const result = await aiInvoke({
-      assetId: "novel.power-system.generate",
-      userPrompt: context,
-      schema: PowerSystemOutput,
-      temperature: 0.7,
-      novelId,
-    });
-
-    // Persist to Novel
-    await prisma.novel.update({
-      where: { id: novelId },
-      data: { powerSystemTree: JSON.stringify(result.levels) },
-    });
-    res.json({ data: result.levels });
+    const result = await generatePowerSystem(req.params.novelId);
+    res.json({ data: result });
   } catch (e) { next(e); }
 });
 
@@ -325,93 +225,8 @@ router.post("/:novelId/world-rules/reference", async (req, res, next) => {
 
 router.post("/:novelId/generate-world-framework", async (req, res, next) => {
   try {
-    const novelId = req.params.novelId;
-    const prisma = getPrisma();
-    const novel = await prisma.novel.findUnique({
-      where: { id: novelId },
-      select: { storySummary:true, centralQuestion:true, endingDirection:true, genre:true, architectureType:true, tonePitch:true, activeProfileId:true },
-    });
-    if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
-
-    const { aiInvoke } = await import("../../../../platform/llm/aiService");
-    const { z } = await import("zod");
-
-    // Build shared context
-    let referenceContext = "";
-    if (novel.activeProfileId) {
-      const rp = await prisma.referenceProfile.findUnique({ where: { id: novel.activeProfileId }, select: { analysisResult: true } });
-      if (rp?.analysisResult) {
-        try {
-          const ar = JSON.parse(rp.analysisResult);
-          const ap = ar.architecture?.architectureProfile;
-          if (ap) referenceContext += `\n【对标书架构数据】章节分布：推进${ap.chapterTypeDistribution?.advance}%/过渡${ap.chapterTypeDistribution?.transition}%/冷却${ap.chapterTypeDistribution?.cooldown}%/高潮${ap.chapterTypeDistribution?.climax}% | 每回环${ap.avgChaptersPerLoop?.avg}章 | 爽点：升级${ap.coolPointRecipe?.upgrade}%/收集${ap.coolPointRecipe?.collect}%/策略${ap.coolPointRecipe?.strategy}%`;
-          const dp = (ar.goldenFinger || ar.goldenFingerAnalysis)?.designPattern;
-          if (dp) referenceContext += `\n【对标书金手指模式】${dp.type}：${dp.coreMechanic}`;
-        } catch {}
-      }
-    }
-
-    const baseContext = [
-      novel.storySummary ? `故事简介：${novel.storySummary}` : "",
-      novel.centralQuestion ? `核心悬念：${novel.centralQuestion}` : "",
-      novel.endingDirection ? `结局方向：${novel.endingDirection}` : "",
-      novel.genre ? `题材：${novel.genre}` : "",
-      novel.architectureType ? `架构类型：${novel.architectureType}` : "",
-      novel.tonePitch ? `语气基调：${novel.tonePitch}` : "",
-      referenceContext,
-    ].filter(Boolean).join("\n");
-
-    // Step 2a: World Rules
-    const worldRulesSchema = z.object({ rules: z.array(z.object({ category:z.string(),title:z.string(),content:z.string(),priority:z.number() })) });
-    const worldRules = await aiInvoke({
-      assetId: "world.rules.generate",
-      userPrompt: [baseContext, "生成6个分类的世界规则（势力格局/力量体系/资源规则/社会结构/地理环境/历史背景），每个分类至少1条。优先参考对标书数据。",].join("\n"),
-      schema: worldRulesSchema, temperature: 0.6, novelId,
-    });
-
-    // Persist world rules
-    await prisma.worldRule.deleteMany({ where: { novelId } });
-    for (const r of worldRules.rules) {
-      await prisma.worldRule.create({ data: { novelId, category: r.category, title: r.title, content: r.content, priority: r.priority } });
-    }
-    const rulesSummary = worldRules.rules.map(r => `[${r.category}] ${r.title}: ${r.content}`).join("\n");
-
-    // Step 2b: Power System Tree
-    const PowerNodeSchema: z.ZodType<any> = z.lazy(() => z.object({ name:z.string(),breakthroughCondition:z.string(),abilityUpgrade:z.string(),children:z.array(PowerNodeSchema).default([]) }));
-    const powerSystemSchema = z.object({ levels: z.array(PowerNodeSchema) });
-    let powerSystemTree: any = null;
-    try {
-      const ps = await aiInvoke({
-        assetId: "novel.power-system.generate",
-        userPrompt: [baseContext, `世界规则：\n${rulesSummary}`, "根据以上世界规则和故事核心，设计力量体系境界树。每个境界必须有具体突破条件和能力跃迁。",].join("\n"),
-        schema: powerSystemSchema, temperature: 0.7, novelId,
-      });
-      await prisma.novel.update({ where: { id: novelId }, data: { powerSystemTree: JSON.stringify(ps.levels) } });
-      powerSystemTree = ps.levels;
-    } catch (e) { console.warn("[WorldFramework] Power system generation failed", e); }
-
-    // Step 2c: Golden Finger
-    const goldenFingerSchema = z.object({ goldenFingerName:z.string(),abilities:z.array(z.string()),limits:z.array(z.string()) });
-    let designPatternContext = "";
-    if (novel.activeProfileId) {
-      try {
-        const rp = await prisma.referenceProfile.findUnique({ where: { id: novel.activeProfileId }, select: { analysisResult: true } });
-        if (rp?.analysisResult) {
-          const ar = JSON.parse(rp.analysisResult);
-          const dp = (ar.goldenFinger || ar.goldenFingerAnalysis)?.designPattern;
-          if (dp) designPatternContext = `\n【参考书设计模式（few-shot）】类型：${dp.type} — ${dp.typeDescription}\n核心机制：${dp.coreMechanic}\n获取方式：${dp.acquisitionPattern}\n进化路径：${dp.evolutionPath?.join(" → ")}\n限制策略：${dp.limitationStrategy}`;
-        }
-      } catch {}
-    }
-    const powerSummary = powerSystemTree ? `\n力量体系：${powerSystemTree.map((l:any) => l.name).join(" → ")}` : "";
-    const gf = await aiInvoke({
-      assetId: "novel.golden-finger.generate",
-      userPrompt: [baseContext, `世界规则：\n${rulesSummary}`, powerSummary, designPatternContext, "设计金手指——它是主角在世界规则和力量体系中的例外。能力和限制必须具体可操作。",].filter(Boolean).join("\n"),
-      schema: goldenFingerSchema, temperature: 0.8, novelId,
-    });
-    await prisma.novel.update({ where: { id: novelId }, data: { goldenFinger: JSON.stringify(gf) } });
-
-    res.json({ data: { worldRules: worldRules.rules, powerSystemTree, goldenFinger: gf } });
+    const result = await generateWorldFramework(req.params.novelId);
+    res.json({ data: result });
   } catch (e) { next(e); }
 });
 

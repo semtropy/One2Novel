@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { BookOpen, FileText, FileJson } from "lucide-react";
-import { useExportPreview, useExportNovel } from "../../api/novel";
+import { useExportPreview, useExportNovel } from "../../api/export";
 
 interface Props {
   novelId: string;

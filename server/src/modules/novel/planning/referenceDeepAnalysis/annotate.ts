@@ -5,6 +5,7 @@ import type { ParsedChapter, ChapterAnnotation } from "./index";
 
 const BASE_BATCH_SIZE = 15;
 const MAX_CHARS_PER_BATCH = 60000;
+const CONCURRENCY = 5; // Number of parallel batch groups
 
 const BatchAnnotationSchema = z.object({
   chapters: z.array(z.object({
@@ -76,14 +77,42 @@ export async function batchAnnotateChapters(
     try { const saved = JSON.parse(existing.chapterAnnotations) as ChapterAnnotation[]; results = saved; doneIndices = new Set(saved.map(a => a.chapterIndex)); console.log(`[Batch] Resuming: ${results.length} already annotated`); } catch {}
   }
 
+  // Build pending batch indices (skip already-completed batches)
+  const pendingBatches: number[] = [];
   for (let i = 0; i < totalBatches; i++) {
     const startIdx = i * batchSize;
-    if (chapters.slice(startIdx, startIdx + batchSize).every(c => doneIndices.has(c.index))) continue;
-    const batch = await annotateBatch(chapters, text, i, totalBatches, batchSize);
-    for (const a of batch) { const idx = results.findIndex(r => r.chapterIndex === a.chapterIndex); if (idx >= 0) results[idx] = a; else results.push(a); }
-    await prisma.referenceProfile.update({ where: { id: profileId }, data: { chapterAnnotations: JSON.stringify(results.sort((a, b) => a.chapterIndex - b.chapterIndex)) } }).catch(() => {});
-    console.log(`[Batch] ${i + 1}/${totalBatches}: ${batch.length} chapters (total: ${results.length})`);
-    if (onProgress) await onProgress(i + 1, totalBatches);
+    if (!chapters.slice(startIdx, startIdx + batchSize).every(c => doneIndices.has(c.index))) {
+      pendingBatches.push(i);
+    }
+  }
+
+  // Process in concurrent groups of CONCURRENCY
+  let completedCount = results.length;
+  for (let g = 0; g < pendingBatches.length; g += CONCURRENCY) {
+    const group = pendingBatches.slice(g, g + CONCURRENCY);
+    const groupResults = await Promise.all(
+      group.map(i => annotateBatch(chapters, text, i, totalBatches, batchSize).catch(e => {
+        console.warn(`[Batch] ${i + 1}/${totalBatches} failed: ${e instanceof Error ? e.message : e}`);
+        return [] as ChapterAnnotation[];
+      }))
+    );
+
+    // Merge results and persist after each group
+    for (const batch of groupResults) {
+      for (const a of batch) {
+        const idx = results.findIndex(r => r.chapterIndex === a.chapterIndex);
+        if (idx >= 0) results[idx] = a; else results.push(a);
+      }
+      completedCount = results.length;
+    }
+    await prisma.referenceProfile.update({
+      where: { id: profileId },
+      data: { chapterAnnotations: JSON.stringify(results.sort((a, b) => a.chapterIndex - b.chapterIndex)) },
+    }).catch(() => {});
+
+    const lastInGroup = group[group.length - 1] + 1;
+    console.log(`[Batch] ~${lastInGroup}/${totalBatches}: ${completedCount} total annotated (${Math.round(completedCount / chapters.length * 100)}%)`);
+    if (onProgress) await onProgress(lastInGroup, totalBatches);
   }
   return results.sort((a, b) => a.chapterIndex - b.chapterIndex);
 }

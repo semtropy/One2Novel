@@ -59,10 +59,7 @@ export interface ExpectationTemplate {
   fulfillmentMethod: string; nextExpectation: string;
 }
 
-export interface PowerSystemResult {
-  tree: Array<{ name: string; breakthroughCondition: string; abilityUpgrade: string; children: any[] }>;
-  expectationNodes: Array<{ name: string; expectation: string }>;
-}
+
 
 export interface AnalysisResultV3 {
   totalChapters: number; completedAt: string;

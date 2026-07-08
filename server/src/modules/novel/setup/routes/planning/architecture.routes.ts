@@ -2,6 +2,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { z } from "zod";
 import { getPrisma } from "../../../../../platform/db/client";
+import { createNovelRepo } from "../../../../../platform/data/repositories";
 import { listArchitectureTemplates, buildExpectationProfile } from "../../../planning/architectureEngine/architectureRegistry";
 import { generateLoopSkeleton, expandLoopToVolume } from "../../../planning/architectureEngine/loopTemplateService";
 import type { ExpandedVolume, ArchitectureType } from "../../../planning/architectureEngine/types";
@@ -132,15 +133,14 @@ router.put("/:novelId/loop-definition", async (req: Request, res: Response, next
 router.get("/:novelId/loop-definition", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const prisma = getPrisma();
-    const novel = await prisma.novel.findUnique({
-      where: { id: param(req, "novelId") },
-      select: { loopDefinition: true, architectureType: true },
-    });
-    if (novel?.loopDefinition) {
-      res.json({ data: JSON.parse(novel.loopDefinition) });
+    const repo = createNovelRepo(prisma);
+    const loopDef = await repo.getLoopDefinition(param(req, "novelId"));
+    if (loopDef) {
+      res.json({ data: loopDef });
       return;
     }
     // Fall back to architecture default
+    const novel = await prisma.novel.findUnique({ where: { id: param(req, "novelId") }, select: { architectureType: true } });
     if (novel?.architectureType) {
       const { getArchitectureTemplate } = await import("../../../planning/architectureEngine/architectureRegistry");
       const tmpl = getArchitectureTemplate(novel.architectureType as ArchitectureType);

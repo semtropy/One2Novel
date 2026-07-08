@@ -256,7 +256,7 @@ function checkStructuralCompleteness(outline: StoryOutline): ConstraintViolation
     violations.push({
       severity: "high", category: "结构缺失", location: "大纲",
       description: "无卷结构——大纲缺少分卷规划。",
-      suggestion: "至少规划2-4卷，每卷5-8章。",
+      suggestion: "建议根据预估总章数规划15-30卷，每卷15-25章。长篇网文（500章+）建议至少15卷，每卷不少于10章。",
     });
   }
 
@@ -267,7 +267,7 @@ function checkStructuralCompleteness(outline: StoryOutline): ConstraintViolation
         severity: "high", category: "结构缺失",
         location: `第${vol.sortOrder}卷《${vol.title}》`,
         description: "该卷没有章节。",
-        suggestion: "每卷至少包含3章。",
+        suggestion: "每卷至少包含10章，建议15-25章以保证完整的叙事弧线。",
       });
     }
   }

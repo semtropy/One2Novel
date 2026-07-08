@@ -6,7 +6,9 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Sparkles, Globe } from "lucide-react";
-import { useNovel, useUpdateNovel, useGenerateStoryCore } from "../../api/novel";
+import { NovelUpdateSchema } from "@one2novel/shared/types/novel";
+import { useNovel, useUpdateNovel } from "../../api/novel";
+import { useGenerateStoryCore } from "../../api/story-core";
 import { cn } from "../../lib/cn";
 
 interface Props {
@@ -14,7 +16,7 @@ interface Props {
   onComplete?: () => void;
 }
 
-const GENRE_OPTIONS = ["悬疑", "言情", "奇幻", "科幻", "历史", "都市", "武侠", "恐怖", "游戏", "其他"];
+const GENRE_OPTIONS = ["仙侠", "玄幻", "修真", "悬疑", "言情", "奇幻", "科幻", "历史", "都市", "武侠", "穿越", "重生", "系统/无限流", "末世", "竞技", "恐怖", "游戏", "轻小说", "其他"];
 const POV_OPTIONS = [
   { value: "first_person", label: "第一人称" },
   { value: "third_person", label: "第三人称" },
@@ -76,8 +78,20 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
   }, [novelId, genStoryCore, refetch, onComplete]);
 
   const [saveError, setSaveError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const quickSave = async (field: string, value: string) => {
+    // Zod validation against shared schema
+    const fieldSchema = (NovelUpdateSchema.shape as Record<string, unknown>)[field];
+    if (fieldSchema && typeof (fieldSchema as any).safeParse === "function") {
+      const result = (fieldSchema as any).safeParse(value);
+      if (!result.success) {
+        setFieldErrors(prev => ({ ...prev, [field]: result.error.issues[0]?.message ?? "格式不正确" }));
+        return;
+      }
+    }
+    setFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+
     try {
       if (field === "commercialTags") {
         const tags = value.split(",").map(s => s.trim()).filter(Boolean);
@@ -165,8 +179,8 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
           <div className="col-span-2 sm:col-span-4">
             <label className="text-[10px] text-slate-400 block mb-0.5">语气基调</label>
             <input
-              value={(novel as unknown as Record<string,string>)["styleTone"] ?? ""}
-              onChange={e => quickSave("styleTone", e.target.value)}
+              value={(novel as unknown as Record<string,string>)["tonePitch"] ?? ""}
+              onChange={e => quickSave("tonePitch", e.target.value)}
               placeholder="如：冷峻克制，以客观叙述和对话推进，氛围偏阴郁"
               className="w-full rounded border border-slate-200 px-2 py-1 text-xs focus:border-brand-300 focus:outline-none"
             />

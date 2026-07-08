@@ -132,7 +132,8 @@ export async function buildReferenceCounterpart(novelId: string, chapterOrder: n
   });
   const totalNovelChapters = novel?.estimatedChapterCount ?? novel?.chapters.length ?? 500;
 
-  // Map current chapter order to reference book chapter index proportionally
+  // Map current chapter to reference book position.
+  // TODO: Structural loop-based mapping (phase-aligned) for more accurate counterpart selection.
   const refTotal = rb.totalChapters;
   const refChapterIndex = Math.max(1, Math.min(refTotal, Math.round((chapterOrder / totalNovelChapters) * refTotal)));
 
@@ -147,20 +148,23 @@ export async function buildReferenceCounterpart(novelId: string, chapterOrder: n
     c => c.chapterIndex >= refChapterIndex - 3 && c.chapterIndex <= refChapterIndex + 3
   );
 
+  const positionPercent = Math.round((refChapterIndex / refTotal) * 100);
   const parts: string[] = [];
-  parts.push(`对标书位置映射：第${refChapterIndex}章/${refTotal}章`);
+  parts.push(`【对标书结构参照 — 全书${positionPercent}%处。对标书在此位置附近爽点密度为高，节奏较快，注意你的本章节奏应与此对应。】`);
 
   if (currentLoop) {
-    parts.push(`所在回环起点：第${currentLoop.chapterIndex}章`);
+    parts.push(`对标书此位置处于以第${currentLoop.chapterIndex}章为起点的回环中。该回环的结构特征可作为你的参考——注意它是如何展开和收束的。`);
   }
 
   if (nearbyCool.length > 0) {
     const highCount = nearbyCool.filter(c => c.level === "high").length;
-    const lowCount = nearbyCool.filter(c => c.level === "low").length;
-    parts.push(`附近±3章爽点密度：${highCount}高/${nearbyCool.length - highCount - lowCount}中/${lowCount}低`);
+    if (highCount >= nearbyCool.length * 0.5) {
+      parts.push("对标书此处爽点密度高——你的本章也应包含至少一处爽点（显圣/升级/策略/收集/打脸）。");
+    } else {
+      parts.push("对标书此处爽点密度适中——你的本章可在日常/过渡与爽点之间平衡安排。");
+    }
   }
 
-  // Get actual chapter snippet if content available
   if (rb.content) {
     const chapterHeadingMatch = rb.content.match(
       new RegExp(`(?:^|\\n)\\s*(?:第${refChapterIndex}[章節节]|Chapter\\s+${refChapterIndex})`, 'im')
@@ -168,7 +172,7 @@ export async function buildReferenceCounterpart(novelId: string, chapterOrder: n
     if (chapterHeadingMatch) {
       const start = chapterHeadingMatch.index!;
       const snippet = rb.content.slice(start, start + 500).replace(/\n/g, " ");
-      parts.push(`对标书同位置章节开头：${snippet}...`);
+      parts.push(`【对标书开篇参考】对标书第${refChapterIndex}章如此开场：${snippet}... — 观察它的开场方式，在你的本章中尝试类似的结构（但内容完全不同）。`);
     }
   }
 

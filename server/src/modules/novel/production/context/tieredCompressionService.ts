@@ -28,7 +28,8 @@ export interface TieredContext {
   tier1Adjacent: string;            // Last 3 chapters, detailed excerpts
   tier2Recent: string;              // Chapters 4-10 behind current
   tier3VolumeSummary: string;       // Previous volume's full summary
-  tier4Archive: string;             // All earlier volumes, 1-2 sentences each
+  tier4Archive: string;             // Earlier volumes, ~500 chars each
+  tier5UltraArchive: string;        // One-line digest of ALL prior volumes
 }
 
 // ─── LLM Schema ────────────────────────────────────────
@@ -123,24 +124,34 @@ export async function buildTieredContext(
     take: 3,
     select: { order: true, title: true, content: true, chapterSummary: { select: { summary: true } } },
   });
-  const tier1Adjacent = tier1Chapters.reverse().map(ch => {
-    const excerpt = ch.chapterSummary?.summary
-      ?? ch.content?.slice(0, 500)?.replace(/<[^>]*>/g, "")
-      ?? "";
-    return `第${ch.order}章《${ch.title}》：${excerpt.slice(0, 500)}`;
-  }).join("\n\n");
+  const tier1Adjacent = tier1Chapters.length > 0
+    ? `【最近3章 — 连续性基础。本章开头必须自然地衔接第${tier1Chapters[tier1Chapters.length - 1].order}章的结尾，但不要复述。】\n` +
+      tier1Chapters.reverse().map(ch => {
+        const excerpt = ch.chapterSummary?.summary
+          ?? ch.content?.slice(0, 500)?.replace(/<[^>]*>/g, "")
+          ?? "";
+        return `第${ch.order}章《${ch.title}》：${excerpt.slice(0, 500)}`;
+      }).join("\n\n")
+    : "";
 
-  // Tier 2: Chapters 4-10 behind current, skeleton only (~150 chars each)
+  // Tier 2: Chapters 4-10 behind current, skeleton only (~200 chars each)
+  // Falls back to content excerpt if summary is missing
   const tier2Chapters = await prisma.chapter.findMany({
     where: { novelId, order: { gte: currentChapterOrder - 10, lt: currentChapterOrder - 3 }, chapterStatus: "completed" },
     orderBy: { order: "desc" },
     take: 7,
-    select: { order: true, title: true, chapterSummary: { select: { summary: true } }, expectation: true },
+    select: { order: true, title: true, content: true, chapterSummary: { select: { summary: true } }, expectation: true },
   });
-  const tier2Recent = tier2Chapters.reverse().map(ch => {
-    const brief = ch.chapterSummary?.summary?.slice(0, 150) ?? ch.expectation ?? "";
-    return `第${ch.order}章《${ch.title}》：${brief}`;
-  }).join("\n");
+  const tier2Recent = tier2Chapters.length > 0
+    ? `【前4-10章概览 — 仅关键事件，不要复述。如果引用了前文的事件，本章必须给出足够的上下文让当前读点读者理解。】\n` +
+      tier2Chapters.reverse().map(ch => {
+        const brief = ch.chapterSummary?.summary?.slice(0, 200)
+          ?? ch.content?.slice(0, 200)?.replace(/\n/g, " ")
+          ?? ch.expectation
+          ?? "";
+        return `第${ch.order}章《${ch.title}》：${brief}`;
+      }).join("\n")
+    : "";
 
   // Tier 3: Previous volume's summary
   const currentVolumePlan = await prisma.volumeChapterPlan.findFirst({
@@ -155,19 +166,27 @@ export async function buildTieredContext(
       select: { title: true, summary: true },
     });
     if (prevVolume) {
-      tier3VolumeSummary = `上一卷「${prevVolume.title}」摘要：${prevVolume.summary ?? "（无摘要）"}`;
+      tier3VolumeSummary = `【上一卷概览 — 理解当前故事的大局位置。本章不应违背已建立的情节方向。】\n上一卷「${prevVolume.title}」摘要：${prevVolume.summary ?? "（无摘要）"}`;
     }
   }
 
-  // Tier 4: Archive — earlier volumes, 1-2 sentences each
+  // Tier 4: Archive — earlier volumes, ~500 chars each
   const archiveVolumes = await prisma.volume.findMany({
     where: { novelId, sortOrder: { lt: prevVolumeOrder } },
     orderBy: { sortOrder: "asc" },
     select: { sortOrder: true, title: true, summary: true },
   });
-  const tier4Archive = archiveVolumes.map(v =>
-    `第${v.sortOrder}卷「${v.title}」：${(v.summary ?? "").slice(0, 100)}`
-  ).join("\n");
+  const tier4Archive = archiveVolumes.length > 0
+    ? `【历史卷览 — 仅供大局参考。不要机械引用历史细节，除非本章需要关联。】\n` +
+      archiveVolumes.map(v =>
+        `第${v.sortOrder}卷「${v.title}」：${(v.summary ?? "").slice(0, 500)}`
+      ).join("\n\n")
+    : "";
 
-  return { tier1Adjacent, tier2Recent, tier3VolumeSummary, tier4Archive };
+  // Tier 5: Ultra-long-term — one-line digest of ALL prior volumes
+  const tier5UltraArchive = archiveVolumes.length > 0
+    ? `【全书历史主线 — 本章不应违背这条主线方向。】\n${archiveVolumes.map(v => `[第${v.sortOrder}卷]${(v.summary ?? "").slice(0, 80)}`).join(" → ")}`
+    : "";
+
+  return { tier1Adjacent, tier2Recent, tier3VolumeSummary, tier4Archive, tier5UltraArchive };
 }

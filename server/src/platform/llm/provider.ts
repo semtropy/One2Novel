@@ -24,7 +24,7 @@ export function createLLM(provider: LLMProvider, options?: { model?: string; tem
   const env = getEnv();
   const model = options?.model;
   const temperature = options?.temperature ?? 0.7;
-  const maxTokens = options?.maxTokens ?? 4096;
+  const maxTokens = options?.maxTokens ?? 8192;
 
   switch (provider) {
     // ── OpenAI-compatible providers ──

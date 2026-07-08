@@ -3,8 +3,10 @@
  * 回环泳道 → 卷展开 → 生成模式切换
  */
 import { useState, useEffect } from "react";
-import { Sparkles, RefreshCw, Zap, Check, Loader2, CheckCircle, Scale, GripVertical } from "lucide-react";
-import { useNovel, useRebalanceVolume } from "../../api/novel";
+import { useNavigate } from "react-router-dom";
+import { Sparkles, RefreshCw, Zap, Check, Loader2, CheckCircle, Scale, GripVertical, GitBranch, AlertTriangle, ArrowUp, ArrowDown, Plus, X, Save } from "lucide-react";
+import { useNovel } from "../../api/novel";
+import { useRebalanceVolume } from "../../api/volumes";
 import { api } from "../../app/api";
 import { cn } from "../../lib/cn";
 
@@ -22,6 +24,7 @@ const LOOP_PHASE_LABELS: Record<string, { label: string; hint: string; color: st
 };
 
 export function BlueprintDomain({ novelId, onComplete }: Props) {
+  const navigate = useNavigate();
   const { data: novel, refetch } = useNovel(novelId);
   const [genMode, setGenMode] = useState<GenMode>("per_volume");
   const [generating, setGenerating] = useState(false);
@@ -36,6 +39,12 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
     try { return JSON.parse(novel.loopSkeleton); } catch { return null; }
   })();
 
+  // Check if skeleton was generated with full context (post world+characters)
+  const hasGolden = (() => { try { const g = JSON.parse(novel?.goldenFinger||'{}'); return !!(g.goldenFingerName); } catch { return false; } })();
+  const hasChars = (novel?.characters?.length ?? 0) > 0;
+  const upstreamReady = hasGolden && hasChars;
+  const hasStaleSkeleton = skeleton && skeleton.loops?.length > 0 && !hasChars;
+
   const volumes = (novel?.volumes ?? []) as Array<{
     id: string; sortOrder: number; title: string; summary?: string | null;
     chapterPlans: Array<{
@@ -46,17 +55,6 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
   }>;
 
   const volumeForLoop = (loopIndex: number) => volumes.find(v => v.sortOrder === loopIndex);
-
-  const handleGenerateSkeleton = async () => {
-    setGenerating(true); setGenError(""); setGenSuccess(false);
-    try {
-      await api.post(`/novels/${novelId}/loops/generate-skeleton`, { architectureType: novel?.architectureType });
-      refetch();
-      setGenSuccess(true);
-      setTimeout(() => setGenSuccess(false), 3000);
-    } catch (e) { setGenError(e instanceof Error ? e.message : "生成失败"); }
-    finally { setGenerating(false); }
-  };
 
   const [expandError, setExpandError] = useState("");
   const rebalance = useRebalanceVolume();
@@ -103,6 +101,10 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
 
   return (
     <div className="space-y-5">
+      {/* Loop Phase Editor */}
+      <LoopPhaseEditor novelId={novelId} />
+
+      {/* Generation mode */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-700">生成模式：</span>
@@ -113,45 +115,70 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
         </div>
         <p className="mt-2 text-xs text-slate-500">
           {genMode === "full"
-            ? "AI 将自动生成回环骨架并一次性展开所有卷为章节（约需 30-90 秒，适合已经确认架构和角色的情况）。"
-            : "先生成回环骨架总览，然后你需要逐卷点击「展开为章节」——每卷展开约需 10-30 秒，适合需要精细控制每卷内容的用户。"}
+            ? "AI 将综合故事核心 + 世界构建 + 角色阵容，分批生成回环骨架并一次性展开为章节（约需 60-120 秒）。"
+            : "生成回环骨架总览后，逐卷点击「展开为章节」——每卷约需 10-30 秒，适合精细控制。"}
         </p>
       </section>
 
-      {!skeleton && (
-        <section className="rounded-xl border border-dashed border-brand-300 bg-brand-50/30 py-8 text-center space-y-3">
-          <p className="text-sm text-brand-700 font-medium">{genMode === "full" ? "一键生成全书蓝图" : "先生成回环骨架"}</p>
-          <p className="text-xs text-brand-500">{genMode === "full" ? "AI 将一次性生成全书所有回环并展开为章节" : "生成回环骨架后，逐卷展开为章节"}</p>
-          <button onClick={genMode === "full" ? handleGenerateAll : handleGenerateSkeleton} disabled={generating || genSuccess}
-            className={cn("rounded-lg px-4 py-2 text-xs font-medium text-white transition-colors disabled:opacity-40",
-              genSuccess ? "bg-green-600" : "bg-brand-600 hover:bg-brand-700")}>
-            {generating ? <RefreshCw size={13} className="animate-spin inline mr-1" /> :
-             genSuccess ? <Check size={13} className="inline mr-1" /> :
-             <Sparkles size={13} className="inline mr-1" />}
-            {generating ? "生成中..." : genSuccess ? "生成完成" : genMode === "full" ? "一键生成全书蓝图" : "生成回环骨架"}
-          </button>
-          <div className="pt-2 border-t border-brand-200/50">
-            <p className="text-[10px] text-brand-400 mb-1.5">展开后每章将包含以下信息：</p>
-            <div className="flex justify-center gap-1 flex-wrap text-[10px]">
-              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">第N章</span>
-              <span className="text-slate-300">·</span>
-              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">标题</span>
-              <span className="text-slate-300">·</span>
-              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">回环阶段标签</span>
-              <span className="text-slate-300">·</span>
-              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">章节类型</span>
-              <span className="text-slate-300">·</span>
-              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">内容节拍</span>
-              <span className="text-slate-300">·</span>
-              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">核心事件</span>
-              <span className="text-slate-300">·</span>
-              <span className="rounded bg-white px-1.5 py-0.5 text-slate-400 border border-slate-200">章尾钩子</span>
-            </div>
-          </div>
-          {genError && <p className="text-xs text-red-500">{genError}</p>}
-          {expandError && <div className="rounded-lg bg-red-50 border border-red-200 p-2 text-xs text-red-600">{expandError}</div>}
-        </section>
+      {/* Context availability summary */}
+      <div className="flex gap-2 text-[10px]">
+        <span className={cn("rounded px-1.5 py-0.5", "bg-emerald-50 text-emerald-600")}>故事核心 ✓</span>
+        <span className={cn("rounded px-1.5 py-0.5", hasGolden ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400")}>金手指 {hasGolden ? "✓" : "✗"}</span>
+        <span className={cn("rounded px-1.5 py-0.5", hasChars ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400")}>角色阵容 {hasChars ? "✓" : "✗"}</span>
+      </div>
+
+      {/* Stale skeleton warning */}
+      {hasStaleSkeleton && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+          ⚠️ 当前回环骨架在角色生成前创建（仅5轮回环，为旧版架构步骤的遗留数据）。建议重新生成以利用完整的角色和世界上下文。
+        </div>
       )}
+
+      {/* Generation entry */}
+      <div className={cn(
+        "rounded-xl border border-dashed py-8 text-center space-y-3",
+        upstreamReady ? "border-brand-300 bg-brand-50/30" : "border-slate-300 bg-slate-50/30",
+      )}>
+        {!upstreamReady ? (
+          <>
+            <p className="text-sm text-slate-500 font-medium">请先完成前序步骤</p>
+            <p className="text-xs text-slate-400">
+              生成回环骨架需要：故事核心 + 世界构建（规则/力量/金手指）+ 角色阵容。
+              {!hasGolden && " 请先到「世界构建」生成金手指。"}
+              {hasGolden && !hasChars && " 请先到「角色阵容」生成角色。"}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-brand-700 font-medium">
+              {skeleton?.loops?.length > 0
+                ? `已有 ${skeleton.loops.length} 轮回环（预估 ${skeleton.estimatedTotalChapters} 章）。重新生成将覆盖。`
+                : "生成回环骨架"}
+            </p>
+            <p className="text-xs text-brand-500">
+              综合 故事核心 + 世界规则 + 力量体系 + 金手指 + {hasChars ? novel?.characters?.length : 0}位角色，分批生成完整回环骨架。
+            </p>
+            <button
+              onClick={genMode === "full" ? handleGenerateAll : async () => {
+                setGenerating(true); setGenError("");
+                try { await api.post(`/novels/${novelId}/pipeline/step/outline`, { mode: "per_volume", skeletonOnly: true }); refetch(); }
+                catch (e) { setGenError(e instanceof Error ? e.message : "生成失败"); }
+                finally { setGenerating(false); }
+              }}
+              disabled={generating || !upstreamReady}
+              className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 shadow-sm">
+              {generating ? <><RefreshCw size={13} className="animate-spin inline mr-1" />生成中（约30-90秒）…</> :
+               <><Sparkles size={13} className="inline mr-1" />{genMode === "full" ? "一键生成全书蓝图" : skeleton?.loops?.length > 0 ? "重新生成回环骨架" : "生成回环骨架"}</>}
+            </button>
+          </>
+        )}
+        {/* Chapter info hint */}
+        <div className="pt-2 border-t border-brand-200/50">
+          <p className="text-[10px] text-brand-400 mb-1.5">展开后每章包含：第N章 · 标题 · 回环阶段 · 章节类型 · 内容节拍 · 核心事件 · 章尾钩子</p>
+        </div>
+        {genError && <p className="text-xs text-red-500">{genError}</p>}
+        {expandError && <div className="rounded-lg bg-red-50 border border-red-200 p-2 text-xs text-red-600">{expandError}</div>}
+      </div>
 
       {skeleton?.loops && (
         <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
@@ -310,5 +337,126 @@ export function BlueprintDomain({ novelId, onComplete }: Props) {
         );
       })()}
     </div>
+  );
+}
+
+// ─── Loop Phase Editor (moved from ArchitectureDomain) ──────
+
+interface PhaseDef {
+  phase: string; label: string; description: string; typicalChapterCount: [number, number];
+}
+
+// Default phases — used when no user configuration or reference book data
+const DEFAULT_PHASES: PhaseDef[] = [
+  { phase: "trigger",    label: "触发事件", description: "新副本/任务/危机的引入", typicalChapterCount: [1,3] },
+  { phase: "enter",      label: "进入探索", description: "进入新环境，收集线索和资源", typicalChapterCount: [2,5] },
+  { phase: "explore",    label: "深入展开", description: "副本内部展开，推进核心探索", typicalChapterCount: [3,6] },
+  { phase: "setback",    label: "受挫考验", description: "遭遇重大阻碍或失败", typicalChapterCount: [1,3] },
+  { phase: "turn",       label: "转折翻盘", description: "利用资源/信息实现逆转", typicalChapterCount: [1,3] },
+  { phase: "climax",     label: "决战高潮", description: "与最大威胁的最终对抗", typicalChapterCount: [1,2] },
+  { phase: "settlement", label: "结算收获", description: "成果盘点，暗示下一轮方向", typicalChapterCount: [1,2] },
+];
+
+function LoopPhaseEditor({ novelId }: { novelId: string }) {
+  const [phases, setPhases] = useState<PhaseDef[]>(DEFAULT_PHASES);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (loaded) return;
+    // Load user-configured phases from DB, or auto-populate from reference book
+    api.get(`/novels/${novelId}/loop-definition`).then(async ({ data: loopData }) => {
+      if (loopData.data?.phases) {
+        setPhases(loopData.data.phases);
+      } else {
+        // Try to load reference book phases
+        try {
+          const { data: novelData } = await api.get(`/novels/${novelId}`);
+          const activeProfileId = novelData?.data?.activeProfileId;
+          if (activeProfileId) {
+            const { data: profileData } = await api.get(`/profiles/${activeProfileId}`);
+            const raw = profileData?.data?.analysisResult;
+            if (raw) {
+              const ar = typeof raw === "string" ? JSON.parse(raw) : raw;
+              const ap = ar.architecture?.architectureProfile || ar.architectureProfile; // V3+V2 compat
+              const refPhases = ap?.loopPhases;
+              if (refPhases?.length > 0) {
+                setPhases(refPhases.map((p: any) => ({
+                  phase: p.phase, label: p.label, description: p.description,
+                  typicalChapterCount: p.typicalChapterRange || p.typicalChapterCount || [1,3],
+                })));
+              }
+            }
+          }
+        } catch { /* use defaults */ }
+      }
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, [novelId]);
+
+  const updatePhase = (idx: number, field: keyof PhaseDef, value: unknown) =>
+    setPhases(prev => { const next = [...prev]; next[idx] = { ...next[idx], [field]: value }; return next; });
+
+  const handleSave = async () => {
+    setSaving(true); setError("");
+    try { await api.put(`/novels/${novelId}/loop-definition`, { phases }); }
+    catch (e) { setError(e instanceof Error ? e.message : "保存失败"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="text-sm font-medium text-slate-700">回环阶段</h3>
+          <p className="text-[10px] text-slate-400 mt-0.5">自定义每轮回环的阶段顺序。如不编辑则使用通用流程（触发→探索→高潮→结算）。</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setPhases(prev => [...prev, { phase: `phase_${prev.length+1}`, label: "新阶段", description: "", typicalChapterCount: [1,3] }])}
+            className="flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-50"><Plus size={11} />新增</button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex items-center gap-1 rounded bg-brand-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+            {saving ? <RefreshCw size={11} className="animate-spin" /> : <Save size={11} />}保存</button>
+        </div>
+      </div>
+      {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+
+      <div className="mb-3 flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1 text-[10px] text-slate-400 flex-1">
+          {phases.map((p, i) => (
+            <span key={i} className="flex items-center gap-1">
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">{p.label}</span>
+              <span className="text-slate-300">({p.typicalChapterCount[0]}-{p.typicalChapterCount[1]}章)</span>
+              {i < phases.length - 1 && <span className="text-slate-300">→</span>}
+            </span>
+          ))}
+        </div>
+        <span className="shrink-0 text-[9px] text-slate-400">
+          {phases === DEFAULT_PHASES ? "（默认流程）" : "（已自定义）"}
+        </span>
+      </div>
+      {/* Editable list */}
+      <div className="space-y-1.5">
+        {phases.map((p, idx) => (
+          <div key={idx} className="flex items-center gap-2 rounded border border-slate-100 bg-slate-50 p-2 group">
+            <div className="flex flex-col shrink-0">
+              <button onClick={() => { if (idx>0) setPhases(prev => { const n=[...prev]; [n[idx-1],n[idx]]=[n[idx],n[idx-1]]; return n; }); }} disabled={idx===0} className="text-slate-300 hover:text-slate-500 disabled:opacity-30"><ArrowUp size={10} /></button>
+              <button onClick={() => { if (idx<phases.length-1) setPhases(prev => { const n=[...prev]; [n[idx],n[idx+1]]=[n[idx+1],n[idx]]; return n; }); }} disabled={idx===phases.length-1} className="text-slate-300 hover:text-slate-500 disabled:opacity-30"><ArrowDown size={10} /></button>
+            </div>
+            <input className="w-16 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 focus:border-brand-300 focus:outline-none" value={p.phase} onChange={e => updatePhase(idx,"phase",e.target.value)} placeholder="key" />
+            <input className="w-20 shrink-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-700 focus:border-brand-300 focus:outline-none" value={p.label} onChange={e => updatePhase(idx,"label",e.target.value)} placeholder="名称" />
+            <input className="flex-1 min-w-0 rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-500 focus:border-brand-300 focus:outline-none" value={p.description} onChange={e => updatePhase(idx,"description",e.target.value)} placeholder="描述" />
+            <div className="flex items-center gap-1 shrink-0">
+              <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none text-center" type="number" min={1} max={10} value={p.typicalChapterCount[0]} onChange={e => updatePhase(idx,"typicalChapterCount",[parseInt(e.target.value)||1,p.typicalChapterCount[1]])} />
+              <span className="text-[10px] text-slate-300">-</span>
+              <input className="w-8 rounded border border-slate-200 px-1 py-0.5 text-[10px] text-slate-500 focus:border-brand-300 focus:outline-none text-center" type="number" min={1} max={30} value={p.typicalChapterCount[1]} onChange={e => updatePhase(idx,"typicalChapterCount",[p.typicalChapterCount[0],parseInt(e.target.value)||3])} />
+              <span className="text-[10px] text-slate-400">章</span>
+            </div>
+            <button onClick={() => setPhases(prev => prev.filter((_,i) => i!==idx))} className="shrink-0 text-slate-300 hover:text-red-500 opacity-60 hover:opacity-100 transition-opacity"><X size={12} /></button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

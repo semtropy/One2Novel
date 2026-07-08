@@ -24,9 +24,9 @@ import { BlueprintDomain } from "../components/planning/BlueprintDomain";
 
 const STEPS = [
   { id: "foundation",   label: "故事核心", icon: BookOpen,    hint: "灵感 → 故事核心 · 创意参数 · 商业定位" },
-  { id: "architecture", label: "世界构建", icon: GitBranch,   hint: "架构选择 · 力量体系树 · 世界规则 · 金手指" },
+  { id: "architecture", label: "世界构建", icon: GitBranch,   hint: "世界规则 · 力量体系 · 金手指 · 回环阶段" },
   { id: "characters",   label: "角色阵容", icon: Users,       hint: "AI 生成角色 · 功能标签 · 关系网络 · 演化轨迹" },
-  { id: "outline",      label: "章节大纲", icon: Map,         hint: "回环骨架 → 逐卷展开 · 设定释放计划" },
+  { id: "outline",      label: "章节大纲", icon: Map,         hint: "回环骨架生成 · 逐卷展开 · 设定释放计划" },
 ];
 
 export function PlanningHubPage() {
@@ -35,27 +35,39 @@ export function PlanningHubPage() {
   const { data: novel, isLoading, error } = useNovel(novelId);
 
   const [currentStep, setCurrentStep] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set([0]));
 
   // Step sub-tabs: Step0(arch/world/golden) Step1(arch/reference)
   const [subTab, setSubTab] = useState("arch");
 
-  // Load persisted pipeline state on mount
+  // Derive completed steps from actual data (not just pipeline state)
+  const getCompletedFromData = useCallback(() => {
+    if (!novel) return new Set<number>();
+    const completed = new Set<number>();
+    if (novel.storySummary && novel.centralQuestion && novel.endingDirection) completed.add(0);
+    if (novel.goldenFinger) completed.add(1); // Step 2 done when golden finger is set
+    if ((novel.characters?.length ?? 0) > 0) completed.add(2);
+    if ((novel.volumes?.length ?? 0) > 0) completed.add(3);
+    return completed;
+  }, [novel]);
+
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => getCompletedFromData());
+
+  // Merge pipeline state into completed steps as secondary source
   useEffect(() => {
+    const fromData = getCompletedFromData();
+    setCompletedSteps(fromData);
     if (!novelId) return;
     api.get(`/novels/${novelId}/pipeline/state`).then(({ data }) => {
       const state = data?.data;
       if (state?.steps) {
-        const completed = new Set<number>();
+        const merged = new Set(fromData);
         STEPS.forEach((s, idx) => {
-          if (state.steps[s.id]?.status === "completed" || state.steps[s.id]?.status === "skipped") {
-            completed.add(idx);
-          }
+          if (state.steps[s.id]?.status === "completed" || state.steps[s.id]?.status === "skipped") merged.add(idx);
         });
-        setCompletedSteps(completed);
+        setCompletedSteps(merged);
       }
     }).catch(() => {});
-  }, [novelId]);
+  }, [novelId, novel, getCompletedFromData]);
 
   const onStepComplete = useCallback((stepIdx: number) => {
     setCompletedSteps(prev => { const next = new Set(prev); next.add(stepIdx); return next; });

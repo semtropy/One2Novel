@@ -99,6 +99,13 @@ model Novel {
   referenceBook      ReferenceBook?
   activeProfileId    String?
   activeProfile      ReferenceProfile?         @relation("ActiveProfile", fields: [activeProfileId], references: [id])
+  incrementalSummaries IncrementalSummary[]
+  entityStateJournals EntityStateJournal[]
+  entityLifecycles    EntityLifecycle[]
+  overrideContracts   OverrideContract[]
+  chaseDebts          ChaseDebt[]
+  debtEvents          DebtEvent[]
+  chapterReadingPowers ChapterReadingPower[]
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
 }
@@ -255,6 +262,7 @@ model NovelCharacter {
   currentState       String?
   currentStatus      String? // 角色当前状态快照 (10-40字)
   currentGoal        String?
+  coreMotivation     String? // 角色最深层驱动力（欲望/恐惧），与 personality 正交
   voiceTexture       String?
   presenceImpression String?
   // Meta
@@ -264,6 +272,8 @@ model NovelCharacter {
   ownedResources     CharacterResource[]
   knownInfo          CharacterInfoProfile[]
   volumePresences    CharacterVolumePresence[]
+  stateJournals      EntityStateJournal[]
+  lifecycles         EntityLifecycle[]
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
 
@@ -521,4 +531,140 @@ model WorldRule {
 
   @@index([novelId, category])
   @@index([novelId, status])
+}
+
+// ── Phase 2: Volume Incremental Compression ─────────────
+
+model IncrementalSummary {
+  id                String   @id @default(cuid())
+  novelId           String
+  startChapter      Int
+  endChapter        Int
+  summary           String
+  keyEvents         String   // JSON: string[]
+  characterChanges  String   // JSON: string[]
+  worldReveals      String   // JSON: string[]
+  unresolvedPayoffs String   // JSON: string[]
+  createdAt         DateTime @default(now())
+  novel             Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@index([novelId, endChapter])
+  @@index([novelId, startChapter])
+}
+
+// ── Phase 3: Entity Lifecycle Tracking ──────────────────
+
+model EntityStateJournal {
+  id               String   @id @default(cuid())
+  novelId          String
+  characterId      String
+  field            String   // currentStatus / currentLocation / currentGoal / ...
+  oldValue         String?
+  newValue         String
+  changedAtChapter Int
+  confidence       Float    @default(1.0)
+  reason           String?
+  createdAt        DateTime @default(now())
+  character        NovelCharacter @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  novel            Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@index([novelId, characterId, changedAtChapter])
+  @@index([novelId, field])
+}
+
+model EntityLifecycle {
+  id                   String   @id @default(cuid())
+  novelId              String
+  characterId          String
+  status               String   // alive / dead / absent / dormant / appearing
+  statusChangedAtChapter Int
+  reason               String?
+  confidence           Float    @default(1.0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  character            NovelCharacter @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  novel                Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@unique([novelId, characterId])
+  @@index([novelId, status])
+  @@index([novelId, characterId])
+}
+
+// ── Phase 5: Chase Debt System ─────────────────────────
+
+model OverrideContract {
+  id               String   @id @default(cuid())
+  novelId          String
+  chapter          Int
+  constraintType   String   // SOFT_HOOK_STRENGTH / SOFT_COOLPOINT_DENSITY / ...
+  constraintId     String
+  rationaleType    String   // TRANSITIONAL_SETUP / LOGIC_INTEGRITY / ...
+  rationaleText    String?
+  paybackPlan      String?
+  dueChapter       Int
+  status           String   @default("pending") // pending / fulfilled / overdue / cancelled
+  fulfilledAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  novel            Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@unique([novelId, chapter, constraintType, constraintId])
+  @@index([novelId, status])
+  @@index([novelId, dueChapter])
+  @@index([novelId, chapter])
+}
+
+model ChaseDebt {
+  id                 String   @id @default(cuid())
+  novelId            String
+  debtType           String   // hook_strength / coolpoint / micropayoff / ...
+  originalAmount     Float    @default(1.0)
+  currentAmount      Float    @default(1.0) // includes interest
+  interestRate       Float    @default(0.1) // 10% per chapter
+  sourceChapter      Int
+  dueChapter         Int
+  overrideContractId String?
+  status             String   @default("active") // active / paid / overdue / written_off
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  novel              Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@index([novelId, status])
+  @@index([novelId, dueChapter])
+  @@index([novelId, sourceChapter])
+}
+
+model DebtEvent {
+  id        String   @id @default(cuid())
+  novelId   String
+  debtId    String
+  eventType String   // created / interest_accrued / partial_payment / full_payment / overdue
+  amount    Float
+  chapter   Int
+  note      String?
+  createdAt DateTime @default(now())
+  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@index([novelId, chapter])
+  @@index([novelId, debtId])
+}
+
+model ChapterReadingPower {
+  id              String   @id @default(cuid())
+  novelId         String
+  chapter         Int      @unique
+  hookType        String?
+  hookStrength    String   @default("medium") // strong / medium / weak
+  coolpointPatterns String?
+  micropayoffs    String?
+  hardViolations  String?
+  softSuggestions String?
+  isTransition    Boolean  @default(false)
+  overrideCount   Int      @default(0)
+  debtBalance     Float    @default(0.0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  novel           Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@index([novelId, chapter])
 }

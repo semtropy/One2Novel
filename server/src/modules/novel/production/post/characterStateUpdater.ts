@@ -30,12 +30,21 @@ const CharacterPostChapterSchema = z.object({
  * Extract character state + relationship changes from a completed chapter and persist them.
  * Single AI call handles what was previously two separate calls.
  * Fire-and-forget — never throws, always logs errors.
+ *
+ * Returns updates for downstream consumers (entityLifecycle, etc.).
  */
 export async function updateCharacterStatesAfterChapter(
   novelId: string,
   chapterContent: string,
   chapterOrder: number,
-): Promise<void> {
+): Promise<{ updates: Array<{
+  characterId: string;
+  characterName: string;
+  oldStatus: string | null;
+  newStatus: string | null;
+  currentLocation: string | null;
+  currentGoal: string | null;
+}> } | null> {
   try {
     const prisma = getPrisma();
     const characters = await prisma.novelCharacter.findMany({
@@ -43,7 +52,15 @@ export async function updateCharacterStatesAfterChapter(
       select: { id: true, name: true, role: true, currentStatus: true, currentLocation: true, currentGoal: true },
     });
 
-    if (characters.length === 0) return;
+    if (characters.length === 0) return null;
+
+    // Snapshot old states for lifecycle tracking
+    const oldStates = new Map(characters.map(c => [c.name, {
+      characterId: c.id,
+      oldStatus: c.currentStatus,
+      oldLocation: c.currentLocation,
+      oldGoal: c.currentGoal,
+    }]));
 
     const charList = characters
       .map(c => {
@@ -109,7 +126,25 @@ export async function updateCharacterStatesAfterChapter(
     if (updated > 0) {
       console.log(`[CharacterState] Updated ${updated} characters after chapter ${chapterOrder}`);
     }
+
+    // Collect updates for downstream consumers (entityLifecycle)
+    const updates = Array.from(oldStates.entries())
+      .filter(([name]) => result.updates.some(u => u.characterName === name))
+      .map(([name, old]) => {
+        const newUpdate = result.updates.find(u => u.characterName === name);
+        return {
+          characterId: old.characterId,
+          characterName: name,
+          oldStatus: old.oldStatus,
+          newStatus: newUpdate?.currentStatus ?? null,
+          currentLocation: newUpdate?.currentLocation ?? old.oldLocation,
+          currentGoal: newUpdate?.currentGoal ?? old.oldGoal,
+        };
+      });
+
+    return { updates };
   } catch (e) {
     logEventError("characterStateUpdate", { novelId, chapterOrder }, e);
+    return null;
   }
 }

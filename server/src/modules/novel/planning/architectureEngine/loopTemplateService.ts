@@ -3,14 +3,16 @@
  */
 import { z } from "zod";
 import { aiInvoke } from "../../../../platform/llm/aiService";
+import { getPrisma } from "../../../../platform/db/client";
+import { createNovelRepo } from "../../../../platform/data/repositories";
+import type { GoldenFingerData, LoopDefinitionData, PowerNodeData, ArchitectureProfileData, ContentBeatProfileData, LoopSkeletonData } from "../../../../platform/data/repositories/novelRepository";
+import { getArchitectureTemplate } from "./architectureRegistry";
+import type { ArchitectureType, LoopSkeleton, LoopSkeletonItem, ExpandedVolume, ExpandedChapter, LoopPhase, CoolPointType, ChapterType } from "./types";
 
-/** 计算长篇网文的回环数：每轮回环约 18 章，最少 5 轮，500章≈28轮回环 */
+/** 计算长篇网文的回环数。每轮回环约 18 章，最少 5 轮，500章≈28轮回环。 */
 export function computeLoopCount(estimatedChapterCount: number): number {
   return Math.max(5, Math.round(estimatedChapterCount / 18));
 }
-import { getPrisma } from "../../../../platform/db/client";
-import { getArchitectureTemplate } from "./architectureRegistry";
-import type { ArchitectureType, LoopSkeleton, LoopSkeletonItem, ExpandedVolume, ExpandedChapter, LoopPhase, CoolPointType, ChapterType } from "./types";
 
 // ─── LLM Output Schemas ────────────────────────────────
 
@@ -18,7 +20,7 @@ const LoopSkeletonItemSchema = z.object({
   loopIndex: z.number().int(),
   triggerEvent: z.string(),
   dungeonName: z.string(),
-  estimatedChapters: z.number().int().min(6).max(25),
+  estimatedChapters: z.number().int().min(6).max(50), // Large loops (30-50) for cross-volume narrative arcs
   settlementContent: z.string(),
   scaleUpDirection: z.string(),
 });
@@ -82,46 +84,40 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
   const estimatedTotal = novel.estimatedChapterCount || 500;
   const loopCount = input.totalLoops || computeLoopCount(estimatedTotal);
 
-  // Get golden finger context (unified JSON)
-  let gfAbilities: string[] = [];
-  let gfLimits: string[] = [];
-  if (novel.goldenFinger) {
-    try {
-      const gf = JSON.parse(novel.goldenFinger);
-      gfAbilities = Array.isArray(gf.abilities) ? gf.abilities : [];
-      gfLimits = Array.isArray(gf.limits) ? gf.limits : [];
-    } catch { /* ignore */ }
-  }
+  // Get golden finger context (via typed accessor)
+  const repo = createNovelRepo(prisma);
+  const gfData = await repo.getGoldenFinger(input.novelId);
+  const gfAbilities: string[] = gfData?.abilities ?? [];
+  const gfLimits: string[] = gfData?.limits ?? [];
 
-  // Check for user-customized loop definition
+  // Check for user-customized loop definition (via typed accessor)
+  const loopDef = await repo.getLoopDefinition(input.novelId);
   let customPhases: Array<{ phase: string; label: string; description: string; typicalChapterCount: [number, number] }> | null = null;
-  if (novel.loopDefinition) {
-    try {
-      const def = JSON.parse(novel.loopDefinition);
-      if (def.phases?.length > 0) customPhases = def.phases;
-    } catch { /* use default */ }
+  if (loopDef?.phases?.length) {
+    customPhases = loopDef.phases.map((p: { key: string; label: string; description: string; chapterShare: number }) => ({
+      phase: p.key,
+      label: p.label,
+      description: p.description,
+      typicalChapterCount: [Math.round(p.chapterShare * 10), Math.round(p.chapterShare * 20)] as [number, number],
+    }));
   }
 
-  // Read ArchitectureProfile for statistics-based parameters (from reference analysis or built-in template)
+  // Read ArchitectureProfile for statistics-based parameters (via typed accessor)
+  const archProfile = await repo.getArchitectureProfile(input.novelId);
   let archProfileStats = "";
-  if (novel.architectureProfile) {
-    try {
-      const ap = JSON.parse(novel.architectureProfile);
-      if (ap.avgChaptersPerLoop) {
-        archProfileStats += `\n【统计参考 — 对标书/模板的真实数据】`;
-        archProfileStats += `\n平均每回环 ${ap.avgChaptersPerLoop.avg} 章（范围 ${ap.avgChaptersPerLoop.min}-${ap.avgChaptersPerLoop.max}）`;
-        if (ap.chapterTypeDistribution) {
-          archProfileStats += `\n章节类型分布 — 推进:${ap.chapterTypeDistribution.advance}% 过渡:${ap.chapterTypeDistribution.transition}% 冷却:${ap.chapterTypeDistribution.cooldown}% 高潮:${ap.chapterTypeDistribution.climax}%`;
-        }
-        if (ap.coolPointRecipe) {
-          const recipe = ap.coolPointRecipe;
-          archProfileStats += `\n爽点配比 — 收集:${recipe.collect}% 策略:${recipe.strategy}% 验证:${recipe.verify}% 揭示:${recipe.reveal}% 升级:${recipe.upgrade}% 打脸:${recipe.faceSlap}%`;
-        }
-        if (ap.hookProfile) {
-          archProfileStats += `\n钩子密度 — 每章${ap.hookProfile.shortTermPerChapter}个短期 每卷${ap.hookProfile.mediumTermPerVolume}个中期 ${ap.hookProfile.longTermLines}条长线`;
-        }
-      }
-    } catch { /* use defaults */ }
+  if (archProfile?.avgChaptersPerLoop) {
+    archProfileStats += `\n【统计参考 — 对标书/模板的真实数据】`;
+    archProfileStats += `\n平均每回环 ${archProfile.avgChaptersPerLoop.avg} 章（范围 ${archProfile.avgChaptersPerLoop.min}-${archProfile.avgChaptersPerLoop.max}）`;
+    if (archProfile.chapterTypeDistribution) {
+      archProfileStats += `\n章节类型分布 — 推进:${archProfile.chapterTypeDistribution.advance}% 过渡:${archProfile.chapterTypeDistribution.transition}% 冷却:${archProfile.chapterTypeDistribution.cooldown}% 高潮:${archProfile.chapterTypeDistribution.climax}%`;
+    }
+    if (archProfile.coolPointRecipe) {
+      const recipe = archProfile.coolPointRecipe;
+      archProfileStats += `\n爽点配比 — 收集:${recipe.collect}% 策略:${recipe.strategy}% 验证:${recipe.verify}% 揭示:${recipe.reveal}% 升级:${recipe.upgrade}% 打脸:${recipe.faceSlap ?? recipe.face_slap ?? 0}%`;
+    }
+    if (archProfile.hookProfile) {
+      archProfileStats += `\n钩子密度 — 每章${archProfile.hookProfile.shortTermPerChapter}个短期 每卷${archProfile.hookProfile.mediumTermPerVolume}个中期 ${archProfile.hookProfile.longTermLines}条长线`;
+    }
   }
 
   // Rhythm profile from reference analysis (V2)
@@ -141,7 +137,7 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
   } catch {}
 
   const effectivePhases = customPhases ?? arch?.defaultLoop.phases ?? [];
-  const effectivePhaseDesc = effectivePhases.map(p => `${p.label}（${p.description}，${p.typicalChapterCount[0]}-${p.typicalChapterCount[1]}章）`).join(" → ");
+  const effectivePhaseDesc = effectivePhases.map((p: { label: string; description: string; typicalChapterCount: [number, number] }) => `${p.label}（${p.description}，${p.typicalChapterCount[0]}-${p.typicalChapterCount[1]}章）`).join(" → ");
 
   const systemPrompt = arch
     ? [
@@ -154,21 +150,17 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
         `【结算类型】${arch.defaultLoop.settlementTypes.join("、")}`,
         `【升级方向】${arch.defaultLoop.scaleUpDirections.join("；")}`,
         "",
-        `【回环数要求】${loopCount}轮回环`,
-        "",
         `【生成原则】`,
         `1. 每轮回环必须有独立的触发事件和副本/事件名称，不得重复`,
         `2. 回环与回环之间必须形成递进关系——舞台逐步放大，敌人逐步增强`,
         `3. 结算内容必须具体可感知，不能是泛泛的「获得力量」`,
         `4. 舞台升级方向必须明确——读者能清楚感知下一轮回环比这一轮「大」在哪`,
-        `5. 触发事件应随回环推进而升级：`,
-        `   - 前半轮回环：外力触发`,
-        `   - 后半轮回环：主角主动`,
+        `5. 触发事件应随回环推进而升级：前半轮回环外力触发，后半轮回环主角主动`,
         `6. 最终轮回环应指向全书的最大悬念和最终敌人`,
       ].join("\n")
     : [
         `你是资深网文架构师。根据故事设定自由设计回环骨架，不套用固定模板。`,
-        "",
+        ``,
         `【回环结构说明】`,
         `每轮回环遵循 触发→展开→挫折→转折→高潮→结算 的自然节奏，`,
         `但具体阶段划分和占比应根据故事类型灵活调整。`,
@@ -176,7 +168,7 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
         `升级类：能力提升节奏更重要（收集→验证→突破→新瓶颈）`,
         `办案类：案件推进节奏更重要（案发→调查→受阻→突破→收网）`,
         ``,
-        `【回环数要求】${loopCount}轮回环，每轮15-25章`,
+        `每轮15-25章（具体由分批指令指定回环数，必须严格生成指定数量的回环）`,
         ``,
         `【设计原则】`,
         `1. 根据故事的前提和主线，推断最自然的回环单元（如：副本/案件/晋升/事件），不要生搬硬套`,
@@ -193,7 +185,31 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
   });
   let worldRulesContext = "";
   if (worldRules.length > 0) {
-    worldRulesContext = `\n【世界规则】\n${worldRules.map(r => `[${r.category}] ${r.title}: ${r.content}`).join("\n")}`;
+    worldRulesContext = `\n【世界规则】\n${worldRules.map((r: { category: string; title: string; content: string }) => `[${r.category}] ${r.title}: ${r.content}`).join("\n")}`;
+  }
+
+  // Power system tree context (via typed accessor)
+  const powerTree = await repo.getPowerSystemTree(input.novelId);
+  let powerSystemContext = "";
+  if (powerTree?.length) {
+    const levelNames = powerTree.map((n: { name: string; children?: Array<{ name: string }> }) => {
+      const subNames = n.children?.map(c => c.name).filter(Boolean) ?? [];
+      return subNames.length > 0 ? `${n.name}（子境界：${subNames.join("、")}）` : n.name;
+    });
+    powerSystemContext = `\n【力量体系】${levelNames.join(" → ")}`;
+  }
+
+  // Character roster context (Step 3 output → Step 4 input)
+  let characterContext = "";
+  const characters = await prisma.novelCharacter.findMany({
+    where: { novelId: input.novelId },
+    select: { name: true, role: true, personality: true },
+  });
+  if (characters.length > 0) {
+    characterContext = `\n【角色阵容】\n${characters.map((c: { name: string; role: string; personality: string | null }) => {
+      const roleLabel = c.role === "protagonist" ? "主角" : c.role === "antagonist" ? "对手" : c.role === "supporting" ? "配角" : "次要";
+      return `${c.name}（${roleLabel}）：${c.personality || "未设定动机"}`;
+    }).join("\n")}`;
   }
 
   const userPrompt = [
@@ -205,6 +221,8 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
     Array.isArray(gfLimits) && gfLimits.length > 0
       ? `金手指限制：${gfLimits.join("、")}` : null,
     worldRulesContext,
+    powerSystemContext,
+    characterContext,
     archProfileStats,
   ].filter(Boolean).join("\n");
 
@@ -225,31 +243,54 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
     } catch { /* ignore */ }
   }
 
-  const finalUserPrompt = userPrompt + refContext;
+  // Batch generation: single AI call can realistically generate ~7 high-quality loops.
+  // For novels needing 20+ loops, split into batches with context from previous batch.
+  const BATCH_SIZE = 7;
+  const batches = Math.ceil(loopCount / BATCH_SIZE);
 
-  const raw = await aiInvoke({
-    assetId: "novel.loop-skeleton.generate",
-    userPrompt: finalUserPrompt,
-    schema: LoopSkeletonSchema,
-    temperature: 0.8,
-    novelId: input.novelId,
-  });
+  let allLoops: LoopSkeletonItem[] = [];
+  let previousBatchSummary = "";
 
-  // Ensure indices are sequential
-  const loops: LoopSkeletonItem[] = raw.loops.map((l, i) => ({
-    loopIndex: i + 1,
-    triggerEvent: l.triggerEvent,
-    dungeonName: l.dungeonName,
-    estimatedChapters: l.estimatedChapters,
-    settlementContent: l.settlementContent,
-    scaleUpDirection: l.scaleUpDirection,
-  }));
+  for (let b = 0; b < batches; b++) {
+    const batchStart = b * BATCH_SIZE + 1;
+    const batchEnd = Math.min((b + 1) * BATCH_SIZE, loopCount);
+
+    const batchPrompt = [
+      userPrompt + refContext,
+      `\n【本批回环】共 ${loopCount} 轮，当前生成第 ${batchStart}-${batchEnd} 轮（每轮15-25章）。`,
+      b === 0
+        ? `这是全书的开头批次。建立从日常到超凡的初始过渡，为后续回环奠定舞台基础。`
+        : `前面已生成：\n${previousBatchSummary}\n\n确保本轮的回环与前面不重复，舞台较前一批进一步放大，敌人进一步提升。`,
+    ].join("\n");
+
+    const raw = await aiInvoke({
+      assetId: "novel.loop-skeleton.generate",
+      userPrompt: batchPrompt,
+      schema: LoopSkeletonSchema,
+      temperature: 0.8,
+      novelId: input.novelId,
+    });
+
+    const batchLoops: LoopSkeletonItem[] = raw.loops.map((l, i) => ({
+      loopIndex: batchStart + i,
+      triggerEvent: l.triggerEvent,
+      dungeonName: l.dungeonName,
+      estimatedChapters: l.estimatedChapters,
+      settlementContent: l.settlementContent,
+      scaleUpDirection: l.scaleUpDirection,
+    }));
+
+    allLoops = allLoops.concat(batchLoops);
+    previousBatchSummary = batchLoops
+      .map(l => `第${l.loopIndex}轮回环「${l.triggerEvent?.slice(0, 40)}」→ ${l.scaleUpDirection?.slice(0, 40)}`)
+      .join("\n");
+  }
 
   return {
     architectureType: input.architectureType,
-    totalLoops: loops.length,
-    loops,
-    estimatedTotalChapters: loops.reduce((s, l) => s + l.estimatedChapters, 0),
+    totalLoops: allLoops.length,
+    loops: allLoops,
+    estimatedTotalChapters: allLoops.reduce((s, l) => s + l.estimatedChapters, 0),
   };
 }
 
@@ -265,6 +306,7 @@ export async function expandLoopToVolume(
   const prisma = getPrisma();
   const novel = await prisma.novel.findUnique({ where: { id: novelId } });
   if (!novel) throw new Error("Novel not found");
+  const repo = createNovelRepo(prisma);
 
   // Fetch character roster for context injection (Step 3 output → Step 4 input)
   const characters = await prisma.novelCharacter.findMany({
@@ -280,16 +322,14 @@ export async function expandLoopToVolume(
   const loopItem = skeleton.loops.find(l => l.loopIndex === loopIndex);
   if (!loopItem) throw new Error(`Loop ${loopIndex} not found in skeleton`);
 
-  // Check for user-customized loop definition
-  let customPhases: Array<{ phase: string; label: string }> | null = null;
-  if (novel.loopDefinition) {
-    try {
-      const def = JSON.parse(novel.loopDefinition);
-      if (def.phases?.length > 0) customPhases = def.phases;
-    } catch { /* use default */ }
+  // Check for user-customized loop definition (via typed accessor)
+  const loopDef2 = await repo.getLoopDefinition(novelId);
+  let customPhases2: Array<{ phase: string; label: string }> | null = null;
+  if (loopDef2?.phases?.length) {
+    customPhases2 = loopDef2?.phases?.map((p: { key: string; label: string }) => ({ phase: p.key, label: p.label })) ?? null;
   }
-  const effectivePhases = customPhases ?? arch?.defaultLoop.phases ?? [];
-  const effectivePhaseOrder = effectivePhases.map(p => p.label).join(" → ");
+  const effectivePhases2 = customPhases2 ?? arch?.defaultLoop.phases ?? [];
+  const effectivePhaseOrder = effectivePhases2.map((p: { label: string }) => p.label).join(" → ");
 
   // Get previous loop's settlement for context
   const prevLoop = skeleton.loops.find(l => l.loopIndex === loopIndex - 1);
@@ -297,11 +337,15 @@ export async function expandLoopToVolume(
     ? `\n【前卷实际进展】\n${previousVolumeSummaries.map((s, i) => `第${i + 1}卷：${s}`).join("\n")}`
     : "";
 
-  // Build content beat hint from novel profile or architecture default
+  // Build content beat hint from typed accessor or architecture default
   let contentBeatHint = "";
   let beatProfile: Record<string, { pct: number; span: string; label: string }> | null = null;
-  if (novel.contentBeatProfile) {
-    try { beatProfile = JSON.parse(novel.contentBeatProfile); } catch {}
+  const beatData = await repo.getContentBeatProfile(novelId);
+  if (beatData?.beats) {
+    beatProfile = beatData.beats.reduce((acc, b) => {
+      acc[b.type] = { pct: b.pct, span: b.span, label: b.label };
+      return acc;
+    }, {} as Record<string, { pct: number; span: string; label: string }>);
   }
   if (!beatProfile && arch?.defaultContentBeats) {
     beatProfile = arch.defaultContentBeats;
@@ -315,20 +359,19 @@ export async function expandLoopToVolume(
     contentBeatHint = `内容节拍配比（共${chapterCount}章）：\n${beatAssignments}`;
   }
 
-  // ArchitectureProfile context for chapter type distribution (from reference book or template)
+  // ArchitectureProfile context via typed accessor
+  const archProfile2 = await repo.getArchitectureProfile(novelId);
   let volumeArchContext = "";
-  try {
-    const ap = JSON.parse(novel.architectureProfile || "{}");
-    if (ap.chapterTypeDistribution) {
-      volumeArchContext = `\n【对标书章节类型分布】推进:${ap.chapterTypeDistribution.advance}% 过渡:${ap.chapterTypeDistribution.transition}% 冷却:${ap.chapterTypeDistribution.cooldown}% 高潮:${ap.chapterTypeDistribution.climax}%`;
-    }
-    if (ap.coolPointRecipe) {
-      volumeArchContext += `\n【对标书爽点配比】收集:${ap.coolPointRecipe.collect}% 策略:${ap.coolPointRecipe.strategy}% 验证:${ap.coolPointRecipe.verify}% 揭示:${ap.coolPointRecipe.reveal}% 升级:${ap.coolPointRecipe.upgrade}% 打脸:${ap.coolPointRecipe.faceSlap}%`;
-    }
-    if (ap.hookProfile) {
-      volumeArchContext += `\n【对标书钩子密度】每章${ap.hookProfile.shortTermPerChapter}个短期 每卷${ap.hookProfile.mediumTermPerVolume}个中期 ${ap.hookProfile.longTermLines}条长线`;
-    }
-  } catch {}
+  if (archProfile2?.chapterTypeDistribution) {
+    volumeArchContext = `\n【对标书章节类型分布】推进:${archProfile2.chapterTypeDistribution.advance}% 过渡:${archProfile2.chapterTypeDistribution.transition}% 冷却:${archProfile2.chapterTypeDistribution.cooldown}% 高潮:${archProfile2.chapterTypeDistribution.climax}%`;
+  }
+  if (archProfile2?.coolPointRecipe) {
+    const r = archProfile2.coolPointRecipe;
+    volumeArchContext += `\n【对标书爽点配比】收集:${r.collect}% 策略:${r.strategy}% 验证:${r.verify}% 揭示:${r.reveal}% 升级:${r.upgrade}% 打脸:${r.face_slap ?? r.faceSlap ?? 0}%`;
+  }
+  if (archProfile2?.hookProfile) {
+    volumeArchContext += `\n【对标书钩子密度】每章${archProfile2.hookProfile.shortTermPerChapter}个短期 每卷${archProfile2.hookProfile.mediumTermPerVolume}个中期 ${archProfile2.hookProfile.longTermLines}条长线`;
+  }
 
   const systemPrompt = arch
     ? [

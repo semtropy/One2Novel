@@ -6,8 +6,11 @@ const LLMCharacterSchema = z.object({
   name: z.string(), role: z.string(), personality: z.string(), background: z.string(),
   appearance: z.string().optional(), quirks: z.string().optional(),
   currentStatus: z.string().optional(),
-  goal: z.string(), voice: z.string(),
+  coreMotivation: z.string().optional(),
+  goal: z.string().optional(), // @deprecated — kept for backward compat during transition
+  voice: z.string(),
   identity: z.string(), faction: z.string().optional(), flaw: z.string().optional(),
+  characterArc: z.string().optional(),
 });
 const LLMCharExtractSchema = z.object({
   characters: z.array(LLMCharacterSchema),
@@ -15,7 +18,7 @@ const LLMCharExtractSchema = z.object({
 });
 
 export interface CharacterExtraction {
-  characters: { name: string; role: string; personality: string; background: string; appearance?: string; quirks?: string; currentStatus?: string; currentGoal: string; voiceTexture: string; identityLabel: string; factionLabel?: string; prohibitions?: string }[];
+  characters: { name: string; role: string; personality: string; background: string; appearance?: string; quirks?: string; currentStatus?: string; coreMotivation?: string; currentGoal: string; voiceTexture: string; identityLabel: string; factionLabel?: string; prohibitions?: string }[];
   relationships: { source: string; target: string; type: string; summary: string }[];
 }
 
@@ -45,15 +48,11 @@ export async function persistCharacters(
   // Create NovelCharacters
   const charNameToId: Record<string, string> = {};
   for (const c of result.characters) {
-    const created = await prisma.novelCharacter.create({
-      data: {
-        novelId, name: c.name, role: c.role, personality: c.personality,
-        background: c.background, appearance: c.appearance, quirks: c.quirks,
-        currentStatus: c.currentStatus, currentGoal: c.currentGoal,
-        voiceTexture: c.voiceTexture, identityLabel: c.identityLabel,
-        prohibitions: c.prohibitions ?? null,
-      },
-    });
+    // Use raw SQL — must include createdAt/updatedAt (Prisma defaults don't apply)
+    const id = `char_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const now = new Date().toISOString();
+    await prisma.$executeRaw`INSERT INTO NovelCharacter (id, novelId, name, role, personality, background, coreMotivation, appearance, quirks, currentStatus, currentGoal, voiceTexture, identityLabel, factionLabel, prohibitions, createdAt, updatedAt) VALUES (${id}, ${novelId}, ${c.name}, ${c.role}, ${c.personality}, ${c.background}, ${c.coreMotivation ?? null}, ${c.appearance ?? null}, ${c.quirks ?? null}, ${c.currentStatus ?? null}, ${c.currentGoal}, ${c.voiceTexture}, ${c.identityLabel}, ${c.factionLabel ?? null}, ${c.prohibitions ?? null}, ${now}, ${now})`;
+    const created = await prisma.novelCharacter.findFirst({ where: { novelId, name: c.name }, orderBy: { createdAt: "desc" } }) as { id: string };
     charNameToId[c.name] = created.id;
   }
 
@@ -71,10 +70,10 @@ export async function persistCharacters(
 
 export async function generateCharacters(novelId: string): Promise<CharacterExtraction> {
   const prisma = getPrisma();
-  const novel = await prisma.novel.findUnique({ where: { id: novelId }, include: { chapters: { orderBy: { order: "asc" }, take: 30 } } });
+  const novel = await prisma.novel.findUnique({ where: { id: novelId }, include: { chapters: { orderBy: { order: "asc" } } } });
   if (!novel) throw new Error("Novel not found");
   const outline = novel.structuredOutline ?? "";
-  const chList = novel.chapters.map(c => `第${c.order}章 ${c.title}`).join("、");
+  const chList = (novel.chapters as Array<{ order: number; title: string }>).map(c => `第${c.order}章 ${c.title}`).join("、");
 
   const descriptionText = novel.description ? `\n原始灵感/大纲：\n${novel.description.slice(0, 8000)}` : "";
   // Gather architecture context to guide character generation
@@ -121,10 +120,9 @@ export async function generateCharacters(novelId: string): Promise<CharacterExtr
   const worldRules = await prisma.worldRule.findMany({
     where: { novelId, status: "active" },
     select: { category: true, title: true, content: true },
-    take: 15,
   });
   if (worldRules.length > 0) {
-    worldContext += `\n【世界规则】\n${worldRules.map(r => `[${r.category}] ${r.title}: ${r.content}`).join("\n")}`;
+    worldContext += `\n【世界规则】\n${(worldRules as Array<{ category: string; title: string; content: string }>).map(r => `[${r.category}] ${r.title}: ${r.content}`).join("\n")}`;
   }
   // Golden finger summary
   if (novel.goldenFinger) {
@@ -159,7 +157,17 @@ export async function generateCharacters(novelId: string): Promise<CharacterExtr
   });
 
   return {
-    characters: raw.characters.map(c => ({ name: c.name, role: normRole(c.role), personality: c.personality, background: c.background, appearance: c.appearance ?? undefined, quirks: c.quirks ?? undefined, currentStatus: c.currentStatus ?? undefined, currentGoal: c.goal, voiceTexture: c.voice, identityLabel: c.identity, factionLabel: c.faction ?? undefined, prohibitions: c.flaw ?? undefined })),
+    characters: raw.characters.map(c => ({
+      name: c.name, role: normRole(c.role),
+      personality: c.personality, background: c.background,
+      appearance: c.appearance ?? undefined, quirks: c.quirks ?? undefined,
+      currentStatus: c.currentStatus ?? undefined,
+      coreMotivation: c.coreMotivation ?? c.goal ?? undefined, // prefer new field, fallback to old
+      currentGoal: c.goal ?? "", // kept for backward compat
+      voiceTexture: c.voice, identityLabel: c.identity,
+      factionLabel: c.faction ?? undefined,
+      prohibitions: c.flaw ?? undefined,
+    })),
     relationships: (raw.relationships ?? []).map(r => ({ source: r.source, target: r.target, type: r.type, summary: r.summary })),
   };
 }

@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { RefreshCw, XCircle, Play, Save, Download, X, ChevronDown, Lightbulb } from "lucide-react";
 import { api } from "../../app/api";
-import { useNovel, useOptimizeChapter } from "../../api/novel";
+import { useNovel } from "../../api/novel";
+import { useOptimizeChapter } from "../../api/chapters";
 import { type RevisionOperation } from "../../api/revision";
 import { ChapterEditor } from "./ChapterEditor";
 import { RevisionToolbar } from "./RevisionToolbar";

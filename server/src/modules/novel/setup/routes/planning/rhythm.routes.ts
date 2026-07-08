@@ -1,6 +1,7 @@
 /** Phase 3: Cool point scheduling + Hook density + Rhythm reports */
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { getPrisma } from "../../../../../platform/db/client";
+import { createNovelRepo } from "../../../../../platform/data/repositories";
 import { param } from "../../../../../platform/express/params";
 import { validateVolumeRhythm } from "../../../planning/storyMacro/constraintEngine";
 
@@ -109,8 +110,14 @@ router.get("/:novelId/expectation-summary", async (req: Request, res: Response, 
     );
 
     let profile: { coolPointRecipe?: Record<string, number>; hookProfile?: Record<string, number>; payoffWindow?: number } | null = null;
-    if (novel?.expectationProfile) {
-      try { profile = JSON.parse(novel.expectationProfile); } catch {}
+    const repo = createNovelRepo(getPrisma());
+    const ep = await repo.getExpectationProfile(String(req.params.novelId));
+    if (ep) {
+      profile = {
+        coolPointRecipe: ep.coolPointRecipe,
+        hookProfile: ep.hookProfile ? { shortTermPerChapter: ep.hookProfile.shortTermPerChapter, longTermPerVolume: ep.hookProfile.longTermPerVolume } : undefined,
+        payoffWindow: ep.payoffWindow,
+      };
     }
 
     res.json({ data: { profile, volumeReports } });

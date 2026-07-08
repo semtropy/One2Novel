@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { RefreshCw, AlertTriangle } from "lucide-react";
-import { useNovelStatistics, useDailyOutput, useQualityTrend, usePayoffStats, useCrossVolumeAudit, useNovel, type CrossVolumeAuditReport } from "../../api/novel";
+import { useNovelStatistics, useDailyOutput, useQualityTrend, usePayoffStats } from "../../api/statistics";
+import { useCrossVolumeAudit, type CrossVolumeAuditReport } from "../../api/volumes";
+import { useNovel } from "../../api/novel";
 
 interface Props {
   novelId: string;

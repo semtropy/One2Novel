@@ -41,10 +41,11 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
   // Reference profiles
   const [profiles, setProfiles] = useState<ProfileItem[]>([]);
 
-  // Confirm button state
+  // Confirm button state — derived from data, persists across refreshes
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false); // transient success flash
+  const isConfirmed = !!(novel?.architectureType && novel?.loopSkeleton);
 
   // Init from novel
   useEffect(() => { if (novel?.architectureType && !selectedArch) setSelectedArch(novel.architectureType); }, [novel?.architectureType]);
@@ -89,7 +90,6 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
     try {
       if (phases.length > 0) await api.put(`/novels/${novelId}/loop-definition`, { phases }).catch(() => {});
       await api.post(`/novels/${novelId}/pipeline/step/architecture`, {
-        architectureType: selectedArch || "case_driven",
         centralQuestion: novel?.centralQuestion ?? undefined,
         endingDirection: novel?.endingDirection ?? undefined,
       });
@@ -102,53 +102,40 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
 
   // ── Render ───────────────────────────────────────
 
-  const hasProfileArchs = profiles.length > 0;
   return (
     <div className="space-y-5">
       <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="text-sm font-medium text-slate-700 mb-3">选择长篇架构</h3>
-        <p className="text-xs text-slate-400 mb-4">上传参考书进行深度分析，获得对标书的真实架构数据作为蓝图。</p>
+        <h3 className="text-sm font-medium text-slate-700 mb-3">参考书蓝图</h3>
+        <p className="text-xs text-slate-400 mb-4">上传参考书进行深度分析，获得对标书的真实架构数据（回环结构、节奏曲线、金手指模式等）。分析结果将自动注入后续步骤的 AI 上下文。</p>
 
-        {/* Reference profiles as architecture cards */}
-        {hasProfileArchs && (
-          <>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="flex-1 h-px bg-slate-100" />
-              <span className="text-[10px] text-slate-400 shrink-0">参考书分析结果</span>
-              <div className="flex-1 h-px bg-slate-100" />
-            </div>
-            <div className="grid grid-cols-3 gap-2.5 mb-4">
-              {profiles.map(profile => {
-                const isSelected = selectedProfileId === profile.id;
-                const archLabel = "已分析";
-                return (
-                <button key={profile.id} onClick={() => handleSelectProfile(profile)}
-                  className={cn("rounded-xl border text-left transition-all", isSelected ? "border-brand-600 bg-brand-50/30 ring-1 ring-brand-300" : "border-slate-200 bg-white hover:border-slate-300")}>
-                  <div className="p-3.5">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-[10px] rounded bg-brand-100 px-1 py-0 text-brand-700">参考书</span>
-                      <span className={cn("text-sm font-semibold truncate", isSelected ? "text-brand-900" : "text-slate-700")}>{profile.name}</span>
-                    </div>
-                    <div className="text-xs text-slate-500 mb-1.5">架构：{archLabel}</div>
-                    <div className="text-[10px] text-slate-400">{new Date(profile.createdAt).toLocaleDateString("zh-CN")} 分析</div>
+        {/* Reference profiles */}
+        {profiles.length > 0 ? (
+          <div className="grid grid-cols-3 gap-2.5 mb-3">
+            {profiles.map(profile => {
+              const isSelected = selectedProfileId === profile.id;
+              return (
+              <button key={profile.id} onClick={() => handleSelectProfile(profile)}
+                className={cn("rounded-xl border text-left transition-all", isSelected ? "border-brand-600 bg-brand-50/30 ring-1 ring-brand-300" : "border-slate-200 bg-white hover:border-slate-300")}>
+                <div className="p-3.5">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-[10px] rounded bg-brand-100 px-1 py-0 text-brand-700">参考书</span>
+                    <span className={cn("text-sm font-semibold truncate", isSelected ? "text-brand-900" : "text-slate-700")}>{profile.name}</span>
                   </div>
-                  {isSelected && (
-                    <div className="border-t border-brand-100 p-3 space-y-1.5 text-xs bg-white">
-                      <div><span className="font-medium text-slate-600">状态：</span><span className="text-slate-500">已分析，查看驾驶舱获取完整架构蓝图</span></div>
-                      <div><span className="font-medium text-slate-600">分析维度：</span><span className="text-slate-500">回环叙事 · 节奏曲线 · 金手指 · 写法技法 · 写作统计</span></div>
-                    </div>
-                  )}
-                </button>
-              )})}
-            </div>
-          </>
+                  <div className="text-xs text-slate-500 mb-1.5">已分析</div>
+                  <div className="text-[10px] text-slate-400">{new Date(profile.createdAt).toLocaleDateString("zh-CN")} 分析</div>
+                </div>
+              </button>
+            )})}
+          </div>
+        ) : (
+          <div className="py-8 text-center">
+            <p className="text-xs text-slate-400 mb-2">尚未上传参考书</p>
+            <button onClick={() => navigate("/reference-profiles/new")}
+              className="rounded-lg border border-dashed border-slate-300 px-4 py-2 text-xs text-slate-500 hover:border-slate-400 hover:text-slate-700 transition-colors">
+              <BookOpen size={12} className="inline mr-1" />上传参考书
+            </button>
+          </div>
         )}
-
-        {/* CTA: analyze new reference book */}
-        <button onClick={() => navigate("/reference-profiles/new")}
-          className="flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500 hover:border-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors w-full justify-center">
-          <BookOpen size={12} />上传新的参考书 <ArrowRight size={10} />
-        </button>
       </section>
 
       {/* Loop Phase Editor — always visible when phases exist */}
@@ -204,17 +191,23 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
         </section>
       )}
 
-      {/* Confirm button */}
-      <button onClick={handleConfirmArchitecture} disabled={saving || saveSuccess}
-        className={cn(
-          "w-full rounded-xl py-2.5 text-sm font-medium transition-colors disabled:opacity-50",
-          saveSuccess ? "bg-green-600 text-white" : "bg-slate-900 text-white hover:bg-slate-800",
-        )}>
-        {saving ? <RefreshCw size={14} className="animate-spin inline mr-1" /> :
-         saveSuccess ? <CheckCircle size={14} className="inline mr-1" /> :
-         <Sparkles size={14} className="inline mr-1" />}
-        {saving ? "保存中..." : saveSuccess ? "架构已确认 ✓" : "确认架构"}
-      </button>
+      {/* Save phases and auto-fill golden finger from reference analysis */}
+      <div className="space-y-2">
+        <button onClick={() => handleConfirmArchitecture()} disabled={saving}
+          className={cn(
+            "w-full rounded-xl py-2.5 text-sm font-medium transition-colors disabled:opacity-50",
+            isConfirmed ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-slate-800 text-white hover:bg-slate-700",
+          )}>
+          {saving ? <><RefreshCw size={14} className="animate-spin inline mr-1" />保存中…</> :
+           isConfirmed ? <><CheckCircle size={14} className="inline mr-1" />已保存 ✓</> :
+           <><Save size={14} className="inline mr-1" />保存回环阶段</>}
+        </button>
+        {isConfirmed && (
+          <p className="text-[10px] text-slate-400 text-center">
+            回环阶段已保存。参考书金手指数据已自动填充。
+          </p>
+        )}
+      </div>
       {saveError && <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-600">{saveError}</div>}
     </div>
   );
