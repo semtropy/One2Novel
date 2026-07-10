@@ -5,7 +5,7 @@ dist/
 *.db*
 .DS_Store
 .vite/
-.agent/
+.agents/
 .claude/
 *.tsbuildinfo
 *.log
