@@ -1,5 +1,6 @@
 import { getPrisma } from "../../../../platform/db/client";
 import type { ArchitectureProfile, WritingTechniques } from "@one2novel/shared/types/architectureProfile";
+import { REF_ANALYSIS_MAX_CHARS } from "../../../../platform/config/constants";
 import { parseChapters } from "./parse";
 import { batchAnnotateChapters } from "./annotate";
 import {

@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
 import { aiInvoke } from "../../../../platform/llm/aiService";
+import { REF_PROMPT_SLICE_LARGE } from "../../../../platform/config/constants";
 import { logEventError } from "../../../../platform/logging/eventErrorLog";
 
 const CharacterPostChapterSchema = z.object({
@@ -77,7 +78,7 @@ export async function updateCharacterStatesAfterChapter(
       charList,
       "",
       `## 第${chapterOrder}章正文`,
-      chapterContent.slice(0, 6000),
+      chapterContent.slice(0, REF_PROMPT_SLICE_LARGE),
     ].join("\n");
 
     const result = await aiInvoke({

@@ -35,6 +35,10 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
   const eventSourceRef = useRef<EventSource | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [showGenerateMenu, setShowGenerateMenu] = useState(false);
+  // Generation resilience
+  const [generationInterrupted, setGenerationInterrupted] = useState(false);
+  const [interruptedContent, setInterruptedContent] = useState("");
+  const generationContentRef = useRef("");
 
   // ─── Revision state ──────────────────────────────────
   const [selectedParagraphs, setSelectedParagraphs] = useState<string[]>([]);
@@ -167,9 +171,17 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
 
   async function handleGenerate() {
     setGenerating(true); setStage(""); setError(""); setContent(""); setAiGenerated(false);
+    setGenerationInterrupted(false);
+    generationContentRef.current = "";
 
     const controller = new AbortController();
     abortRef.current = controller;
+
+    let heartbeatReceived = false;
+    let lastHeartbeatTs = Date.now();
+    let tokenCount = 0;
+    const DRAFT_SAVE_INTERVAL = 50; // Save to localStorage every N tokens
+    const heartbeatTimeout = 30_000; // 3x heartbeat interval tolerance
 
     try {
       const response = await fetch(`/api/novels/${novelId}/chapters/${chapterId}/write`, {
@@ -201,22 +213,90 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
             const data = JSON.parse(line.slice(6));
             switch (currentEvent) {
               case "stage": setStage(data.stage); break;
-              case "token": setContent(p => p + data.text); break;
+              case "token":
+                setContent(p => p + data.text);
+                generationContentRef.current += data.text;
+                tokenCount++;
+                // Periodically save to localStorage for recovery
+                if (tokenCount % DRAFT_SAVE_INTERVAL === 0) {
+                  try {
+                    localStorage.setItem(`gen-draft-${chapterId}`, JSON.stringify({
+                      content: generationContentRef.current,
+                      ts: Date.now(),
+                    }));
+                  } catch { /* localStorage full */ }
+                }
+                break;
+              case "heartbeat":
+                heartbeatReceived = true;
+                lastHeartbeatTs = data.ts;
+                break;
               case "complete":
+                // Clear generation draft on success
+                try { localStorage.removeItem(`gen-draft-${chapterId}`); } catch {}
                 setGenerating(false); setAiGenerated(true); refetch();
+                break;
+              case "error":
+                setError(data.message ?? "生成失败");
+                setGenerating(false);
                 break;
             }
           }
         }
+
+        // Detect stale connection (no heartbeat within timeout)
+        if (heartbeatReceived && Date.now() - lastHeartbeatTs > heartbeatTimeout) {
+          // Connection is stale — save what we have and break
+          const partialContent = generationContentRef.current;
+          if (partialContent.length > 0) {
+            setGenerationInterrupted(true);
+            setInterruptedContent(partialContent);
+            setContent(partialContent);
+            setError("网络连接已断开，部分内容已保存到本地草稿");
+          }
+          break;
+        }
       }
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
-      setError(e instanceof Error ? e.message : "生成失败");
+      // On error, try to recover partial content
+      const partialContent = generationContentRef.current;
+      if (partialContent.length > 0) {
+        setGenerationInterrupted(true);
+        setInterruptedContent(partialContent);
+        setContent(partialContent);
+        setError(`生成中断：${e instanceof Error ? e.message : "未知错误"}（已保存 ${partialContent.length} 字草稿）`);
+      } else {
+        setError(e instanceof Error ? e.message : "生成失败");
+      }
     } finally {
       setGenerating(false);
       abortRef.current = null;
     }
   }
+
+  // Resume generation from interrupted state
+  const handleResumeGeneration = useCallback(async () => {
+    // The user has partial content in the editor. They can click "Generate" again
+    // to regenerate. The partial content is preserved in the editor state.
+    setGenerationInterrupted(false);
+    setInterruptedContent("");
+    // The user can manually continue from the saved content
+  }, []);
+
+  // Save interrupted draft to server before leaving
+  useEffect(() => {
+    if (generationInterrupted && interruptedContent) {
+      const saveDraft = async () => {
+        try {
+          await api.patch(`/novels/${novelId}/chapters/${chapterId}/draft`, {
+            content: interruptedContent,
+          });
+        } catch { /* silent */ }
+      };
+      saveDraft();
+    }
+  }, [generationInterrupted, interruptedContent, novelId, chapterId]);
 
   const handleSave = useCallback(async () => {
     try {
@@ -240,6 +320,24 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
 
   return (
     <div className="flex flex-col h-full">
+      {/* Generation interruption banner */}
+      {generationInterrupted && interruptedContent && (
+        <div className="mb-3 mx-4 rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-800">生成已中断</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              已保存 {interruptedContent.length} 字到本地和服务器草稿。点击「生成本章」可继续生成。
+            </p>
+          </div>
+          <button
+            onClick={handleResumeGeneration}
+            className="shrink-0 px-3 py-1.5 text-xs font-medium bg-amber-200 text-amber-800 rounded hover:bg-amber-300 transition-colors"
+          >
+            清除中断标记
+          </button>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex items-center gap-2 mb-3 shrink-0 flex-wrap">
         <span className="text-sm font-bold text-slate-900 shrink-0 leading-none">第{chapter?.order ?? "?"}章</span>

@@ -108,6 +108,11 @@ promptRegistry.register({
     "- overallComment：总体评语（含题材特定维度的评估）",
     "- issues：具体问题列表，每条含 type(类型)、severity(低/中/高)、description(描述)、fixSuggestion(修复建议)",
     "",
+    "【JSON输出字段】",
+    "请严格按以下字段名输出 10 个维度分数（键名精确匹配，每项1-10分）：",
+    "openingScore, plotScore, characterScore, dialogueScore, suspenseScore,",
+    "pacingScore, showNotTellScore, languageScore, genreScore, coherenceScore",
+    "",
     "只输出JSON。",
   ].filter(Boolean).join("\n"),
 });
@@ -489,7 +494,46 @@ promptRegistry.register({
     "",
     "【Few-Shot 示例】",
     "输入：第1轮回环(第1-18章) | 标注摘要显示前3章hook=suspense/preview/suspense，中段beat=修炼/赚钱/探索，末段cool=high",
-    `输出：{"expectations":[{"loopIndex":1,"expectationType":"能力成长期待","establishmentChapter":2,"establishmentMethod":"主角首次无意识触发血脉能力后，章尾以追捕队长报告'目标似乎能预判我们的行动'暗示能力潜力远不止此","maintenanceMethod":"中段修炼章每章结尾用preview钩子预告'主角正在尝试控制能力'，同时以赚钱章（接佣兵任务）展示能力在实际战斗中的优势","fulfillmentChapter":17,"fulfillmentMethod":"决战中主角用完整血脉能力预判并切断索菲亚的'胜利线'，兑现了前面15章积累的'能力到底有多强'的期待","nextExpectation":"索菲亚退回帝国时暗示'下一次不会这么简单'，同时维克多即将透露'神陨之地'的秘密——读者接下来期待主角能力进化+真相揭示的双重兑现"}]}`,
+    `输出：{"expectations":[{"loopIndex":1,"expectationType":"能力成长期待",...}]}`,
     "只输出JSON。",
+  ].join("\n"),
+});
+
+// ── Phase 4: Context Agent — Writing Task Brief ───────────
+
+promptRegistry.register({
+  id: "novel.chapter.brief",
+  taskType: "planner", version: "v1",
+  systemPrompt: [
+    "你是写作任务书生成器。将小说上下文块浓缩为结构化的「写作任务书」。",
+    "",
+    "任务书包含五个部分：",
+    "1. 故事目标：本章要达成的叙事目的（一句话）",
+    "2. 角色状态与动机：出场角色的当前状态和本章推断出的动机",
+    "3. 情节节点与约束：必须完成的情节节点和不可违背的约束",
+    "4. 风格指导：来自风格合约和对标书的写作风格要求",
+    "5. 结尾方向：本章应该引导向的方向",
+    "",
+    "只输出JSON，不要解释。",
+  ].join("\n"),
+});
+
+// ── Phase 4: Data Agent — Structured Fact Extraction ──────
+
+promptRegistry.register({
+  id: "novel.chapter.extract",
+  taskType: "extractor", version: "v1",
+  systemPrompt: [
+    "你是章节事实提取器。从完成的章节正文中提取结构化事实。",
+    "",
+    "提取内容：",
+    "1. state_deltas：角色状态变化（field: currentStatus/currentLocation/currentGoal/availability）",
+    "2. entity_deltas：实体变化（新增角色、死亡、消亡等）",
+    "3. accepted_events：已确认的故事事件（带类型、主题、新旧值）",
+    "4. summary_text：章节摘要（100-150字）",
+    "5. scenes：场景拆解（如有明显场景转换）",
+    "6. fulfillment_result：计划节点兑现情况（planned/covered/missed）",
+    "",
+    "只输出JSON，不要解释。",
   ].join("\n"),
 });

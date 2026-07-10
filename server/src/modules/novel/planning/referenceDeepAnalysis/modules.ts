@@ -2,6 +2,7 @@ import { z } from "zod";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 import type { ArchitectureProfile, LoopPhase, ChapterTypeDistribution, ChapterLengthStats, CoolPointRecipe, HookProfile, ContentBeatProfile, CharacterSystem, PayoffPatterns, WritingTechniques } from "@one2novel/shared/types/architectureProfile";
 import type { ParsedChapter, ChapterAnnotation, LoopNarrative, RhythmProfile, GoldenFingerAnalysis, CraftStats, ExpectationTemplate } from "./index";
+import { REF_PROMPT_SLICE_LARGE, REF_PROMPT_SLICE, REF_BOOK_CONTENT_SLICE } from "../../../../platform/config/constants";
 
 // ═══════════════════════════════════════════════════════════
 // Module A: Architecture Synthesis
@@ -52,7 +53,7 @@ export async function detectAndAnalyzeLoops(
       }).join("\n\n");
       const r = await aiInvoke({
         assetId: "novel.chapter.review",
-        userPrompt: [`分析第${loop.loopIndex}轮回环（第${loop.startChapter}-${loop.endChapter}章）的叙事结构。`,`触发提示：${loop.triggerHint}`,`【章节标注】${annotationSummary.slice(0, 6000)}`,`【章节样本】${samples.slice(0, 9000)}`].join("\n"),
+        userPrompt: [`分析第${loop.loopIndex}轮回环（第${loop.startChapter}-${loop.endChapter}章）的叙事结构。`,`触发提示：${loop.triggerHint}`,`【章节标注】${annotationSummary.slice(0, REF_PROMPT_SLICE_LARGE)}`,`【章节样本】${samples.slice(0, REF_PROMPT_SLICE_LARGE)}`].join("\n"),
         schema: LoopNarrativeSchema, temperature: 0.5,
       });
       narratives.push({ loopIndex: loop.loopIndex, startChapter: loop.startChapter, endChapter: loop.endChapter, ...r });
@@ -133,7 +134,7 @@ export async function extractGoldenFinger(text: string, annotations: ChapterAnno
   try {
     const raw = await aiInvoke({
       assetId: "reference.golden-finger.extract",
-      userPrompt: [text.slice(0, 80000), "提取金手指后，分析其设计模式。",].join("\n"),
+      userPrompt: [text.slice(0, REF_PROMPT_SLICE_LARGE), "提取金手指后，分析其设计模式。",].join("\n"),
       schema: GoldenFingerSchema, temperature: 0.5,
     });
     // Evolution timeline from annotation matrix
@@ -164,13 +165,13 @@ export async function extractWritingTechniques(text: string, annotations: Chapte
   try {
     const findChapter = (type: string): string => {
       const match = annotations.find(a => a.chapterType === type || a.contentBeat === type);
-      if (!match) return text.slice(0, 3000);
+      if (!match) return text.slice(0, REF_PROMPT_SLICE);
       const pattern = new RegExp(`第${match.chapterIndex}[章節节回].*?(?=第\\d+[章節节回]|$)`, "s");
       const found = text.match(pattern);
-      return found ? found[0].slice(0, 3000) : text.slice(0, 3000);
+      return found ? found[0].slice(0, REF_PROMPT_SLICE) : text.slice(0, REF_PROMPT_SLICE);
     };
     const samples = [`【高潮场景】\n${findChapter("climax")}`, `【日常场景】\n${findChapter("cooldown")}`, `【推进场景】\n${findChapter("advance")}`].join("\n\n");
-    return await aiInvoke({ assetId: "reference.writing_assets.extract", userPrompt: samples.slice(0, 12000), schema: WritingExtractSchema, temperature: 0.5 });
+    return await aiInvoke({ assetId: "reference.writing_assets.extract", userPrompt: samples.slice(0, REF_PROMPT_SLICE_LARGE), schema: WritingExtractSchema, temperature: 0.5 });
   } catch { return null; }
 }
 

@@ -15,8 +15,11 @@
 import { OpenAIEmbeddings } from "@langchain/openai";
 import Database from "better-sqlite3";
 import path from "node:path";
+import fs from "node:fs";
 import { getEnv } from "../config/env";
 import { logEventError } from "../logging/eventErrorLog";
+import { RAG_CHUNK_CONFIG } from "../config/constants";
+import { resolveProviderBaseUrl } from "../config/providers";
 
 // ─── Types ───────────────────────────────────────────────
 
@@ -38,10 +41,10 @@ export interface ChunkConfig {
 }
 
 const DEFAULT_CHUNK_CONFIG: ChunkConfig = {
-  sceneChunkSize: 1500,
-  sceneOverlap: 300,
-  summaryChunkSize: 2000,
-  maxScenesPerChapter: 20,
+  sceneChunkSize: RAG_CHUNK_CONFIG.sceneChunkSize,
+  sceneOverlap: RAG_CHUNK_CONFIG.sceneOverlap,
+  summaryChunkSize: RAG_CHUNK_CONFIG.summaryChunkSize,
+  maxScenesPerChapter: RAG_CHUNK_CONFIG.maxScenesPerChapter,
 };
 
 // ─── SQLite Schema ───────────────────────────────────────
@@ -183,7 +186,7 @@ export class RAGService {
       try {
         this.embeddings = createClient({
           apiKey: env.QWEN_API_KEY,
-          basePath: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+          basePath: resolveProviderBaseUrl(env, "qwen"),
           model: "text-embedding-v3",
         });
         return this.embeddings;
@@ -195,7 +198,7 @@ export class RAGService {
 
   private ensureDb(): Database.Database {
     if (this.db) return this.db;
-    const fs = require("node:fs");
+    // fs already imported at top
     fs.mkdirSync(path.dirname(this.dbPath), { recursive: true });
     this.db = new Database(this.dbPath);
     this.db.exec(SCHEMA_SQL);
@@ -542,7 +545,7 @@ export class RAGService {
     // Try Qwen/DashScope rerank
     if (env.QWEN_API_KEY) {
       try {
-        const res = await fetch("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/rerank", {
+        const res = await fetch(`${resolveProviderBaseUrl(env, "qwen")}/rerank`, {
           method: "POST",
           headers: { "Authorization": `Bearer ${env.QWEN_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({ model: "bge-reranker-v2-m3", query, documents }),

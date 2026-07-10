@@ -1,5 +1,6 @@
 import type { PromptContextBlock } from "./promptTypes";
 import { sortByEffectivePriority } from "./freshnessDecay";
+import { CTX_PRIORITY_FORCE_KEEP, CTX_PRIORITY_SUMMARIZE, CTX_PRIORITY_DROP } from "../config/constants";
 
 export interface ContextSelectionResult {
   selectedBlocks: PromptContextBlock[];
@@ -18,9 +19,9 @@ export interface TokenBudgetConfig {
  * Select context blocks with deduplication and optional token budget enforcement.
  *
  * When a maxTokens budget is set:
- *   - Priority >= 90: Always kept (hard requirements like book contract, previous chapter)
- *   - Priority 60-89:  Summarized when budget exceeded (summary replaces content)
- *   - Priority < 60:   Dropped when budget exceeded
+ *   - Priority >= CTX_PRIORITY_FORCE_KEEP (90): Always kept
+ *   - Priority in [CTX_PRIORITY_SUMMARIZE, FORCE_KEEP): Summarized
+ *   - Priority < CTX_PRIORITY_DROP (60): Dropped
  */
 export function selectContextBlocks(
   blocks: PromptContextBlock[],
@@ -48,11 +49,11 @@ export function selectContextBlocks(
     let used = 0;
 
     for (const block of selectedBlocks) {
-      if (block.priority >= 90) {
+      if (block.priority >= CTX_PRIORITY_FORCE_KEEP) {
         // High priority (book contract, previous chapter): always keep full content
         kept.push(block);
         used += block.estimatedTokens;
-      } else if (block.priority >= 60 && used + block.estimatedTokens > budget.maxTokens && block.allowSummary !== false) {
+      } else if (block.priority >= CTX_PRIORITY_SUMMARIZE && used + block.estimatedTokens > budget.maxTokens && block.allowSummary !== false) {
         // Medium priority with summary allowed: truncate to fit remaining budget
         const remainingBudget = budget.maxTokens - used;
         if (remainingBudget > 100) {
@@ -63,7 +64,7 @@ export function selectContextBlocks(
         } else {
           droppedIds.add(block.id);
         }
-      } else if (block.priority < 60 && used + block.estimatedTokens > budget.maxTokens) {
+      } else if (block.priority < CTX_PRIORITY_DROP && used + block.estimatedTokens > budget.maxTokens) {
         // Low priority: drop entirely
         droppedIds.add(block.id);
       } else {

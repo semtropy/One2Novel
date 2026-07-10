@@ -22,7 +22,7 @@ export interface UserPreferences {
     estimatedChapterCount: number | null;
     defaultChapterLength: number | null;
     creationHistory: Array<{ title: string; genre: string; createdAt: string }>;
-    defaultProvider?: "deepseek" | "openai" | "anthropic";
+    defaultProvider?: string; // "deepseek" | "openai" | "anthropic" | "gemini" | "qwen" | "moonshot"
     providerModels?: Record<string, string>;
     /** Persisted API keys (masked on read from API, loaded to process.env on boot) */
     apiKeys?: Record<string, string>;

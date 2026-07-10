@@ -1,5 +1,13 @@
 import { getEnv } from "../config/env";
 import type { LLMProvider } from "./provider";
+import {
+  PROVIDER_REGISTRY,
+  resolveProviderBaseUrl,
+  resolveProviderModel,
+  isProviderConfigured,
+  getAllProviderConfigs,
+  type ProviderConfig,
+} from "../config/providers";
 
 interface LLMConnectionResult {
   ok: boolean;
@@ -8,7 +16,7 @@ interface LLMConnectionResult {
   error?: string;
 }
 
-/** Probe endpoints for each provider type */
+/** Probe endpoints for each provider type — derived from registry */
 const PROBE_CONFIG: Record<LLMProvider, { baseUrl: string; apiKey: string; model: string }> = {
   deepseek:  { baseUrl: "https://api.deepseek.com/v1",     apiKey: "", model: "" },
   openai:    { baseUrl: "https://api.openai.com/v1",        apiKey: "", model: "" },
@@ -20,20 +28,11 @@ const PROBE_CONFIG: Record<LLMProvider, { baseUrl: string; apiKey: string; model
 
 function resolveProbeConfig(provider: LLMProvider) {
   const env = getEnv();
-  switch (provider) {
-    case "deepseek":
-      return { baseUrl: env.DEEPSEEK_BASE_URL, apiKey: env.DEEPSEEK_API_KEY, model: env.DEEPSEEK_MODEL };
-    case "openai":
-      return { baseUrl: env.OPENAI_BASE_URL, apiKey: env.OPENAI_API_KEY, model: env.OPENAI_MODEL };
-    case "anthropic":
-      return { baseUrl: env.ANTHROPIC_BASE_URL ?? "https://api.anthropic.com/v1", apiKey: env.ANTHROPIC_API_KEY, model: env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6" };
-    case "gemini":
-      return { baseUrl: "https://generativelanguage.googleapis.com/v1beta", apiKey: env.GEMINI_API_KEY, model: "gemini-2.5-flash" };
-    case "qwen":
-      return { baseUrl: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", apiKey: env.QWEN_API_KEY, model: env.QWEN_MODEL ?? "qwen-plus" };
-    case "moonshot":
-      return { baseUrl: "https://api.moonshot.cn/v1", apiKey: env.MOONSHOT_API_KEY, model: env.MOONSHOT_MODEL ?? "moonshot-v1-8k" };
-  }
+  return {
+    baseUrl: resolveProviderBaseUrl(env as unknown as Record<string, unknown>, provider),
+    apiKey: env[PROVIDER_REGISTRY[provider].apiKeyEnv as keyof typeof env] as string,
+    model: resolveProviderModel(env as unknown as Record<string, unknown>, provider),
+  };
 }
 
 async function probeProvider(provider: LLMProvider): Promise<LLMConnectionResult> {
@@ -64,12 +63,12 @@ async function probeProvider(provider: LLMProvider): Promise<LLMConnectionResult
 export async function probeAllLLM(): Promise<LLMConnectionResult[]> {
   const env = getEnv();
   const configured: LLMProvider[] = [];
-  if (env.DEEPSEEK_API_KEY) configured.push("deepseek");
-  if (env.OPENAI_API_KEY) configured.push("openai");
-  if (env.ANTHROPIC_API_KEY) configured.push("anthropic");
-  if (env.GEMINI_API_KEY) configured.push("gemini");
-  if (env.QWEN_API_KEY) configured.push("qwen");
-  if (env.MOONSHOT_API_KEY) configured.push("moonshot");
+
+  for (const cfg of getAllProviderConfigs()) {
+    if (isProviderConfigured(env as unknown as Record<string, unknown>, cfg.id)) {
+      configured.push(cfg.id);
+    }
+  }
 
   if (!configured.length) {
     return [{ ok: false, provider: "none", model: "", error: "No API key configured for any provider" }];

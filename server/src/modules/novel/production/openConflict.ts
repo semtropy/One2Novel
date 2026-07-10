@@ -1,6 +1,7 @@
 import { getPrisma } from "../../../platform/db/client";
 import { aiInvoke } from "../../../platform/llm/aiService";
 import { z } from "zod";
+import { REF_PROMPT_SLICE_LARGE } from "../../../platform/config/constants";
 
 const ConflictSchema = z.object({
   conflicts: z.array(z.object({
@@ -42,7 +43,7 @@ export async function scanConflicts(novelId: string, chapterId: string): Promise
 
     const result = await aiInvoke({
       assetId: "novel.conflict.scan",
-      userPrompt: `出场角色：${charList}\n\n章节内容：\n${chapter.content.slice(0, 6000)}${prevConflictContext}`,
+      userPrompt: `出场角色：${charList}\n\n章节内容：\n${chapter.content.slice(0, REF_PROMPT_SLICE_LARGE)}${prevConflictContext}`,
       schema: ConflictSchema, temperature: 0.3,
     });
 

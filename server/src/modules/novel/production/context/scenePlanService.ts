@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 import { assembleChapterContext } from "./contextBlockBuilders";
+import { SCENE_MAX_ESTIMATED_WORDS } from "../../../../platform/config/constants";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -13,7 +14,7 @@ const SceneSchema = z.object({
   goal: z.string().optional(),
   location: z.string().optional(),
   timeOfDay: z.string().optional(),
-  estimatedWords: z.number().int().min(100).max(3000).optional(),
+  estimatedWords: z.number().int().min(100).max(SCENE_MAX_ESTIMATED_WORDS).optional(),
 });
 
 const ScenePlanOutputSchema = z.object({

@@ -14,6 +14,7 @@
 import { z } from "zod";
 import { getPrisma } from "../../../platform/db/client";
 import { aiInvoke } from "../../../platform/llm/aiService";
+import { REF_CHUNK_SIZE, REF_PROMPT_SLICE_LARGE } from "../../../platform/config/constants";
 import type { ContentBeatAnnotation } from "@one2novel/shared/types/novel";
 
 // ─── Types ─────────────────────────────────────────────
@@ -199,7 +200,7 @@ export async function inferLoops(novelId: string): Promise<ReferenceAnnotation> 
     novelId,
     userPrompt: [
       `全书共${chapters.length}章。以下是全部章节目录，请从头到尾扫描，标注每轮回环的起止章号。`,
-      `\n${titleList.slice(0, 15000)}${existingContext}`,
+      `\n${titleList.slice(0, REF_PROMPT_SLICE_LARGE)}${existingContext}`,
       `\n\n请输出每轮回环的起止章号（chapterIndex + type: \"start\"/\"end\"）.`,
       `标题不足以判断时，根据标题的内容暗示（如"突破"/"决战"/"新篇章"等）推断。`,
     ].join("\n"),
@@ -288,7 +289,7 @@ export async function inferCoolPoints(novelId: string): Promise<ReferenceAnnotat
   const raw = await aiInvoke({
     assetId: "reference.coolpoint.infer",
     novelId,
-    userPrompt: `参考书章节片段(均匀采样${sampleIndices.length}章覆盖全书${chapters.length}章)：\n${chapterSnippets.slice(0, 15000)}\n\n${existingContext}`,
+    userPrompt: `参考书章节片段(均匀采样${sampleIndices.length}章覆盖全书${chapters.length}章)：\n${chapterSnippets.slice(0, REF_PROMPT_SLICE_LARGE)}\n\n${existingContext}`,
     schema: CoolPointInferenceSchema,
     temperature: 0.4,
   });

@@ -33,6 +33,7 @@ import { buildCharacterProhibitions, type CharacterProhibition } from "../qualit
 import { buildRagContextBlock } from "./ragContextBuilder";
 import { buildEntityLifecycleBlock, compileEntityLifecycleContent } from "../post/entityLifecycle";
 import { buildCurrentVolumeContext } from "./volumeCompressor";
+import { buildMemoryPack, compileMemoryPackContent } from "../post/memoryOrchestrator";
 
 // Content guides (extracted to keep this file focused on assembly logic)
 import { getLoopPhaseGuide, buildReferenceStyleHints, buildReferenceCounterpart, getContentBeatGuide } from "./contentGuides";
@@ -145,6 +146,22 @@ export async function assembleChapterBlocks(
         id: "entity_lifecycle", group: "character_hard_facts", priority: 95, required: true,
         content: lifecycleContent, conflictGroup: "character_hard_facts", freshness: 1,
       }));
+    }
+  } catch { /* best-effort */ }
+
+  // ── semantic_memory (write-after沉淀, write-before injection) ──
+  try {
+    const novelOrder = chapter.order;
+    const pack = await buildMemoryPack(novelId, novelOrder);
+    if (pack) {
+      const content = compileMemoryPackContent(pack);
+      if (content) {
+        blocks.push(createContextBlock({
+          id: "semantic_memory", group: "semantic_memory", priority: 92,
+          content,
+          freshness: 1,
+        }));
+      }
     }
   } catch { /* best-effort */ }
 

@@ -106,8 +106,10 @@ model Novel {
   chaseDebts          ChaseDebt[]
   debtEvents          DebtEvent[]
   chapterReadingPowers ChapterReadingPower[]
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
+  chapterCommits       ChapterCommit[]
+  storyEvents          StoryEvent[]
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
 }
 
 // ─── Chapter ──────────────────────────────────────────
@@ -121,7 +123,7 @@ model Chapter {
   chapterStatus    ChapterStatus @default(unplanned)
   targetWordCount  Int           @default(3000)
   actualWordCount  Int?
-  qualityScore     Float? // 0-80 scale
+  qualityScore     Float? // 0-100 scale (10 dimensions × 1-10)
   openingScore     Int?
   plotScore        Int?
   characterScore   Int?
@@ -153,6 +155,7 @@ model Chapter {
   acquiredResources    CharacterResource[]    @relation("ResourceAcquiredIn")
   depletedResources    CharacterResource[]    @relation("ResourceDepletedIn")
   revealedInfoProfiles CharacterInfoProfile[] @relation("InfoProfileRevealedIn")
+  chapterCommit        ChapterCommit?
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
 
@@ -614,6 +617,117 @@ model OverrideContract {
   @@index([novelId, chapter])
 }
 
+// ─── Semantic Memory — write-after fact沉淀, write-before injection ──
+
+model MemoryItem {
+  id            String   @id @default(cuid())
+  novelId       String
+  category      String   // world_rule | character_state | relationship | story_fact | open_loop | reader_promise | timeline
+  subject       String   // 主体：角色名/事件名/规则名
+  field         String   // 字段：currentStatus | first_seen | rule_content 等
+  value         String   // 值：具体的记忆内容
+  payload       String?  // JSON: 扩展数据（urgency, evidence, source_chapter 等）
+  status        String   @default("active") // active | outdated | contradicted | tentative
+  sourceChapter Int
+  evidence      String?  // JSON: 证据列表（哪些章节支持这条记忆）
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@unique([novelId, category, subject, field])
+  @@index([novelId, category, status])
+  @@index([novelId, sourceChapter])
+}
+
+// ─── Phase 3: Chapter Commit + Projection System ─────────
+
+model ChapterCommit {
+  id                    String    @id @default(cuid())
+  novelId               String
+  chapterId             String    @unique
+  chapterOrder          Int
+
+  // Quality gate snapshot at commit time
+  qualityScore          Float?
+  verdict               String?   // PASS | WARNING | NEEDS_FIX | BLOCKED
+  reviewResult          String?   // JSON: QualityResult snapshot (10 scores, issues[], dimensionResults[])
+  extractionResult      String?   // JSON: entity_deltas, state_deltas, accepted_events, summary
+
+  // Status
+  status                String    @default("pending") // pending | accepted | rejected
+  acceptedAt            DateTime?
+  rejectedAt            DateTime?
+  rejectionReason       String?
+
+  // Projection tracking
+  projectionStatus      String    @default("not_started") // not_started | in_progress | completed | partially_completed | failed
+  projectionStartedAt   DateTime?
+  projectionCompletedAt DateTime?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  chapter               Chapter   @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  novel                 Novel     @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  projectionRuns        ProjectionRun[]
+  storyEvents           StoryEvent[]
+
+  @@index([novelId, status])
+  @@index([novelId, chapterOrder])
+}
+
+model ProjectionRun {
+  id              String    @id @default(cuid())
+  commitId        String
+  commit          ChapterCommit @relation(fields: [commitId], references: [id], onDelete: Cascade)
+  writerName      String    // state | index | summary | memory | vector
+  status          String    @default("pending") // pending | running | completed | failed
+  attempt         Int       @default(1)
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  durationMs      Int?
+  error           String?
+  resultSummary   String?   // JSON: brief outcome
+
+  @@index([commitId, writerName])
+  @@index([commitId, status])
+  @@index([writerName, status])
+}
+
+model StoryEvent {
+  id            String    @id @default(cuid())
+  novelId       String
+  chapterOrder  Int
+  chapterCommit ChapterCommit? @relation(fields: [chapterCommitId], references: [id], onDelete: Cascade)
+  chapterCommitId String?
+  eventType     String    // character_state_change | character_death | character_revival |
+                          // new_relationship | relationship_change | world_rule_update |
+                          // payoff_set_up | payoff_paid | location_change | goal_change |
+                          // new_entity_appeared | entity_departed
+  subject       String
+  field         String?   // currentStatus | currentLocation | etc.
+  oldValue      String?
+  newValue      String
+  sourceChapter Int
+  confidence    Float     @default(1.0)
+  createdAt     DateTime  @default(now())
+  novel         Novel     @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@index([novelId, chapterOrder])
+  @@index([novelId, eventType])
+  @@index([novelId, subject])
+}
+
+// ─── Schema Version Tracking ─────────────────────────────
+
+model SchemaVersion {
+  id        Int      @id @default(1)
+  version   Int      @unique
+  appliedAt DateTime @default(now())
+  description String?
+  checksum  String?
+}
+
+
 model ChaseDebt {
   id                 String   @id @default(cuid())
   novelId            String
@@ -668,3 +782,4 @@ model ChapterReadingPower {
 
   @@index([novelId, chapter])
 }
+

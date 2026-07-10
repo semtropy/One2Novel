@@ -10,6 +10,7 @@
 
 import { getPrisma } from "../../../platform/db/client";
 import type { ContentBeatAnnotation } from "@one2novel/shared/types/novel";
+import { REF_BOOK_CONTENT_SLICE, REF_PROMPT_SLICE } from "../../../platform/config/constants";
 import {
   inferLoops,
   inferCoolPoints,
@@ -103,7 +104,7 @@ export function createReferenceBookService(): ReferenceBookService {
 
       return {
         id: rb.id, novelId: rb.novelId, fileName: rb.fileName,
-        totalChapters: rb.totalChapters, content: content.slice(0, 5000),
+        totalChapters: rb.totalChapters, content: content.slice(0, REF_PROMPT_SLICE),
         chapters,
         annotations: rb.annotations ? JSON.parse(rb.annotations) : null,
         analysisSummary: rb.analysisSummary ? JSON.parse(rb.analysisSummary) : null,

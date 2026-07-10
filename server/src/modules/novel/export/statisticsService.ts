@@ -127,14 +127,23 @@ export async function getQualityTrend(novelId: string): Promise<QualityTrend[]> 
     where: { novelId, qualityScore: { not: null } },
     orderBy: { order: "asc" },
     select: {
-      order: true, title: true, qualityScore: true,
-      openingScore: true, plotScore: true, characterScore: true,
-      dialogueScore: true, suspenseScore: true, pacingScore: true,
-      languageScore: true, genreScore: true,
+      order: true,
+      title: true,
+      qualityScore: true,
+      openingScore: true,
+      plotScore: true,
+      characterScore: true,
+      dialogueScore: true,
+      suspenseScore: true,
+      pacingScore: true,
+      showNotTellScore: true,
+      languageScore: true,
+      genreScore: true,
+      coherenceScore: true,
     },
   });
 
-  return (chapters as Array<{ order: number; title: string; chapterStatus: string; qualityScore: number | null; content: string | null; openingScore: number | null; plotScore: number | null; characterScore: number | null; dialogueScore: number | null; suspenseScore: number | null; pacingScore: number | null; languageScore: number | null; genreScore: number | null }>).map(ch => ({
+  return chapters.map(ch => ({
     chapterOrder: ch.order,
     title: ch.title,
     totalScore: ch.qualityScore ?? 0,
@@ -145,8 +154,10 @@ export async function getQualityTrend(novelId: string): Promise<QualityTrend[]> 
       dialogue: ch.dialogueScore ?? 0,
       suspense: ch.suspenseScore ?? 0,
       pacing: ch.pacingScore ?? 0,
+      showNotTell: ch.showNotTellScore ?? 0,
       language: ch.languageScore ?? 0,
       genre: ch.genreScore ?? 0,
+      coherence: ch.coherenceScore ?? 0,
     },
   }));
 }

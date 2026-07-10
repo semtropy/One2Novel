@@ -16,6 +16,9 @@ import { runPostWriteHooks } from "../post/postWriteHooks";
 import { finalizeChapter } from "../audit/finalization";
 import { diagnoseWorkspace } from "../revision/revisionService";
 import { formatIssuesForRepair, patchRepair, heavyRepair } from "../repair/repairService";
+import { createCommit, acceptCommit } from "../commit/commitService";
+import { runProjections } from "../commit/projectionEngine";
+import { runDataAgent } from "../agents/dataAgent";
 
 export interface ChapterPipelineResult {
   content: string;
@@ -135,8 +138,67 @@ export async function processChapter(
     await persistQualityScores(chapterId, lastQuality, { repairAttempts, finalScore });
   }
 
-  // Post-write hooks (fire-and-forget)
-  runPostWriteHooks(novelId, chapterId, currentContent, chapterOrder);
+  // ── Phase 3: Commit + Projection ──────────────────────────
+  let commitId: string | null = null;
+
+  // Upsert: get existing or create new (single DB round-trip via upsert)
+  try {
+    const commit = await prisma.chapterCommit.upsert({
+      where: { chapterId },
+      create: {
+        novelId,
+        chapterId,
+        chapterOrder,
+        qualityScore: finalScore,
+        verdict: lastQuality?.verdict ?? null,
+        reviewResult: lastQuality ? JSON.stringify(lastQuality) : null,
+        status: 'pending',
+        projectionStatus: 'not_started',
+      },
+      update: {}, // Don't update existing commits
+      select: { id: true, status: true },
+    });
+
+    if (commit.status === 'accepted') {
+      // Already accepted (from a previous run or backfill)
+      commitId = commit.id;
+    } else {
+      // Was just created as pending — accept it
+      await acceptCommit(chapterId).catch(e =>
+        logEventError("pipeline.acceptCommit", { novelId, chapterId }, e)
+      );
+      commitId = commit.id;
+    }
+  } catch (e) {
+    logEventError("pipeline.commitUpsert", { novelId, chapterId }, e);
+  }
+
+  // ── Phase 4: DataAgent (structured fact extraction) ──────
+  // When enabled, extracts structured facts and stores them in the commit.
+  // This replaces the separate LLM calls in characterStateUpdater + memoryWriter.
+  let extractionResult: Record<string, unknown> | undefined;
+  try {
+    const dataRun = await runDataAgent(novelId, chapterId, chapterOrder, currentContent);
+    if (dataRun.output) {
+      extractionResult = dataRun.output;
+      // Update the commit with extraction result
+      await prisma.chapterCommit.updateMany({
+        where: { chapterId, status: 'accepted' },
+        data: { extractionResult: JSON.stringify(dataRun.output) },
+      }).catch(e => logEventError("pipeline.updateExtraction", { novelId, chapterId }, e));
+    }
+  } catch (e) {
+    logEventError("pipeline.dataAgent", { novelId, chapterId }, e);
+  }
+
+  // Dispatch projections or fall back to post-write hooks
+  if (commitId) {
+    runProjections(commitId, novelId, chapterId, chapterOrder, currentContent, lastQuality ? (lastQuality as unknown as Record<string, unknown>) : undefined, extractionResult)
+      .catch(e => logEventError("pipeline.projections", { novelId, chapterId }, e));
+  } else {
+    // No commit — run traditional post-write hooks
+    runPostWriteHooks(novelId, chapterId, currentContent, chapterOrder);
+  }
 
   const ctx = { novelId, chapterId, chapterOrder };
 

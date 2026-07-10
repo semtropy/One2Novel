@@ -9,6 +9,7 @@ import {
   getArrayElement,
   type ZodDefInner,
 } from "./zodIntrospect";
+import { PROVIDER_REGISTRY } from "../config/providers";
 
 /** Recursively replace null with undefined in objects/arrays. AI models frequently return null for missing optional fields, but Zod's .optional() only accepts undefined. */
 function nullToUndefined(v: unknown): unknown {
@@ -297,7 +298,8 @@ export async function invokeStructuredLlm<T extends z.ZodType>(
 ): Promise<StructuredInvokeResult<T>> {
   const provider = opts.provider ?? "deepseek";
   const maxRetries = opts.maxRetries ?? 3;
-  const useJsonMode = provider === "deepseek" || provider === "openai";
+  const supportsJson = PROVIDER_REGISTRY[provider]?.supportsJsonMode ?? true;
+  const useJsonMode = supportsJson;
   const llm = createLLM(provider, {
     model: opts.model,
     temperature: opts.temperature,

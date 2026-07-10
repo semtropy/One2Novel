@@ -3,6 +3,7 @@
  * Extracted from ContextPanel.tsx
  */
 import { RefreshCw } from "lucide-react";
+import { QUALITY_DIMENSIONS } from "@one2novel/shared/types/qualityDimensions";
 import { useNovel } from "../../api/novel";
 import { type WorkspaceDiagnosis } from "../../api/revision";
 import { cn } from "../../lib/cn";
@@ -12,7 +13,7 @@ export function ReviewPanel({ novelId, chapterId, quality, diagnosis, reviewing,
 }) {
   const { data: novel } = useNovel(novelId);
   const chapter = novel?.chapters?.find(c => c.id === chapterId);
-  const scores = quality ?? (chapter?.qualityScore && chapter.qualityScore > 0 ? { openingScore: chapter.openingScore, plotScore: chapter.plotScore, characterScore: chapter.characterScore, dialogueScore: chapter.dialogueScore, suspenseScore: chapter.suspenseScore, pacingScore: chapter.pacingScore, showNotTellScore: chapter.showNotTellScore, languageScore: chapter.languageScore, genreScore: chapter.genreScore, coherenceScore: chapter.coherenceScore } : null);
+  const scores = quality ?? (chapter?.qualityScore && chapter.qualityScore > 0 ? Object.fromEntries(QUALITY_DIMENSIONS.map(d => [d.scoreField, (chapter as any)[d.scoreField] ?? 0])) : null);
   const total = scores ? Object.values(scores).reduce((a: number, b) => a + (typeof b === 'number' ? b : 0), 0) : 0;
   const displayDiagnosis = diagnosis ?? (() => { try { return chapter?.diagnosis ? JSON.parse(chapter.diagnosis) : null; } catch { return null; } })();
 
@@ -25,10 +26,10 @@ export function ReviewPanel({ novelId, chapterId, quality, diagnosis, reviewing,
         <>
           <div className="text-slate-600">总分 <span className="font-bold text-slate-800">{total}</span>/100</div>
           <div className="space-y-0.5">
-            {[["开头吸引力","openingScore"],["情节推进","plotScore"],["人物塑造","characterScore"],["对话质量","dialogueScore"],["悬念设置","suspenseScore"],["节奏控制","pacingScore"],["展示而非讲述","showNotTellScore"],["语言质量","languageScore"],["题材适应度","genreScore"],["跨章连贯性","coherenceScore"]].map(([l,k]) => {
-              const v = typeof scores?.[k] === 'number' ? scores[k] as number : 0;
+            {QUALITY_DIMENSIONS.map(d => {
+              const v = typeof scores?.[d.scoreField] === 'number' ? scores[d.scoreField] as number : 0;
               return (
-              <div key={l} className="flex items-center gap-2"><span className="w-16 text-right text-slate-500 shrink-0">{l}</span><div className="flex-1 h-1.5 bg-slate-100 rounded-full"><div className={cn("h-full rounded-full", v>=7?"bg-green-400":v>=5?"bg-accent-400":"bg-red-400")} style={{width:`${v*10}%`}}/></div><span className="w-3 text-right font-medium">{v}</span></div>
+              <div key={d.key} className="flex items-center gap-2"><span className="w-16 text-right text-slate-500 shrink-0">{d.label}</span><div className="flex-1 h-1.5 bg-slate-100 rounded-full"><div className={cn("h-full rounded-full", v>=7?"bg-green-400":v>=5?"bg-accent-400":"bg-red-400")} style={{width:`${v*10}%`}}/></div><span className="w-3 text-right font-medium">{v}</span></div>
             )})}
           </div>
           {displayDiagnosis?.cards?.length > 0 && (

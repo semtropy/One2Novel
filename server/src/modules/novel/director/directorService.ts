@@ -5,11 +5,15 @@ import { logEventError } from "../../../platform/logging/eventErrorLog";
 import { processChapter } from "../production/writing/chapterPipeline";
 import { generateChapterContentCore } from "../production/writing/chapterGenerator";
 import { saveCheckpoint, clearCheckpoint, loadCheckpoint } from "./checkpointService";
+import {
+  CHAPTER_TIMEOUT_MS,
+  DIRECTOR_BATCH_LIMIT,
+  DIRECTOR_MAX_LISTENERS,
+  DIRECTOR_PROGRESS_IDLE_TTL,
+} from "../../../platform/config/constants";
 
 export const directorEmitter = new EventEmitter();
-directorEmitter.setMaxListeners(50);
-
-const CHAPTER_TIMEOUT_MS = 120_000;
+directorEmitter.setMaxListeners(DIRECTOR_MAX_LISTENERS);
 
 export interface DirectorProgress {
   novelId: string;
@@ -70,7 +74,7 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
   if (!novel) throw new Error("Novel not found");
 
   const startIdx = novel.chapters.findIndex((c: { chapterStatus: string }) => c.chapterStatus !== "completed");
-  const batchLimit = maxChapters ?? 30; // Cap at 30 chapters per director run for long-form
+  const batchLimit = maxChapters ?? DIRECTOR_BATCH_LIMIT; // Cap at 30 chapters per director run for long-form
   const chaptersToWrite = startIdx >= 0 ? novel.chapters.slice(startIdx, startIdx + batchLimit) : [];
 
   const progress: DirectorProgress = {
@@ -202,7 +206,7 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
     clearCheckpoint(novelId, checkpointTaskId).catch(e => logEventError("director.clearCheckpoint", { novelId }, e));
   } finally {
     progressMap.set(novelId, progress);
-    setTimeout(() => progressMap.delete(novelId), 300_000);
+    setTimeout(() => progressMap.delete(novelId), DIRECTOR_PROGRESS_IDLE_TTL);
   }
 
   return progress;

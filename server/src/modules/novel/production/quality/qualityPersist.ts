@@ -2,7 +2,7 @@ import { getPrisma } from "../../../../platform/db/client";
 import type { QualityResult } from "./qualityGate";
 
 /**
- * Persist 9-dimension quality scores + overall qualityScore + repairHistory to Chapter.
+ * Persist 10-dimension quality scores + overall qualityScore + repairHistory to Chapter.
  * Used by both POST /review and director auto-write flow.
  */
 export async function persistQualityScores(
@@ -35,6 +35,7 @@ export async function persistQualityScores(
         ...(extra?.repairAttempts != null ? { attempts: extra.repairAttempts, finalScore: extra.finalScore } : {}),
         overallComment: result.overallComment,
         issues: result.issues ?? [],
+        dimensionResults: result.dimensionResults ?? [],
       }),
     },
   });

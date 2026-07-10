@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 import { getPrisma } from "../../../../platform/db/client";
+import { REF_PROMPT_SLICE_LARGE } from "../../../../platform/config/constants";
 
 const LLMCharacterSchema = z.object({
   name: z.string(), role: z.string(), personality: z.string(), background: z.string(),
@@ -75,7 +76,7 @@ export async function generateCharacters(novelId: string): Promise<CharacterExtr
   const outline = novel.structuredOutline ?? "";
   const chList = (novel.chapters as Array<{ order: number; title: string }>).map(c => `第${c.order}章 ${c.title}`).join("、");
 
-  const descriptionText = novel.description ? `\n原始灵感/大纲：\n${novel.description.slice(0, 8000)}` : "";
+  const descriptionText = novel.description ? `\n原始灵感/大纲：\n${novel.description.slice(0, REF_PROMPT_SLICE_LARGE)}` : "";
   // Gather architecture context to guide character generation
   let archContext = "";
   if (novel.architectureType) {

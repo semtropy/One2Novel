@@ -2,9 +2,10 @@ import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 import type { ParsedChapter, ChapterAnnotation } from "./index";
+import { REF_ANALYSIS_MAX_CHARS } from "../../../../platform/config/constants";
 
 const BASE_BATCH_SIZE = 15;
-const MAX_CHARS_PER_BATCH = 60000;
+const MAX_CHARS_PER_BATCH = REF_ANALYSIS_MAX_CHARS;
 const CONCURRENCY = 5; // Number of parallel batch groups
 
 const BatchAnnotationSchema = z.object({

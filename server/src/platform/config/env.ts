@@ -26,9 +26,15 @@ const envSchema = z.object({
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-6"),
 
   GEMINI_API_KEY: z.string().optional(),
+  GEMINI_BASE_URL: z.string().default("https://generativelanguage.googleapis.com/v1beta"),
+  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
+
   QWEN_API_KEY: z.string().optional(),
+  QWEN_BASE_URL: z.string().default("https://dashscope-intl.aliyuncs.com/compatible-mode/v1"),
   QWEN_MODEL: z.string().default("qwen-plus"),
+
   MOONSHOT_API_KEY: z.string().optional(),
+  MOONSHOT_BASE_URL: z.string().default("https://api.moonshot.cn/v1"),
   MOONSHOT_MODEL: z.string().default("moonshot-v1-8k"),
 });
 

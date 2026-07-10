@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 import { getPrisma } from "../../../../platform/db/client";
+import { REF_PROMPT_SLICE_LARGE } from "../../../../platform/config/constants";
 import { assembleChapterContext } from "../context/contextBlockBuilders";
 import { computeDiff, diffSummary, type DiffChunk } from "./diffService";
 import { splitParagraphs } from "./textUtils";
@@ -289,7 +290,7 @@ export async function diagnoseWorkspace(
     "",
     paragraphs.length > 0
       ? paragraphs.map((p, i) => `[段落${i + 1}]\n${p.slice(0, 500)}${p.length > 500 ? "..." : ""}`).join("\n\n")
-      : chapter.content.replace(/<[^>]*>/g, "").slice(0, 6000),
+      : chapter.content.replace(/<[^>]*>/g, "").slice(0, REF_PROMPT_SLICE_LARGE),
   ].filter(Boolean).join("\n");
 
   const raw = await aiInvoke({

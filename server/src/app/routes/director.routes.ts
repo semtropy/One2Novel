@@ -2,23 +2,23 @@ import { Router } from "express";
 import { runDirector, getDirectorProgress, stopDirector, directorEmitter } from "../../modules/novel/director/directorService";
 import { loadCheckpoint } from "../../modules/novel/director/checkpointService";
 import { getPrisma } from "../../platform/db/client";
+import { errorHandlerWrap } from "../../platform/errors/requestErrorHandler";
+import { llmRateLimit } from "../../platform/rateLimit";
 
 const router = Router();
 
-// Auto-Director
-router.post("/novels/:novelId/director/run", async (req, res, next) => {
-  try {
-    const novel = await getPrisma().novel.findUnique({ where: { id: req.params.novelId }, select: { id: true } });
-    if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Novel not found" } }); return; }
-    runDirector(req.params.novelId, req.body.maxChapters).catch(console.error);
-    res.json({ data: { started: true } });
-  } catch (e) { next(e); }
-});
+// Auto-Director — rate limited
+router.post("/novels/:novelId/director/run", llmRateLimit, errorHandlerWrap(async (req, res) => {
+  const novel = await getPrisma().novel.findUnique({ where: { id: String(req.params.novelId) }, select: { id: true } });
+  if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Novel not found" } }); return; }
+  runDirector(String(req.params.novelId), req.body.maxChapters).catch(console.error);
+  res.json({ data: { started: true } });
+}));
 
-router.post("/novels/:novelId/director/stop", async (req, res) => {
-  const stopped = await stopDirector(req.params.novelId);
+router.post("/novels/:novelId/director/stop", errorHandlerWrap(async (req, res) => {
+  const stopped = await stopDirector(String(req.params.novelId));
   res.json({ data: { stopped } });
-});
+}));
 
 router.get("/novels/:novelId/director/progress", (req, res) => {
   res.json({ data: getDirectorProgress(req.params.novelId) });
@@ -42,19 +42,17 @@ router.get("/novels/:novelId/director/stream", (req, res) => {
 });
 
 // Resume interrupted director run
-router.post("/novels/:novelId/director/resume", async (req, res, next) => {
-  try {
-    const novel = await getPrisma().novel.findUnique({ where: { id: req.params.novelId }, select: { id: true } });
-    if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Novel not found" } }); return; }
-    const checkpoint = await loadCheckpoint(req.params.novelId);
-    if (!checkpoint) {
-      res.status(400).json({ error: { code: "NO_CHECKPOINT", message: "没有可恢复的进度" } });
-      return;
-    }
-    const remaining = checkpoint.totalChaptersToWrite - checkpoint.completedChapterIds.length;
-    runDirector(req.params.novelId, remaining).catch(console.error);
-    res.json({ data: { resumed: true, fromChapter: checkpoint.currentChapterOrder, remaining } });
-  } catch (e) { next(e); }
-});
+router.post("/novels/:novelId/director/resume", errorHandlerWrap(async (req, res) => {
+  const novel = await getPrisma().novel.findUnique({ where: { id: String(req.params.novelId) }, select: { id: true } });
+  if (!novel) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Novel not found" } }); return; }
+  const checkpoint = await loadCheckpoint(String(req.params.novelId));
+  if (!checkpoint) {
+    res.status(400).json({ error: { code: "NO_CHECKPOINT", message: "没有可恢复的进度" } });
+    return;
+  }
+  const remaining = checkpoint.totalChaptersToWrite - checkpoint.completedChapterIds.length;
+  runDirector(String(req.params.novelId), remaining).catch(console.error);
+  res.json({ data: { resumed: true, fromChapter: checkpoint.currentChapterOrder, remaining } });
+}));
 
 export default router;

@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { REF_PROMPT_SLICE_LARGE, TIMELINE_MAX_ITEMS } from "../../platform/config/constants";
 import { getPrisma } from "../../platform/db/client";
 import { aiInvoke } from "../../platform/llm/aiService";
 import { logEventError } from "../../platform/logging/eventErrorLog";
@@ -66,7 +67,7 @@ function buildExtractionUserPrompt(
   if (existingItemsText) {
     parts.push(`【已有时间线】\n${existingItemsText}`);
   }
-  parts.push(`【第${chapterOrder}章正文】\n${chapterContent.slice(0, 6000)}`);
+  parts.push(`【第${chapterOrder}章正文】\n${chapterContent.slice(0, REF_PROMPT_SLICE_LARGE)}`);
   parts.push("请从本章正文中提取新的事件。只输出JSON。");
   return parts.join("\n\n");
 }
@@ -149,7 +150,7 @@ async function detectAndStoreConflicts(
   try {
     const result = await aiInvoke({
       assetId: "novel.timeline.conflict",
-      userPrompt: `时间线数据：\n${timelineText.slice(0, 6000)}`,
+      userPrompt: `时间线数据：\n${timelineText.slice(0, REF_PROMPT_SLICE_LARGE)}`,
       schema: ConflictSchema,
       temperature: 0.3,
     });

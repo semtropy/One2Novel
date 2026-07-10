@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
 import { aiInvoke } from "../../../../platform/llm/aiService";
+import { REF_PROMPT_SLICE } from "../../../../platform/config/constants";
 
 // ─── Volume Dynamics ─────────────────────────────────
 
@@ -78,7 +79,7 @@ export async function generateVolumeDynamics(
     "## 本卷结构",
     volLines.join("\n"),
     "",
-    novel?.structuredOutline ? `## 全书大纲\n${novel.structuredOutline.slice(0, 2000)}` : "",
+    novel?.structuredOutline ? `## 全书大纲\n${novel.structuredOutline.slice(0, REF_PROMPT_SLICE)}` : "",
   ].filter(Boolean).join("\n");
 
   return aiInvoke({

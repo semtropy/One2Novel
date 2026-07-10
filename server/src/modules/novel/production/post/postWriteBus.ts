@@ -21,6 +21,8 @@ import { detectAiTraces } from "../../../style/antiAiDetector";
 import { afterChapterSave } from "../../../timeline/timelineService";
 import { detectOverduePayoffs } from "../../../payoff/payoffService";
 import { logEventError } from "../../../../platform/logging/eventErrorLog";
+import { Semaphore } from "../../../../platform/concurrency/semaphore";
+import { POST_WRITE_MAX_CONCURRENT } from "../../../../platform/config/constants";
 
 // ─── Handler: Timeline extraction ──────────────────────────
 
@@ -32,6 +34,8 @@ async function handleTimeline(ctx: { novelId: string; chapterId: string; chapter
 // ─── Handler: Chapter summary ──────────────────────────────
 
 async function handleChapterSummary(ctx: { novelId: string; chapterId: string; content: string }) {
+  if (await shouldSkipHandler(ctx.chapterId)) return;
+
   generateChapterSummary(ctx.novelId, ctx.chapterId, ctx.content)
     .catch(e => logEventError("postWrite.summary", { novelId: ctx.novelId, chapterId: ctx.chapterId }, e));
 }
@@ -39,6 +43,8 @@ async function handleChapterSummary(ctx: { novelId: string; chapterId: string; c
 // ─── Handler: RAG auto-index ───────────────────────────────
 
 async function handleRagIndex(ctx: { novelId: string; chapterId: string; chapterOrder: number; content: string }) {
+  if (await shouldSkipHandler(ctx.chapterId)) return;
+
   const prisma = getPrisma();
   try {
     const cs = await prisma.chapterSummary.findUnique({
@@ -90,6 +96,8 @@ async function handleAntiAi(ctx: { novelId: string; chapterId: string; content: 
 // ─── Handler: Character state auto-update ──────────────────
 
 async function handleCharacterState(ctx: { novelId: string; chapterId: string; chapterOrder: number; content: string }) {
+  if (await shouldSkipHandler(ctx.chapterId)) return;
+
   try {
     const m = await import("./characterStateUpdater");
     const result = await m.updateCharacterStatesAfterChapter(ctx.novelId, ctx.content, ctx.chapterOrder);
@@ -171,6 +179,31 @@ async function handleVolumeCompletion(ctx: { novelId: string; chapterId: string;
   }
 }
 
+// ─── Handler: Memory沉淀 (write-after fact沉淀) ─────────────
+
+async function handleMemoryWrite(ctx: {
+  novelId: string;
+  chapterId: string;
+  chapterOrder: number;
+  content: string;
+}) {
+  if (await shouldSkipHandler(ctx.chapterId)) return;
+
+  try {
+    const m = await import("./memoryWriter");
+    await m.writeMemories({
+      novelId: ctx.novelId,
+      chapterId: ctx.chapterId,
+      chapterOrder: ctx.chapterOrder,
+      content: ctx.content,
+      useDbFallback: true,
+    })
+      .catch(e => logEventError("postWrite.memory", ctx, e));
+  } catch (e) {
+    logEventError("postWrite.memory", ctx, e);
+  }
+}
+
 // ─── Handler: Debt interest accrual ────────────────────────
 
 async function handleDebtInterest(ctx: { novelId: string; chapterOrder: number }) {
@@ -180,6 +213,31 @@ async function handleDebtInterest(ctx: { novelId: string; chapterOrder: number }
       .catch(e => logEventError("postWrite.debtInterest", ctx, e));
   } catch (e) {
     logEventError("postWrite.debtInterest", ctx, e);
+  }
+}
+
+// ─── Concurrency Control ───────────────────────────────────
+
+/** Semaphore to limit concurrent post-write handler execution */
+const postWriteSemaphore = new Semaphore(POST_WRITE_MAX_CONCURRENT);
+
+// ─── Guard: skip handlers if projections are complete ──────
+
+/**
+ * Check if a ChapterCommit exists and projections are done.
+ * If so, skip this handler to avoid double-writing.
+ * Called by handlers that are replaced by projection writers.
+ */
+async function shouldSkipHandler(chapterId: string): Promise<boolean> {
+  try {
+    const prisma = getPrisma();
+    const commit = await prisma.chapterCommit.findUnique({
+      where: { chapterId },
+      select: { projectionStatus: true },
+    });
+    return commit?.projectionStatus === 'completed';
+  } catch {
+    return false;
   }
 }
 
@@ -196,18 +254,30 @@ export function registerPostWriteHandlers(): void {
     };
     const logErr = (tag: string, e: unknown) => logEventError(`postWrite.${tag}`, ctx, e);
 
-    // Run all handlers in parallel — no ordering dependency
+    // Run all handlers in parallel with concurrency control.
+    // Each handler acquires a semaphore slot before executing,
+    // preventing SQLite lock contention during Director batch writes.
+    const throttled = (fn: () => Promise<unknown>, tag: string) => async () => {
+      await postWriteSemaphore.acquire();
+      try {
+        return await fn();
+      } finally {
+        postWriteSemaphore.release();
+      }
+    };
+
     Promise.allSettled([
-      handleTimeline(ctx).catch(e => logErr("timeline", e)),
-      handleChapterSummary(ctx).catch(e => logErr("summary", e)),
-      handleRagIndex(ctx).catch(e => logErr("ragIndex", e)),
-      handleVolumeCompress({ novelId: ctx.novelId, chapterOrder: ctx.chapterOrder }).catch(e => logErr("volumeCompress", e)),
-      handleAntiAi({ novelId: ctx.novelId, chapterId: ctx.chapterId, content: ctx.content }).catch(e => logErr("antiAi", e)),
-      handleCharacterState({ novelId: ctx.novelId, chapterId: ctx.chapterId, chapterOrder: ctx.chapterOrder, content: ctx.content }).catch(e => logErr("characterState", e)),
-      handlePayoff({ novelId: ctx.novelId }).catch(e => logErr("payoff", e)),
-      handleCompletionGuidance({ novelId: ctx.novelId, chapterId: ctx.chapterId }).catch(e => logErr("completion", e)),
-      handleVolumeCompletion({ novelId: ctx.novelId, chapterId: ctx.chapterId, chapterOrder: ctx.chapterOrder }).catch(e => logErr("volumeCompletion", e)),
-      handleDebtInterest({ novelId: ctx.novelId, chapterOrder: ctx.chapterOrder }).catch(e => logErr("debtInterest", e)),
+      throttled(() => handleTimeline(ctx).catch(e => logErr("timeline", e)), "timeline"),
+      throttled(() => handleChapterSummary(ctx).catch(e => logErr("summary", e)), "summary"),
+      throttled(() => handleRagIndex(ctx).catch(e => logErr("ragIndex", e)), "ragIndex"),
+      throttled(() => handleVolumeCompress({ novelId: ctx.novelId, chapterOrder: ctx.chapterOrder }).catch(e => logErr("volumeCompress", e)), "volumeCompress"),
+      throttled(() => handleAntiAi({ novelId: ctx.novelId, chapterId: ctx.chapterId, content: ctx.content }).catch(e => logErr("antiAi", e)), "antiAi"),
+      throttled(() => handleCharacterState({ novelId: ctx.novelId, chapterId: ctx.chapterId, chapterOrder: ctx.chapterOrder, content: ctx.content }).catch(e => logErr("characterState", e)), "characterState"),
+      throttled(() => handleMemoryWrite({ novelId: ctx.novelId, chapterId: ctx.chapterId, chapterOrder: ctx.chapterOrder, content: ctx.content }).catch(e => logErr("memory", e)), "memory"),
+      throttled(() => handlePayoff({ novelId: ctx.novelId }).catch(e => logErr("payoff", e)), "payoff"),
+      throttled(() => handleCompletionGuidance({ novelId: ctx.novelId, chapterId: ctx.chapterId }).catch(e => logErr("completion", e)), "completion"),
+      throttled(() => handleVolumeCompletion({ novelId: ctx.novelId, chapterId: ctx.chapterId, chapterOrder: ctx.chapterOrder }).catch(e => logErr("volumeCompletion", e)), "volumeCompletion"),
+      throttled(() => handleDebtInterest({ novelId: ctx.novelId, chapterOrder: ctx.chapterOrder }).catch(e => logErr("debtInterest", e)), "debtInterest"),
     ]).catch(() => {}); // Suppress unhandled rejection
   });
 }
@@ -218,7 +288,7 @@ export function registerPostWriteHandlers(): void {
  * Emit the chapter-saved event. All registered handlers run fire-and-forget.
  *
  * This is the module's sole public interface. The implementation
- * (10 handlers across 8+ modules) is hidden behind one call.
+ * (11 handlers across 9+ modules) is hidden behind one call.
  */
 export function runPostWriteHooks(
   novelId: string,

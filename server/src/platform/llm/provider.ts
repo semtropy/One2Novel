@@ -2,87 +2,65 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { getEnv } from "../config/env";
+import {
+  PROVIDER_REGISTRY,
+  resolveProviderBaseUrl,
+  resolveProviderModel,
+  type ProviderId,
+} from "../config/providers";
 
-export type LLMProvider = "deepseek" | "openai" | "anthropic" | "gemini" | "qwen" | "moonshot";
+export type LLMProvider = ProviderId;
 
 export interface ProviderModel {
   provider: LLMProvider;
   models: string[];
 }
 
-/** All supported providers and their available models */
-export const PROVIDER_MODELS: ProviderModel[] = [
-  { provider: "deepseek", models: ["deepseek-chat", "deepseek-reasoner"] },
-  { provider: "openai", models: ["gpt-5-mini", "gpt-5", "gpt-4o"] },
-  { provider: "anthropic", models: ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"] },
-  { provider: "gemini", models: ["gemini-2.5-flash", "gemini-2.5-pro"] },
-  { provider: "qwen", models: ["qwen-plus", "qwen-max"] },
-  { provider: "moonshot", models: ["moonshot-v1-8k", "moonshot-v1-32k"] },
-];
+/** All supported providers and their available models — derived from registry */
+export const PROVIDER_MODELS: ProviderModel[] = Object.values(PROVIDER_REGISTRY).map(cfg => ({
+  provider: cfg.id,
+  models: cfg.models,
+}));
 
-export function createLLM(provider: LLMProvider, options?: { model?: string; temperature?: number; maxTokens?: number; responseFormat?: "json_object" }) {
+export function createLLM(
+  provider: LLMProvider,
+  options?: { model?: string; temperature?: number; maxTokens?: number; responseFormat?: "json_object" },
+) {
   const env = getEnv();
-  const model = options?.model;
+  const model = options?.model ?? resolveProviderModel(env, provider);
   const temperature = options?.temperature ?? 0.7;
   const maxTokens = options?.maxTokens ?? 8192;
+  const config = PROVIDER_REGISTRY[provider];
 
-  switch (provider) {
-    // ── OpenAI-compatible providers ──
-    case "deepseek":
+  switch (config.category) {
+    case "openai-compatible":
       return new ChatOpenAI({
-        model: model ?? env.DEEPSEEK_MODEL,
-        temperature, maxTokens, timeout: 120000,
-        apiKey: env.DEEPSEEK_API_KEY,
-        configuration: { baseURL: env.DEEPSEEK_BASE_URL },
-        ...(options?.responseFormat === "json_object" ? { modelKwargs: { response_format: { type: "json_object" as const } } } : {}),
+        model,
+        temperature,
+        maxTokens,
+        timeout: 120000,
+        apiKey: env[config.apiKeyEnv as keyof typeof env] as string,
+        configuration: { baseURL: resolveProviderBaseUrl(env, provider) },
+        ...(options?.responseFormat === "json_object"
+          ? { modelKwargs: { response_format: { type: "json_object" as const } } }
+          : {}),
       });
 
-    case "openai":
-      return new ChatOpenAI({
-        model: model ?? env.OPENAI_MODEL,
-        temperature, maxTokens, timeout: 120000,
-        apiKey: env.OPENAI_API_KEY,
-        configuration: { baseURL: env.OPENAI_BASE_URL },
-        ...(options?.responseFormat === "json_object" ? { modelKwargs: { response_format: { type: "json_object" as const } } } : {}),
-      });
-
-    case "qwen": {
-      if (!env.QWEN_API_KEY) throw new Error("Qwen API key not configured. Please set QWEN_API_KEY in Settings.");
-      return new ChatOpenAI({
-        model: model ?? env.QWEN_MODEL ?? "qwen-plus",
-        temperature, maxTokens, timeout: 120000,
-        apiKey: env.QWEN_API_KEY,
-        configuration: { baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1" },
-        ...(options?.responseFormat === "json_object" ? { modelKwargs: { response_format: { type: "json_object" as const } } } : {}),
-      });
-    }
-
-    case "moonshot": {
-      if (!env.MOONSHOT_API_KEY) throw new Error("Moonshot API key not configured. Please set MOONSHOT_API_KEY in Settings.");
-      return new ChatOpenAI({
-        model: model ?? env.MOONSHOT_MODEL ?? "moonshot-v1-8k",
-        temperature, maxTokens, timeout: 120000,
-        apiKey: env.MOONSHOT_API_KEY,
-        configuration: { baseURL: "https://api.moonshot.cn/v1" },
-        ...(options?.responseFormat === "json_object" ? { modelKwargs: { response_format: { type: "json_object" as const } } } : {}),
-      });
-    }
-
-    // ── Anthropic ──
     case "anthropic":
       return new ChatAnthropic({
-        modelName: model ?? env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
-        temperature, maxTokens,
-        anthropicApiKey: env.ANTHROPIC_API_KEY,
+        modelName: model,
+        temperature,
+        maxTokens,
+        anthropicApiKey: env[config.apiKeyEnv as keyof typeof env] as string,
       });
 
-    // ── Gemini ──
-    case "gemini": {
-      const apiKey = env.GEMINI_API_KEY;
+    case "google": {
+      const apiKey = env[config.apiKeyEnv as keyof typeof env] as string;
       if (!apiKey) throw new Error("Gemini API key not configured");
       return new ChatGoogleGenerativeAI({
-        model: model ?? "gemini-2.5-flash",
-        temperature, maxOutputTokens: maxTokens,
+        model,
+        temperature,
+        maxOutputTokens: maxTokens,
         apiKey,
       });
     }

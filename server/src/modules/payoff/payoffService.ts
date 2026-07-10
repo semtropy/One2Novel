@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getPrisma } from "../../platform/db/client";
 import { aiInvoke } from "../../platform/llm/aiService";
 import { logEventError } from "../../platform/logging/eventErrorLog";
+import { PAYOFF_CHAPTER_CONTENT_SLICE } from "../../platform/config/constants";
 
 const PayoffSchema = z.object({
   items: z.array(z.object({ title: z.string(), summary: z.string(), scopeType: z.string(), status: z.string() })),
@@ -25,7 +26,7 @@ export async function scanChapterForPayoffs(novelId: string, chapterId: string):
 
     const result = await aiInvoke({
       assetId: "novel.payoff.scan",
-      userPrompt: `分析以下章节的伏笔：\n\n${chapter.content.slice(0, 6000)}${existingList}`,
+      userPrompt: `分析以下章节的伏笔：\n\n${chapter.content.slice(0, PAYOFF_CHAPTER_CONTENT_SLICE)}${existingList}`,
       schema: PayoffSchema, temperature: 0.3,
     });
 

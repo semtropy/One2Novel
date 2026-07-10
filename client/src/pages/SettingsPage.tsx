@@ -1,12 +1,20 @@
+/**
+ * Settings Page — AI Provider configuration, API keys, creative preferences.
+ *
+ * NOTE: MODEL_OPTIONS is a client-side fallback. The authoritative model list
+ * comes from the server's /settings/providers endpoint which reads from the
+ * unified PROVIDER_REGISTRY. The frontend should prefer the server-returned data.
+ */
 import { useState, useEffect } from "react";
 import { api } from "../app/api";
 import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import type { ProviderInfo } from "../components/settings/ProviderConfigDialog";
-const SELECT_STYLE = "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:ring-1 focus:ring-brand-200 focus:outline-none bg-white";
 
+/** Client-side model options — kept for backward compat, prefer server API */
+/** Updated to match server PROVIDER_REGISTRY */
 export const MODEL_OPTIONS = [
   { provider: "deepseek", label: "DeepSeek", models: ["deepseek-chat", "deepseek-reasoner"] },
-  { provider: "openai", label: "OpenAI", models: ["gpt-4.1-mini", "gpt-4.1", "gpt-4o"] },
+  { provider: "openai", label: "OpenAI", models: ["gpt-5-mini", "gpt-5", "gpt-4o"] },
   { provider: "anthropic", label: "Anthropic Claude", models: ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"] },
   { provider: "gemini", label: "Google Gemini", models: ["gemini-2.5-flash", "gemini-2.5-pro"] },
   { provider: "qwen", label: "通义千问", models: ["qwen-plus", "qwen-max"] },

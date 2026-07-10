@@ -3,6 +3,8 @@ import { getPrisma } from "../../../../platform/db/client";
 import { generateChapterContentCore } from "./chapterGenerator";
 import { processChapter } from "./chapterPipeline";
 
+const HEARTBEAT_INTERVAL_MS = 10_000;
+
 export async function streamChapter(novelId: string, chapterId: string, res: Response): Promise<void> {
   const prisma = getPrisma();
   const chapter = await prisma.chapter.findUnique({ where: { id: chapterId } });
@@ -25,6 +27,11 @@ export async function streamChapter(novelId: string, chapterId: string, res: Res
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Heartbeat — detect stale connections
+  const heartbeatInterval = setInterval(() => {
+    if (!aborted) send("heartbeat", { ts: Date.now() });
+  }, HEARTBEAT_INTERVAL_MS);
+
   try {
     send("stage", { stage: "writing" });
 
@@ -33,9 +40,8 @@ export async function streamChapter(novelId: string, chapterId: string, res: Res
       onToken: (text) => send("token", { text }),
     });
 
-    if (aborted) return; // Client disconnected — don't save partial content
+    if (aborted) return;
 
-    // Run full pipeline: quality gate → repair → persist → post-write hooks → finalization
     send("stage", { stage: "quality_gate" });
     const pipelineResult = await processChapter(novelId, chapterId, fullContent, chapter.order);
     if (pipelineResult.repairAttempts > 0) {
@@ -56,7 +62,7 @@ export async function streamChapter(novelId: string, chapterId: string, res: Res
   } catch (e) {
     send("error", { message: e instanceof Error ? e.message : "生成失败" });
   } finally {
+    clearInterval(heartbeatInterval);
     res.end();
   }
 }
-

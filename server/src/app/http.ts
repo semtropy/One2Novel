@@ -4,7 +4,9 @@ import helmet from "helmet";
 import { getEnv } from "../platform/config/env";
 import { resolveAppRuntimeMode } from "../platform/config/appPaths";
 import { errorMiddleware } from "../platform/errors/errorMiddleware";
+import { requestErrorHandler } from "../platform/errors/requestErrorHandler";
 import { registerRoutes } from "./routes";
+import { getAllProviderConfigs } from "../platform/config/providers";
 
 export function createApp() {
   const env = getEnv();
@@ -15,6 +17,12 @@ export function createApp() {
   if (isDesktop) {
     app.use(helmet({ contentSecurityPolicy: false }));
   } else {
+    // Collect all allowed hostnames from the provider registry
+    const allowedHosts = getAllProviderConfigs().map(cfg => {
+      const url = new URL(cfg.defaultBaseUrl);
+      return url.origin;
+    });
+
     app.use(helmet({
       contentSecurityPolicy: {
         directives: {
@@ -25,12 +33,7 @@ export function createApp() {
           connectSrc: [
             "'self'",
             "http://localhost:*",
-            "https://api.deepseek.com",
-            "https://api.openai.com",
-            "https://api.anthropic.com",
-            "https://generativelanguage.googleapis.com",
-            "https://dashscope-intl.aliyuncs.com",
-            "https://api.moonshot.cn",
+            ...allowedHosts,
           ],
           fontSrc: ["'self'"],
         },
@@ -40,6 +43,9 @@ export function createApp() {
 
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json({ limit: "50mb" }));
+
+  // Request context middleware — runs for ALL requests
+  app.use(requestErrorHandler);
 
   registerRoutes(app);
   app.use(errorMiddleware);

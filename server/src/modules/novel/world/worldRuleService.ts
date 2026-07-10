@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { getPrisma } from "../../../platform/db/client";
 import { aiInvoke } from "../../../platform/llm/aiService";
+import { REF_PROMPT_SLICE } from "../../../platform/config/constants";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ export async function batchGenerateRules(novelId: string): Promise<WorldRuleData
     novel.genre ? `题材：${novel.genre}` : "",
     novel.description ? `概述：${novel.description}` : "",
     storyCoreContext,
-    `大纲：${(novel.structuredOutline ?? "").slice(0, 3000)}`,
+    `大纲：${(novel.structuredOutline ?? "").slice(0, REF_PROMPT_SLICE)}`,
   ].filter(Boolean).join("\n");
 
   const raw = await aiInvoke({

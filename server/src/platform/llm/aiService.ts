@@ -20,6 +20,7 @@ import { selectContextBlocks } from "./contextSelection";
 import { renderSelectedContextBlocks } from "./renderContextBlocks";
 import { injectSkillRules } from "./skillRules";
 import type { PromptContextBlock } from "./promptTypes";
+import { PROVIDER_REGISTRY } from "../config/providers";
 
 // ═══════════════════════════════════════════════════════════
 // Preferred Provider

@@ -8,19 +8,20 @@ export interface DiffChunk {
   text: string;
 }
 
+import { DIFF_MAX_TOKENS, DIFF_FALLBACK_SLICE } from "../../../../platform/config/constants";
+
 // ─── Tokenization ──────────────────────────────────────
 
 /** Tokenize Chinese text: characters, words, punctuation as individual tokens */
 function tokenize(text: string): string[] {
   const normalized = text.replace(/\r\n/g, "\n");
-  // Split: CJK chars individually, ASCII words together, whitespace, punctuation
   const parts = normalized.match(/[一-鿿]|[A-Za-z0-9_]+|\s+|[^\sA-Za-z0-9_一-鿿]/g) ?? [];
   return parts;
 }
 
 // ─── LCS Diff ──────────────────────────────────────────
 
-const MAX_TOKENS = 3000; // ~3000 Chinese chars — prevent OOM on full-chapter inputs
+const MAX_TOKENS = DIFF_MAX_TOKENS;
 
 /** Compute LCS-based diff between original and rewritten text */
 export function computeDiff(original: string, rewritten: string): DiffChunk[] {
@@ -28,7 +29,7 @@ export function computeDiff(original: string, rewritten: string): DiffChunk[] {
   const target = tokenize(rewritten);
   if (source.length > MAX_TOKENS || target.length > MAX_TOKENS) {
     // Fallback: show full replacement for very long inputs
-    return [{ type: "delete", text: original.slice(0, 500) + (original.length > 500 ? "..." : "") }, { type: "insert", text: rewritten.slice(0, 500) + (rewritten.length > 500 ? "..." : "") }];
+    return [{ type: "delete", text: original.slice(0, DIFF_FALLBACK_SLICE) + (original.length > DIFF_FALLBACK_SLICE ? "..." : "") }, { type: "insert", text: rewritten.slice(0, DIFF_FALLBACK_SLICE) + (rewritten.length > DIFF_FALLBACK_SLICE ? "..." : "") }];
   }
   const sl = source.length;
   const tl = target.length;

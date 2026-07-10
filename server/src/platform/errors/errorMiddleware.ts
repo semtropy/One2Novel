@@ -1,5 +1,20 @@
 import type { Request, Response, NextFunction } from "express";
 import { AppError } from "./AppError";
+import { ERROR_MSG_TRUNCATE_AT } from "../config/constants";
+
+/** Extract novelId and chapterId from request for structured error logging */
+function extractErrorContext(req: Request): Record<string, unknown> {
+  return {
+    method: req.method,
+    url: req.originalUrl || req.url,
+    novelId: req.params.novelId ?? null,
+    chapterId: req.params.chapterId ?? null,
+    requestId: (req as any).requestId ?? null,
+    ip: req.ip ?? null,
+    userAgent: req.get("User-Agent") ?? null,
+    timestamp: new Date().toISOString(),
+  };
+}
 
 /** Translate raw technical errors into user-facing Chinese messages */
 function toUserMessage(err: Error): string {
@@ -40,7 +55,7 @@ function toUserMessage(err: Error): string {
 
   // Other errors — truncate long technical messages for the client
   // but ALWAYS log the full error on the server for debugging
-  if (msg.length > 150) {
+  if (msg.length > ERROR_MSG_TRUNCATE_AT) {
     console.error("[Internal Error — full message]", msg);
     return "AI 生成遇到问题，请重试。如果持续失败，请检查 API Key 配置。";
   }
@@ -50,12 +65,17 @@ function toUserMessage(err: Error): string {
 
 export function errorMiddleware(
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ) {
+  // Log structured context for all errors
+  const context = extractErrorContext(req);
+
   if (err instanceof AppError) {
     const appErr = err as AppError;
+    // AppErrors are expected — log at warn level with context
+    console.warn(`[AppError:${appErr.code}] ${appErr.message}`, JSON.stringify(context));
     res.status(appErr.statusCode).json({
       error: {
         code: appErr.code ?? "ERROR",
@@ -66,7 +86,10 @@ export function errorMiddleware(
     return;
   }
 
-  console.error("[Unhandled Error]", err.message, err.stack?.slice(0, 300));
+  // Unhandled error — log full stack for debugging
+  console.error("[Unhandled Error]", err.message, "\n", err.stack);
+  console.error("[Error Context]", JSON.stringify(context));
+
   res.status(500).json({
     error: {
       code: "INTERNAL_ERROR",

@@ -10,6 +10,7 @@
  * 3. 同优先级下，更近的章节上下文优先保留
  */
 import type { PromptContextBlock } from "./promptTypes";
+import { DEFAULT_FRESHNESS_DECAY_RATE } from "../config/constants";
 
 // ─── Freshness Groups ────────────────────────────────────
 
@@ -56,7 +57,7 @@ export const FRESHNESS_DECAY_RATES: Record<string, number> = {
 };
 
 /** 默认 decayRate */
-const DEFAULT_DECAY_RATE = 50;
+const DEFAULT_DECAY_RATE = DEFAULT_FRESHNESS_DECAY_RATE;
 
 // ─── Freshness Decay Function ───────────────────────────
 
