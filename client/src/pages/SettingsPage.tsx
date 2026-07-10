@@ -8,6 +8,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../app/api";
 import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
+import { toast } from "../lib/toast";
 import type { ProviderInfo } from "../components/settings/ProviderConfigDialog";
 
 /** Client-side model options — kept for backward compat, prefer server API */
@@ -41,7 +42,12 @@ export function SettingsPage() {
     if (keyVal?.trim()) body.key = keyVal.trim();
     if (modelVal?.trim()) body.model = modelVal.trim();
     if (!Object.keys(body).length) return;
-    await api.post(`/settings/providers/${p}`, body).catch(() => {});
+    try {
+      await api.post(`/settings/providers/${p}`, body);
+      toast.success(`${p} 配置已保存`);
+    } catch {
+      toast.error(`${p} 保存失败`);
+    }
   }
 
   async function testProvider(p: string, keyVal: string, modelVal: string) {
@@ -72,7 +78,10 @@ export function SettingsPage() {
   }
 
   async function savePref(key: string, value: unknown) {
-    await api.post("/preferences", { [key]: value }).catch(() => {});
+    try {
+      await api.post("/preferences", { [key]: value });
+      toast.success("偏好已保存");
+    } catch {}
   }
 
   return (
@@ -91,7 +100,7 @@ export function SettingsPage() {
             <select
               value={(prefs.defaultProvider as string) ?? "deepseek:deepseek-chat"}
               onChange={e => { const v = e.target.value; setPrefs(p => ({ ...p, defaultProvider: v })); savePref("defaultProvider", v); }}
-              className={SELECT_STYLE + " w-full h-10"}
+              className="w-full h-10 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none bg-white"
             >
               {MODEL_OPTIONS.filter(g => providers.some(p => p.provider === g.provider && p.isConfigured)).map(g => (
                 <optgroup key={g.provider} label={g.label}>
@@ -181,7 +190,7 @@ export function SettingsPage() {
                 <select
                   value={(prefs.preferredPerspective as string) ?? "third_person"}
                   onChange={e => { const v = e.target.value; setPrefs(p => ({ ...p, preferredPerspective: v })); savePref("preferredPerspective", v); }}
-                  className={SELECT_STYLE + " w-full"}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none bg-white"
                 >
                   <option value="third_person">第三人称</option>
                   <option value="first_person">第一人称</option>
@@ -193,7 +202,7 @@ export function SettingsPage() {
                 <select
                   value={(prefs.preferredPace as string) ?? "balanced"}
                   onChange={e => { const v = e.target.value; setPrefs(p => ({ ...p, preferredPace: v })); savePref("preferredPace", v); }}
-                  className={SELECT_STYLE + " w-full"}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none bg-white"
                 >
                   <option value="slow">慢节奏 · 细腻铺垫</option>
                   <option value="balanced">均衡 · 张弛有度</option>

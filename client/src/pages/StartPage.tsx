@@ -59,7 +59,7 @@ export function StartPage() {
 
         {/* Inspiration Input */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-700 mb-2">输入你的一句话灵感</label>
+          <label className="block text-sm font-medium text-slate-700 mb-2">输入你的一句话灵感 <span className="text-red-400">*</span></label>
           <textarea
             className={cn(
               "w-full rounded-xl border bg-white px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 transition-all",

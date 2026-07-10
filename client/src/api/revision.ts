@@ -55,12 +55,12 @@ export function useRevisionCandidates() {
 }
 
 export const useApplyRevision = createMutationHook<
-  { novelId: string; chapterId: string; selectedText: string; replacementText: string },
+  { novelId: string; chapterId: string; selectedParagraphs: string[]; replacementText: string },
   { success: boolean; wordCount: number }
 >({
   method: "post",
   url: (input) => `/novels/${input.novelId}/chapters/${input.chapterId}/revision/apply`,
-  body: (input) => ({ selectedText: input.selectedText, replacementText: input.replacementText }),
+  body: (input) => ({ selectedParagraphs: input.selectedParagraphs, replacementText: input.replacementText }),
   invalidateKeys: (input) => [["novel", input.novelId]],
 });
 

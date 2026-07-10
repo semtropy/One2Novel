@@ -52,13 +52,13 @@ export default function ExportDialog({ novelId, onClose }: Props) {
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">导出全书</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
         </div>
 
         {preview.data && (
           <div className="mb-4 p-3 bg-slate-50 rounded-lg text-sm space-y-1">
             <div className="font-medium">{preview.data.title}</div>
-            <div className="text-gray-500">
+            <div className="text-slate-500">
               {preview.data.chapterCount} 章 · {preview.data.completedChapters} 已完成 · {(preview.data.totalChars / 1000).toFixed(1)}k 字
             </div>
           </div>
@@ -69,7 +69,7 @@ export default function ExportDialog({ novelId, onClose }: Props) {
             <label
               key={f.key}
               className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                format === f.key ? "border-accent-500 bg-accent-50" : "border-gray-200 hover:border-gray-300"
+                format === f.key ? "border-accent-500 bg-accent-50" : "border-slate-200 hover:border-slate-300"
               }`}
             >
               <input
@@ -84,7 +84,7 @@ export default function ExportDialog({ novelId, onClose }: Props) {
                 <div className="font-medium text-sm flex items-center gap-1.5">
                   {(() => { const Icon = FORMAT_ICONS[f.key]; return <Icon size={15} />; })()} {f.label}
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5">{f.desc}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{f.desc}</div>
               </div>
             </label>
           ))}
@@ -97,7 +97,7 @@ export default function ExportDialog({ novelId, onClose }: Props) {
         )}
 
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+          <button onClick={onClose} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">
             取消
           </button>
           <button

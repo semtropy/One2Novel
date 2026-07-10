@@ -14,6 +14,7 @@ import { z } from "zod";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 import { errorHandlerWrap } from "../../../../platform/errors/requestErrorHandler";
 import { llmRateLimit } from "../../../../platform/rateLimit";
+import { param } from "../../../../platform/express/params";
 
 const router = Router();
 
@@ -206,6 +207,21 @@ router.get("/:novelId/chapters/:chapterId/edit-history", errorHandlerWrap(async 
     take: 5,
   });
   res.json({ data: history });
+}));
+
+// ─── Timeline Item Reorder ──────────────────────────────
+
+router.patch("/:novelId/timeline/:title", errorHandlerWrap(async (req, res) => {
+  const { sortOrder } = req.body;
+  if (sortOrder == null) {
+    res.status(400).json({ error: { code: "INVALID_INPUT", message: "sortOrder required" } });
+    return;
+  }
+  await getPrisma().timelineItem.updateMany({
+    where: { novelId: String(req.params.novelId), title: param(req, "title") },
+    data: { sortOrder },
+  });
+  res.json({ data: { ok: true } });
 }));
 
 export default router;

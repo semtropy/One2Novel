@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { getEnv, reloadEnv } from "../../platform/config/env";
 import { getPreferences, savePreferences, saveApiKey } from "../../modules/settings/preferences";
 import { setSetting } from "../../modules/settings/runtimeSettings";
@@ -84,6 +84,47 @@ router.post("/settings/providers/:provider/test", async (req, res, next) => {
     const msg = e instanceof Error ? e.message : "测试失败";
     res.json({ data: { ok: false, error: msg } });
   }
+});
+
+// ─── Preferences CRUD ───────────────────────────────────
+
+router.get("/preferences", (_req, res) => {
+  res.json({ data: getPreferences() });
+});
+
+router.post("/preferences", (req, res) => {
+  const { key, value } = req.body;
+  if (!key) {
+    res.status(400).json({ error: { code: "INVALID_INPUT", message: "key required" } });
+    return;
+  }
+  savePreferences({ [key]: value });
+  res.json({ data: getPreferences() });
+});
+
+// ─── Per-Provider Config Save ──────────────────────────────
+
+router.post("/settings/providers/:provider", (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const provider = req.params.provider as LLMProvider;
+    const config = PROVIDER_REGISTRY[provider];
+    if (!config) {
+      res.status(400).json({ error: { code: "INVALID_PROVIDER", message: "不支持的提供商" } });
+      return;
+    }
+    const { key, model } = req.body;
+    if (key) {
+      setSetting(config.apiKeyEnv, key);
+      saveApiKey(provider, key);
+    }
+    if (model) {
+      const prefs = getPreferences();
+      const models = { ...(prefs.preferences.providerModels ?? {}), [provider]: model };
+      savePreferences({ providerModels: models });
+    }
+    if (key) reloadEnv();
+    res.json({ data: { ok: true } });
+  } catch (e) { next(e); }
 });
 
 export default router;

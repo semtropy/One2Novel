@@ -223,4 +223,4 @@ export function PlanningHubPage() {
   );
 }
 
-// GoldenFingerPanel removed — now integrated into FoundationDomain
+// GoldenFingerPanel removed — now integrated into WorldDomain

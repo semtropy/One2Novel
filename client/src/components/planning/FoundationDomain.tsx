@@ -120,7 +120,7 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* ── AI Generate All ── */}
       <button
         onClick={handleGenerateAll}

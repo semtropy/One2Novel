@@ -11,7 +11,7 @@ import { type WorkspaceDiagnosis } from "../api/revision";
 import { DirectorPanel } from "../components/workspace/DirectorPanel";
 import { TitleEditor } from "../components/novel/TitleEditor";
 import { Loading } from "../components/common/Loading";
-import { AlertTriangle, PenLine, Trash2, Plus } from "lucide-react";
+import { AlertTriangle, PenLine, Trash2, Plus, X } from "lucide-react";
 import { cn } from "../lib/cn";
 
 export function NovelWorkspacePage() {
@@ -21,6 +21,7 @@ export function NovelWorkspacePage() {
   const qc = useQueryClient();
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [deleteChapterId, setDeleteChapterId] = useState<string | null>(null);
+  const [deleteVolumeTitle, setDeleteVolumeTitle] = useState<string | null>(null);
   // ─── Review + Diagnosis state (lifted from ChapterWritePanel) ───
   const [quality, setQuality] = useState<Record<string, unknown> | null>(null);
   const [diagnosis, setDiagnosis] = useState<WorkspaceDiagnosis | null>(null);
@@ -37,6 +38,12 @@ export function NovelWorkspacePage() {
     if (!deleteChapterId) return;
     try { await api.delete(`/novels/${novelId}/chapters/${deleteChapterId}`); qc.invalidateQueries({ queryKey: ["novel", novelId] }); setSelectedChapterId(null); } catch {}
     setDeleteChapterId(null);
+  }
+
+  async function handleDeleteVolume(sortOrder: number) {
+    if (!deleteVolumeTitle) return;
+    try { await api.delete(`/novels/${novelId}/volumes/${sortOrder}`); qc.invalidateQueries({ queryKey: ["novel", novelId] }); } catch {}
+    setDeleteVolumeTitle(null);
   }
 
   // ─── Review + Diagnose (one-click from toolbar) ───
@@ -132,11 +139,7 @@ export function NovelWorkspacePage() {
                         className="text-slate-400 hover:text-blue-500 opacity-60 hover:opacity-100 transition-opacity" title="新增章节">
                         <Plus size={12} />
                       </button>
-                      <button onClick={async () => {
-                        if (window.confirm(`删除"${vol.title}"及其所有章节？`)) {
-                          try { await api.delete(`/novels/${novelId}/volumes/${vol.sortOrder}`); qc.invalidateQueries({ queryKey: ["novel", novelId] }); } catch {}
-                        }
-                      }} className="text-slate-300 hover:text-red-500 opacity-60 hover:opacity-100 transition-opacity"><Trash2 size={11} /></button>
+                      <button onClick={() => setDeleteVolumeTitle(vol.title)} className="text-slate-300 hover:text-red-500 opacity-60 hover:opacity-100 transition-opacity"><Trash2 size={11} /></button>
                     </div>
                   </div>
                   {vol.chapters.map((ch) => (
@@ -225,6 +228,24 @@ export function NovelWorkspacePage() {
             <div className="flex gap-2">
               <button onClick={() => setDeleteChapterId(null)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">取消</button>
               <button onClick={handleDeleteChapter} className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">确认删除</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete volume confirmation */}
+      {deleteVolumeTitle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setDeleteVolumeTitle(null)}>
+          <div className="w-80 rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-slate-800 mb-2">删除卷「{deleteVolumeTitle}」</h3>
+            <p className="text-xs text-slate-500 mb-4">此操作不可撤销。卷内所有章节及计划将被永久删除。</p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteVolumeTitle(null)} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">取消</button>
+              <button onClick={async () => {
+                // Find the volume order to delete
+                const vol = volumeGroups.find(v => v.title === deleteVolumeTitle);
+                if (vol) await handleDeleteVolume(vol.sortOrder);
+              }} className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">确认删除</button>
             </div>
           </div>
         </div>

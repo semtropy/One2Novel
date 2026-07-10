@@ -52,6 +52,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
   const [addCharOpen, setAddCharOpen] = useState(false);
   const [addCharName, setAddCharName] = useState("");
   const [addCharRole, setAddCharRole] = useState("supporting");
+  const [addCharError, setAddCharError] = useState("");
 
   const handleDeleteChar = async (charId: string, name: string) => {
     if (!window.confirm(`删除角色「${name}」？此操作不可撤销。`)) return;
@@ -60,14 +61,20 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
 
   const handleAddChar = async () => {
     const result = NovelCharacterCreateSchema.safeParse({ name: addCharName.trim(), role: addCharRole });
-    if (!result.success) return; // Silently reject invalid input (field-level validation in JSX)
+    if (!result.success) {
+      setAddCharError("请填写角色姓名和定位");
+      return;
+    }
+    setAddCharError("");
     try {
       await api.post(`/novels/${novelId}/characters`, result.data);
       refetchNovel();
       setAddCharName("");
       setAddCharRole("supporting");
       setAddCharOpen(false);
-    } catch {}
+    } catch {
+      setAddCharError("添加失败，请重试");
+    }
   };
 
   const handleTagChange = async (charId: string, tag: string) => {
@@ -119,7 +126,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {characters.length === 0 ? (
         <section className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 py-10 text-center">
           <p className="text-sm text-slate-500">暂无角色</p>
@@ -144,7 +151,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
                 <RefreshCw size={12} className={generating ? "animate-spin" : ""} /> {generating ? "生成中（约30秒）…" : genSuccess ? "生成完成 ✓" : "重新生成全部"}
               </button>
               {genError && <p className="text-xs text-red-500 mt-1">{genError}</p>}
-              <button onClick={() => setAddCharOpen(!addCharOpen)}
+              <button onClick={() => { setAddCharOpen(!addCharOpen); setAddCharError(""); }}
                 className="flex items-center gap-1 rounded-lg border bg-slate-800 text-white px-3 py-1.5 text-xs font-medium hover:bg-slate-700 rounded-lg">
                 <Plus size={12} /> 手动添加
               </button>
@@ -152,6 +159,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
 
             {addCharOpen && (
               <div className="mb-3 flex items-end gap-2 rounded-lg border border-brand-200 bg-brand-50/30 p-3">
+                {addCharError && <p className="absolute -top-5 left-0 text-xs text-red-500">{addCharError}</p>}
                 <div className="flex-1">
                   <label className="text-xs text-slate-500 block mb-1">角色姓名</label>
                   <input autoFocus className="w-full rounded border border-slate-200 px-2 py-1 text-sm focus:border-brand-300 focus:outline-none"

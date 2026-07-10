@@ -70,7 +70,7 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
   const handleSelectProfile = async (profile: ProfileItem) => {
     setSelectedProfileId(profile.id);
     // Profile selected — no longer exposes architectureType directly (in analysisResult now)
-    await api.put(`/novels/${novelId}/active-profile`, { profileId: profile.id }).catch(() => {});
+    await api.put(`/${novelId}/active-profile`, { profileId: profile.id }).catch(() => {});
     // If the profile has a deep analysis result, apply its ArchitectureProfile to the novel
     try {
       const { data } = await api.get(`/profiles/${profile.id}`);
@@ -103,7 +103,7 @@ export function ArchitectureDomain({ novelId, onComplete }: Props) {
   // ── Render ───────────────────────────────────────
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-medium text-slate-700 mb-3">参考书蓝图</h3>
         <p className="text-xs text-slate-400 mb-4">上传参考书进行深度分析，获得对标书的真实架构数据（回环结构、节奏曲线、金手指模式等）。分析结果将自动注入后续步骤的 AI 上下文。</p>

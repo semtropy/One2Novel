@@ -222,4 +222,48 @@ router.put("/:novelId/active-profile", async (req: Request, res: Response, next:
   } catch (e) { next(e); }
 });
 
+// Apply reference profile analysis data to a novel
+router.post("/profiles/:id/apply", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { novelId } = req.body;
+    if (!novelId) {
+      res.status(400).json({ error: { code: "INVALID_INPUT", message: "novelId required" } });
+      return;
+    }
+    const profile = await getPrisma().referenceProfile.findUnique({
+      where: { id: param(req, "id") },
+    });
+    if (!profile) {
+      res.status(404).json({ error: { code: "NOT_FOUND", message: "Profile not found" } });
+      return;
+    }
+
+    const prisma = getPrisma();
+    // Set as active profile
+    await prisma.novel.update({
+      where: { id: novelId },
+      data: { activeProfileId: profile.id },
+    });
+
+    // Migrate analysis fields from analysisResult JSON if available
+    if (profile.analysisResult) {
+      let ar: any = {};
+      try { ar = JSON.parse(profile.analysisResult); } catch { /* skip */ }
+
+      const updateData: Record<string, unknown> = {};
+      if (ar.architectureType) updateData.architectureType = ar.architectureType;
+      if (ar.architecture?.loopNarratives) updateData.loopSkeleton = JSON.stringify(ar.architecture.loopNarratives);
+      if (ar.goldenFinger) updateData.goldenFinger = JSON.stringify(ar.goldenFinger);
+      if (ar.writing?.techniques) updateData.architectureProfile = JSON.stringify(ar.writing.techniques);
+      if (ar.writing?.expectations) updateData.expectationProfile = JSON.stringify(ar.writing.expectations);
+
+      if (Object.keys(updateData).length > 0) {
+        await prisma.novel.update({ where: { id: novelId }, data: updateData });
+      }
+    }
+
+    res.json({ data: { ok: true } });
+  } catch (e) { next(e); }
+});
+
 export default router;
