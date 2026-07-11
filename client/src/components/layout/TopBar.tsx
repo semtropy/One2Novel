@@ -21,7 +21,7 @@ export function TopBar() {
     <header className="flex h-14 items-center gap-1 border-b border-slate-200 bg-white px-4">
       {/* Logo */}
       <button onClick={() => navigate("/")} className="flex items-center gap-2 font-bold text-slate-800 hover:text-slate-600 mr-4 shrink-0">
-        <img src="/icon-bw-512.png" alt="One2Novel" className="w-[18px] h-[18px]" />
+        <img src="./icon-bw-512.png" alt="One2Novel" className="w-[18px] h-[18px]" />
         <span className="text-sm">One2Novel</span>
       </button>
 

@@ -4,7 +4,6 @@ import { RouterProvider } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createRouter } from "./app/router";
 import { queryClient } from "./app/queryClient";
-import DesktopBootstrapBoundary from "./components/layout/DesktopBootstrapBoundary";
 import "./index.css";
 
 const router = createRouter();
@@ -12,9 +11,7 @@ const router = createRouter();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <DesktopBootstrapBoundary>
-        <RouterProvider router={router} />
-      </DesktopBootstrapBoundary>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>,
 );

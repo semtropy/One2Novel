@@ -22,6 +22,80 @@ function resolveDbPath(dbUrl: string): string | null {
   return path.isAbsolute(relative) ? relative : path.resolve(relative);
 }
 
+/**
+ * Read table columns from an existing SQLite database.
+ * Returns column names in lowercase.
+ */
+function getTableColumns(dbPath: string, tableName: string): Set<string> {
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    const rows = db.prepare(`PRAGMA table_info("${tableName}")`).all() as Array<{ name: string }>;
+    return new Set(rows.map(r => r.name.toLowerCase()));
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Read table columns from the template database (source of truth).
+ */
+function getTemplateColumns(tableName: string): Set<string> {
+  const db = new Database(TEMPLATE_DB, { readonly: true });
+  try {
+    const rows = db.prepare(`PRAGMA table_info("${tableName}")`).all() as Array<{ name: string }>;
+    return new Set(rows.map(r => r.name.toLowerCase()));
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Add missing columns to an existing SQLite database based on the template.
+ * Only ADDs columns — never drops or modifies existing data.
+ */
+function syncMissingColumns(dbPath: string): void {
+  try {
+    const templateCols = getTemplateColumns("Novel");
+    const existingCols = getTableColumns(dbPath, "Novel");
+
+    const missing: string[] = [];
+    for (const col of templateCols) {
+      if (!existingCols.has(col)) {
+        missing.push(col);
+      }
+    }
+
+    if (missing.length === 0) {
+      console.log("[db] No missing columns detected — schema is up to date.");
+      return;
+    }
+
+    console.log(`[db] Found ${missing.length} missing column(s) in Novel table: ${missing.join(", ")}`);
+
+    const db = new Database(dbPath);
+    try {
+      for (const col of missing) {
+        // Infer column type from template
+        const row = db.prepare(`PRAGMA table_info("Novel")`).all() as Array<{ name: string; type: string }>;
+        const colInfo = row.find(r => r.name.toLowerCase() === col);
+        if (colInfo) {
+          const colDef = `ALTER TABLE "Novel" ADD COLUMN "${col}" ${colInfo.type}`;
+          try {
+            db.exec(colDef);
+            console.log(`[db] Added column: ${col} (${colInfo.type})`);
+          } catch (err) {
+            console.warn(`[db] Failed to add column ${col}: ${err instanceof Error ? err.message : err}`);
+          }
+        }
+      }
+    } finally {
+      db.close();
+    }
+  } catch {
+    console.warn("[db] Column sync failed — schema may be out of date.");
+  }
+}
+
 /** If the database is fresh, initialize it from the pre-built template */
 function ensureSchema(): void {
   if (schemaPushed) return;
@@ -40,6 +114,8 @@ function ensureSchema(): void {
       try {
         const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='Novel' LIMIT 1").get();
         if (row) {
+          // Existing database — sync missing columns from template
+          syncMissingColumns(dbPath);
           schemaPushed = true;
           return;
         }

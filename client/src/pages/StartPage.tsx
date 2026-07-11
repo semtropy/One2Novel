@@ -52,7 +52,7 @@ export function StartPage() {
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-8">
-          <img src="/icon-bw-512.png" alt="One2Novel" className="mx-auto mb-4 w-10 h-10" />
+          <img src="./icon-bw-512.png" alt="One2Novel" className="mx-auto mb-4 w-10 h-10" />
           <h1 className="text-xl font-bold text-slate-900 mb-2">从一句灵感到百万字大作</h1>
           <p className="text-sm text-slate-500">AI 驱动的长篇小说创作工作台</p>
         </div>
