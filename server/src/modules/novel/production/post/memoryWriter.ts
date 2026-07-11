@@ -41,18 +41,6 @@ interface UpsertResult {
   itemsOutdated: number;
 }
 
-// ─── Category priority (for filtering) ───────────────────
-
-const CATEGORY_PRIORITY: Record<string, number> = {
-  world_rule: 0,
-  open_loop: 1,
-  character_state: 2,
-  relationship: 3,
-  reader_promise: 4,
-  story_fact: 5,
-  timeline: 6,
-};
-
 // ─── Public API ──────────────────────────────────────────
 
 /**
@@ -436,6 +424,8 @@ async function fetchLatestCharacterStates(
   currentGoal: string | null;
 }>> {
   const prisma = getPrisma();
+
+  // 1. Fetch current character states (new values)
   const characters = await prisma.novelCharacter.findMany({
     where: { novelId },
     select: {
@@ -443,10 +433,32 @@ async function fetchLatestCharacterStates(
     },
   });
   if (characters.length === 0) return [];
+
+  // 2. Fetch the latest EntityStateJournal entry per character before currentChapter
+  //    This gives us the "old" status — the last known state before this chapter
+  const oldStates = await prisma.entityStateJournal.findMany({
+    where: {
+      novelId,
+      field: "currentStatus",
+      changedAtChapter: { lt: currentChapter },
+    },
+    orderBy: { changedAtChapter: "desc" },
+    select: { characterId: true, oldValue: true },
+  });
+
+  // 3. Build a map from characterId → oldValue (first occurrence per character = most recent)
+  const oldStatusMap = new Map<string, string | null>();
+  for (const entry of oldStates) {
+    if (!oldStatusMap.has(entry.characterId)) {
+      oldStatusMap.set(entry.characterId, entry.oldValue);
+    }
+  }
+
+  // 4. Combine current state with historical state
   return characters.map((c: { id: string; name: string; currentStatus: string | null; currentLocation: string | null; currentGoal: string | null }) => ({
     characterId: c.id,
     characterName: c.name,
-    oldStatus: c.currentStatus,
+    oldStatus: oldStatusMap.get(c.id) ?? null,
     newStatus: c.currentStatus,
     currentLocation: c.currentLocation,
     currentGoal: c.currentGoal,

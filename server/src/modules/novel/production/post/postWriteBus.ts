@@ -278,7 +278,7 @@ export function registerPostWriteHandlers(): void {
       throttled(() => handleCompletionGuidance({ novelId: ctx.novelId, chapterId: ctx.chapterId }).catch(e => logErr("completion", e)), "completion"),
       throttled(() => handleVolumeCompletion({ novelId: ctx.novelId, chapterId: ctx.chapterId, chapterOrder: ctx.chapterOrder }).catch(e => logErr("volumeCompletion", e)), "volumeCompletion"),
       throttled(() => handleDebtInterest({ novelId: ctx.novelId, chapterOrder: ctx.chapterOrder }).catch(e => logErr("debtInterest", e)), "debtInterest"),
-    ]).catch(() => {}); // Suppress unhandled rejection
+    ]);
   });
 }
 

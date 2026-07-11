@@ -157,14 +157,36 @@ function estimateTextTokens(text: string): number {
   return Math.max(1, Math.ceil(chineseChars * 1.5 + asciiChars * 0.25));
 }
 
-/** Truncate block content to fit within a token budget. */
+/** Truncate block content to fit within a token budget, respecting paragraph boundaries. */
 function truncateToFitTokens(block: PromptContextBlock, maxTokens: number): PromptContextBlock {
-  // Conservative: truncate to roughly maxTokens * 0.7 characters (Chinese-dominant)
   const maxChars = Math.floor(maxTokens * 0.7);
-  const truncated =
-    block.content.length > maxChars
-      ? block.content.slice(0, maxChars) + "\n...[摘要截断]"
-      : block.content;
+  if (block.content.length <= maxChars) return block;
+
+  // Split on double newlines (paragraph boundaries)
+  const parts = block.content.split(/(\n\n+)/);
+  let accumulated = "";
+
+  for (const part of parts) {
+    // Skip standalone newline separators
+    if (/^\n+$/.test(part)) {
+      if (accumulated.length > 0) {
+        const candidate = accumulated + part;
+        if (estimateTextTokens(candidate) <= maxTokens) {
+          accumulated = candidate;
+        }
+      }
+      continue;
+    }
+
+    // Check if adding this paragraph exceeds budget
+    const candidate = accumulated + part;
+    if (estimateTextTokens(candidate) > maxTokens) {
+      break; // Stop at the last complete paragraph
+    }
+    accumulated = candidate;
+  }
+
+  const truncated = accumulated + "\n...[摘要截断]";
   return {
     ...block,
     content: truncated,

@@ -21,10 +21,16 @@ import { renderSelectedContextBlocks } from "./renderContextBlocks";
 import { injectSkillRules } from "./skillRules";
 import type { PromptContextBlock } from "./promptTypes";
 import { PROVIDER_REGISTRY } from "../config/providers";
+import { DEFAULT_MODEL_CONTEXT_WINDOW, CONTEXT_SELECTION_BUDGET_FRACTION } from "../config/constants";
 
 // ═══════════════════════════════════════════════════════════
 // Preferred Provider
 // ═══════════════════════════════════════════════════════════
+
+/** Compute the default token budget for context selection. Uses model context window * 0.7. */
+function getDefaultTokenBudget(): number {
+  return Math.floor(DEFAULT_MODEL_CONTEXT_WINDOW * CONTEXT_SELECTION_BUDGET_FRACTION);
+}
 
 function loadPreferencesModule() {
   return require("../../modules/settings/preferences") as {
@@ -183,7 +189,7 @@ export async function invokeAsset<T extends ZodType>(opts: {
   if (!asset) throw new Error(`Prompt asset not found: ${opts.assetId}`);
   if (!asset.contextPolicy) throw new Error(`Asset ${opts.assetId} has no contextPolicy`);
 
-  const selection = selectContextBlocks(opts.blocks, undefined, opts.currentChapterOrder);
+  const selection = selectContextBlocks(opts.blocks, { maxTokens: getDefaultTokenBudget() }, opts.currentChapterOrder);
   const userPrompt = renderSelectedContextBlocks(selection.selectedBlocks);
 
   const route = TASK_MODEL[asset.taskType];
@@ -208,7 +214,7 @@ export async function invokeAsset<T extends ZodType>(opts: {
     trace: {
       selected: selection.selectedBlocks.map((b) => b.id),
       dropped: selection.droppedBlockIds,
-      summarized: [],
+      summarized: selection.summarizedBlockIds,
       tokens: selection.estimatedTokens,
     },
   };
@@ -223,7 +229,7 @@ export function compileAsset(opts: {
   if (!asset) throw new Error(`Prompt asset not found: ${opts.assetId}`);
   if (!asset.contextPolicy) throw new Error(`Asset ${opts.assetId} has no contextPolicy`);
 
-  const selection = selectContextBlocks(opts.blocks, undefined, opts.currentChapterOrder);
+  const selection = selectContextBlocks(opts.blocks, { maxTokens: getDefaultTokenBudget() }, opts.currentChapterOrder);
   const userPrompt = renderSelectedContextBlocks(selection.selectedBlocks);
 
   return {
@@ -232,7 +238,7 @@ export function compileAsset(opts: {
     trace: {
       selected: selection.selectedBlocks.map((b) => b.id),
       dropped: selection.droppedBlockIds,
-      summarized: [],
+      summarized: selection.summarizedBlockIds,
       tokens: selection.estimatedTokens,
     },
   };

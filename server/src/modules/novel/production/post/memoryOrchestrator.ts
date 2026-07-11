@@ -20,22 +20,9 @@
  */
 import { getPrisma } from "../../../../platform/db/client";
 import { logEventError } from "../../../../platform/logging/eventErrorLog";
+import { MEMORY_WINDOW, SEMANTIC_MEMORY_LIMIT, ACTIVE_CONSTRAINTS_LIMIT, CATEGORY_PRIORITY } from "../../../../platform/config/constants";
 
 // ─── Constants ─────────────────────────────────────────────
-
-const MEMORY_WINDOW = 50; // Look back N chapters for relevant memory
-const SEMANTIC_MEMORY_LIMIT = 25; // Max semantic items to inject
-const ACTIVE_CONSTRAINTS_LIMIT = 10; // Max world_rule + open_loop (hard constraints)
-
-const CATEGORY_PRIORITY: Record<string, number> = {
-  world_rule: 0,
-  open_loop: 1,
-  character_state: 2,
-  relationship: 3,
-  reader_promise: 4,
-  story_fact: 5,
-  timeline: 6,
-};
 
 const CATEGORY_LABELS: Record<string, string> = {
   world_rule: "世界规则（硬约束）",
@@ -89,18 +76,30 @@ export async function buildMemoryPack(
   const cutoff = chapterOrder - MEMORY_WINDOW;
 
   try {
-    // Load all active memory items for this novel within the time window
-    const items = await prisma.memoryItem.findMany({
+    // Load world_rule items (no time window — they are permanent constraints)
+    const worldRules = await prisma.memoryItem.findMany({
+      where: {
+        novelId,
+        status: "active",
+        category: "world_rule",
+      },
+    });
+
+    // Load all other active memory items within the time window
+    const timeFilteredItems = await prisma.memoryItem.findMany({
       where: {
         novelId,
         status: "active",
         sourceChapter: { gte: cutoff },
+        category: { not: "world_rule" },
       },
       orderBy: [
         { category: "asc" },
         { sourceChapter: "desc" },
       ],
     });
+
+    const items = [...worldRules, ...timeFilteredItems];
 
     if (items.length === 0) return null;
 
@@ -201,7 +200,7 @@ export function compileMemoryPackContent(pack: MemoryPack): string {
   // Add a note about filtered items
   if (pack.stats.filtered > 0) {
     lines.push("");
-    lines.push(`（共${pack.stats.total}条记忆，注入${pack.stats.injected}条，过滤${pack.stats.filtered}条超出时间窗口）`);
+    lines.push(`（共${pack.stats.total}条记忆，注入${pack.stats.injected}条，过滤${pack.stats.filtered}条）`);
   }
 
   return lines.join("\n");

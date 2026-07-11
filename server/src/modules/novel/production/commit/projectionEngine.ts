@@ -298,3 +298,64 @@ export async function replayAllUnfinished(novelId: string): Promise<number> {
 
   return totalReplayed;
 }
+
+/**
+ * Replay projections for chapters stuck in partially_completed or failed status
+ * for more than the given staleness threshold (in chapters).
+ *
+ * A chapter is considered "stale" if its position lags behind the current
+ * chapter order by more than stalenessThreshold. This enables automatic
+ * recovery of chapters whose projection writers failed and were never retried.
+ *
+ * Returns the number of chapters successfully replayed.
+ */
+export async function replayStaleProjections(
+  novelId: string,
+  stalenessThreshold: number = 5,
+): Promise<number> {
+  const prisma = getPrisma();
+
+  // Find commits that are accepted but stuck in bad projection status
+  const staleCommits = await prisma.chapterCommit.findMany({
+    where: {
+      novelId,
+      status: 'accepted',
+      projectionStatus: { in: ['partially_completed', 'failed'] },
+    },
+    select: {
+      id: true,
+      chapterId: true,
+      chapterOrder: true,
+      novelId: true,
+    },
+    orderBy: { chapterOrder: 'asc' },
+  });
+
+  // Current max chapter order to compute staleness
+  const maxOrder = await prisma.chapter.aggregate({
+    where: { novelId },
+    _max: { order: true },
+  });
+  const currentOrder = maxOrder._max.order ?? 0;
+
+  let replayed = 0;
+  for (const commit of staleCommits) {
+    // Skip if the commit was recently completed (within staleness threshold)
+    const staleness = currentOrder - commit.chapterOrder;
+    if (staleness < stalenessThreshold) continue;
+
+    try {
+      const result = await runProjections(
+        commit.id,
+        commit.novelId,
+        commit.chapterId,
+        commit.chapterOrder,
+      );
+      if (result.success) replayed++;
+    } catch (e) {
+      logEventError("projection.replayStale", { chapterId: commit.chapterId }, e);
+    }
+  }
+
+  return replayed;
+}

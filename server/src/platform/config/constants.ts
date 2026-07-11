@@ -40,6 +40,36 @@ export const QUALITY_PASS_THRESHOLD_STRICT = 65;
 /** Score delta between total and threshold for WARNING verdict */
 export const QUALITY_WARNING_DELTA = 10;
 
+// ─── Semantic Memory ──────────────────────────────────────
+
+/** Look back N chapters for relevant memory items */
+export const MEMORY_WINDOW = 50;
+
+/** Max semantic memory items (excl. world_rule + open_loop) to inject */
+export const SEMANTIC_MEMORY_LIMIT = 25;
+
+/** Max world_rule + open_loop items (hard constraints) */
+export const ACTIVE_CONSTRAINTS_LIMIT = 10;
+
+/** Category priority map for memory sorting — lower = higher priority */
+export const CATEGORY_PRIORITY: Record<string, number> = {
+  world_rule: 0,
+  open_loop: 1,
+  character_state: 2,
+  relationship: 3,
+  reader_promise: 4,
+  story_fact: 5,
+  timeline: 6,
+};
+
+// ─── LLM / Model ──────────────────────────────────────────
+
+/** Default model context window size (tokens). Most modern models support 128K+. */
+export const DEFAULT_MODEL_CONTEXT_WINDOW = 128_000;
+
+/** Fraction of context window used as the default token budget for context selection */
+export const CONTEXT_SELECTION_BUDGET_FRACTION = 0.7;
+
 // ─── Context Selection (LLM) ────────────────────────────────
 
 /** Blocks with priority >= this value are always kept during token budget enforcement */
