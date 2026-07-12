@@ -10,7 +10,6 @@
  */
 import { z } from "zod";
 import { getPrisma } from "../../../platform/db/client";
-import { createWorldRuleRepo } from "../../../platform/data/repositories/worldRuleRepository";
 import { aiInvoke } from "../../../platform/llm/aiService";
 import type { PowerNode } from "./powerSystemService";
 
@@ -101,10 +100,11 @@ export async function generateWorldFramework(novelId: string): Promise<WorldFram
   });
 
   // Persist world rules (delete old, create new)
-  const worldRuleRepo = createWorldRuleRepo(prisma);
-  await worldRuleRepo.deleteByNovel(novelId);
+  await prisma.worldRule.deleteMany({ where: { novelId } });
   for (const r of worldRules.rules) {
-    await worldRuleRepo.create({ novelId, category: r.category, title: r.title, content: r.content, priority: r.priority });
+    await prisma.worldRule.create({
+      data: { novelId, category: r.category, title: r.title, content: r.content, priority: r.priority },
+    });
   }
   const rulesSummary = worldRules.rules
     .map(r => `[${r.category}] ${r.title}: ${r.content}`)

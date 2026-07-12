@@ -12,7 +12,7 @@ import { assembleRepairContext } from "../repair/repairContext";
 import { assembleChapterContext } from "../context/contextBlockBuilders";
 import { runQualityGate, totalQualityScore } from "../quality/qualityGate";
 import { persistQualityScores } from "../quality/qualityPersist";
-import { runPostWriteHooks } from "../post/postWriteHooks";
+import { runPostWriteHooks } from "../post/postWriteBus";
 import { finalizeChapter } from "../audit/finalization";
 import { diagnoseWorkspace } from "../revision/revisionService";
 import { formatIssuesForRepair, patchRepair, heavyRepair } from "../repair/repairService";

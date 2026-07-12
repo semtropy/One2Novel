@@ -208,8 +208,8 @@ async function handleMemoryWrite(ctx: {
 
 async function handleDebtInterest(ctx: { novelId: string; chapterOrder: number }) {
   try {
-    const m = await import("../debtService");
-    m.getDebtService().accrueInterest(ctx.novelId, ctx.chapterOrder)
+    const { accrueInterest } = await import("../debtService");
+    accrueInterest(ctx.novelId, ctx.chapterOrder)
       .catch(e => logEventError("postWrite.debtInterest", ctx, e));
   } catch (e) {
     logEventError("postWrite.debtInterest", ctx, e);

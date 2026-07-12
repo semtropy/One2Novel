@@ -6,7 +6,6 @@ import { aiInvoke } from "../../../../platform/llm/aiService";
 import { getPrisma } from "../../../../platform/db/client";
 import { createNovelRepo } from "../../../../platform/data/repositories";
 import type { GoldenFingerData, LoopDefinitionData, PowerNodeData, ArchitectureProfileData, ContentBeatProfileData, LoopSkeletonData } from "../../../../platform/data/repositories/novelRepository";
-import { getArchitectureTemplate } from "./architectureRegistry";
 import type { ArchitectureType, LoopSkeleton, LoopSkeletonItem, ExpandedVolume, ExpandedChapter, LoopPhase, CoolPointType, ChapterType } from "./types";
 
 /** 计算长篇网文的回环数。每轮回环约 18 章，最少 5 轮，500章≈28轮回环。 */
@@ -71,7 +70,7 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
   const novel = await prisma.novel.findUnique({ where: { id: input.novelId } });
   if (!novel) throw new Error("Novel not found");
 
-  const arch = getArchitectureTemplate(input.architectureType);
+  const arch = null; // architectureRegistry stub removed — always null
 
   // Read story core directly from Novel columns
   const storyCoreContext = [
@@ -136,31 +135,10 @@ export async function generateLoopSkeleton(input: GenerateLoopSkeletonInput): Pr
     }
   } catch {}
 
-  const effectivePhases = customPhases ?? arch?.defaultLoop.phases ?? [];
+  const effectivePhases = customPhases ?? [];
   const effectivePhaseDesc = effectivePhases.map((p: { label: string; description: string; typicalChapterCount: [number, number] }) => `${p.label}（${p.description}，${p.typicalChapterCount[0]}-${p.typicalChapterCount[1]}章）`).join(" → ");
 
-  const systemPrompt = arch
-    ? [
-        `你是资深网文架构师。根据以下信息为长篇网文生成回环骨架。`,
-        "",
-        `【架构类型】${arch.name}`,
-        `【架构说明】${arch.description}`,
-        `【回环阶段】${effectivePhaseDesc}`,
-        `【每轮回环章数】${arch.defaultLoop.estimatedChaptersPerLoop[0]}-${arch.defaultLoop.estimatedChaptersPerLoop[1]}章`,
-        `【结算类型】${arch.defaultLoop.settlementTypes.join("、")}`,
-        `【升级方向】${arch.defaultLoop.scaleUpDirections.join("；")}`,
-        "",
-        `【生成原则】`,
-        `1. 每轮回环必须有独立的触发事件和副本/事件名称，不得重复`,
-        `2. 回环与回环之间必须形成递进关系——舞台逐步放大，敌人逐步增强`,
-        `3. 结算内容必须具体可感知，不能是泛泛的「获得力量」`,
-        `4. 舞台升级方向必须明确——读者能清楚感知下一轮回环比这一轮「大」在哪`,
-        `5. 触发事件应随回环推进而升级：前半轮回环外力触发，后半轮回环主角主动`,
-        `6. 最终轮回环应指向全书的最大悬念和最终敌人`,
-      ].join("\n")
-    : [
-        `你是资深网文架构师。根据故事设定自由设计回环骨架，不套用固定模板。`,
-        ``,
+  const systemPrompt = [
         `【回环结构说明】`,
         `每轮回环遵循 触发→展开→挫折→转折→高潮→结算 的自然节奏，`,
         `但具体阶段划分和占比应根据故事类型灵活调整。`,
@@ -317,7 +295,7 @@ export async function expandLoopToVolume(
     ? `\n【角色阵容】\n${characters.map(c => `- ${c.name}（${c.role === "protagonist" ? "主角" : c.role === "antagonist" ? "对手" : "配角"}）${c.factionLabel ? ` [${c.factionLabel}]` : ""}`).join("\n")}`
     : "";
 
-  const arch = getArchitectureTemplate(skeleton.architectureType);
+  const arch = null; // architectureRegistry stub removed
 
   const loopItem = skeleton.loops.find(l => l.loopIndex === loopIndex);
   if (!loopItem) throw new Error(`Loop ${loopIndex} not found in skeleton`);
@@ -328,7 +306,7 @@ export async function expandLoopToVolume(
   if (loopDef2?.phases?.length) {
     customPhases2 = loopDef2?.phases?.map((p: { key: string; label: string }) => ({ phase: p.key, label: p.label })) ?? null;
   }
-  const effectivePhases2 = customPhases2 ?? arch?.defaultLoop.phases ?? [];
+  const effectivePhases2 = customPhases2 ?? [];
   const effectivePhaseOrder = effectivePhases2.map((p: { label: string }) => p.label).join(" → ");
 
   // Get previous loop's settlement for context
@@ -346,9 +324,6 @@ export async function expandLoopToVolume(
       acc[b.type] = { pct: b.pct, span: b.span, label: b.label };
       return acc;
     }, {} as Record<string, { pct: number; span: string; label: string }>);
-  }
-  if (!beatProfile && arch?.defaultContentBeats) {
-    beatProfile = arch.defaultContentBeats;
   }
   if (beatProfile && Object.keys(beatProfile).length > 0) {
     const beatEntries = Object.entries(beatProfile);

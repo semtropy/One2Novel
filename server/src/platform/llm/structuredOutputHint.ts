@@ -9,8 +9,6 @@ import {
 } from "../config/constants";
 
 const DEFAULT_MAX_DEPTH = DEFAULT_MAX_STRUCTURE_DEPTH;
-const DEFAULT_ARRAY_ITEM_COUNT_LOCAL = DEFAULT_ARRAY_ITEM_COUNT;
-const MAX_EXACT_ARRAY_EXAMPLE_ITEMS_LOCAL = MAX_EXACT_ARRAY_EXAMPLE_ITEMS;
 const MANUAL_STRUCTURED_HINT_PATTERNS = [
   "输出结构必须严格为",
   "json 结构必须严格为",
@@ -33,10 +31,10 @@ function resolveArrayExampleLength(schema: AnySchema): number {
   for (const check of checks) {
     const val = (check as { value?: unknown }).value;
     if (typeof val === "number") {
-      return Math.max(0, Math.min(MAX_EXACT_ARRAY_EXAMPLE_ITEMS_LOCAL, val));
+      return Math.max(0, Math.min(MAX_EXACT_ARRAY_EXAMPLE_ITEMS, val));
     }
   }
-  return DEFAULT_ARRAY_ITEM_COUNT_LOCAL;
+  return DEFAULT_ARRAY_ITEM_COUNT;
 }
 
 function cloneExample<T>(value: T): T {

@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "updatedAt": "2026-07-10T16:00:00.111Z",
+  "preferences": {
+    "favoriteGenres": [],
+    "preferredPerspective": "third_person",
+    "preferredPace": "balanced",
+    "preferredTone": "dramatic",
+    "estimatedChapterCount": null,
+    "defaultChapterLength": 3000,
+    "creationHistory": [],
+    "providerModels": {
+      "deepseek": "deepseek-chat"
+    },
+    "apiKeys": {
+      "deepseek": "sk-fd5f444897a749a2b91f86e94c9d9ecc"
+    }
+  }
+}

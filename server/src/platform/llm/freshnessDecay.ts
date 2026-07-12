@@ -56,9 +56,6 @@ export const FRESHNESS_DECAY_RATES: Record<string, number> = {
   rag_retrieval: 50, // RAG 结果跨距较大，衰减较慢
 };
 
-/** 默认 decayRate */
-const DEFAULT_DECAY_RATE = DEFAULT_FRESHNESS_DECAY_RATE;
-
 // ─── Freshness Decay Function ───────────────────────────
 
 /**
@@ -81,7 +78,7 @@ export function effectivePriority(
   block: PromptContextBlock,
   chapterDistance: number,
 ): number {
-  const decayRate = FRESHNESS_DECAY_RATES[block.group] ?? DEFAULT_DECAY_RATE;
+  const decayRate = FRESHNESS_DECAY_RATES[block.group] ?? DEFAULT_FRESHNESS_DECAY_RATE;
   const decay = freshnessDecay(chapterDistance, decayRate);
   return block.priority * decay;
 }

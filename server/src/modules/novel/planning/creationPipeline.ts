@@ -9,7 +9,6 @@
  */
 import { getPrisma } from "../../../platform/db/client";
 import { createNovelRepo } from "../../../platform/data/repositories/novelRepository";
-import { createReferenceBookRepo } from "../../../platform/data/repositories/referenceBookRepository";
 import type { GoldenFingerData, LoopSkeletonData } from "../../../platform/data/repositories/novelRepository";
 import { serializeTags } from "../../../platform/data/tagHelpers";
 
@@ -20,11 +19,6 @@ import {
   generateCharacters,
   persistCharacters,
 } from "./characterPrep/characterService";
-import {
-  getArchitectureTemplate,
-  buildExpectationProfile,
-  listArchitectureTemplates,
-} from "./architectureEngine/architectureRegistry";
 import {
   generateLoopSkeleton,
   expandLoopToVolume,
@@ -127,9 +121,10 @@ export class CreationPipeline {
 
       // Inject reference book setting timeline for world-building guidance
       try {
-        const refBookRepo = createReferenceBookRepo(prisma);
-        const annotations = await refBookRepo.getAnnotations(this.novelId);
-        const keySettings = (annotations as any)?.keySettings as Array<{ chapterIndex: number; settingName: string; description: string }> | undefined;
+        const prisma = getPrisma();
+        const rb = await prisma.referenceBook.findUnique({ where: { novelId: this.novelId } });
+        const annotations = rb?.annotations ? JSON.parse(rb.annotations) : null;
+        const keySettings = annotations?.keySettings as Array<{ chapterIndex: number; settingName: string; description: string }> | undefined;
         if (keySettings?.length) {
           const settingSummary = keySettings
             .sort((a, b) => a.chapterIndex - b.chapterIndex)
@@ -202,16 +197,16 @@ export class CreationPipeline {
     await updateStepState(this.novelId, "architecture", { status: "generating" });
     onProgress?.({ step: "architecture", detail: "正在分析参考书...", percent: 15 });
 
-    const refBookRepo = createReferenceBookRepo(getPrisma());
-    const rb = await refBookRepo.findByNovel(this.novelId);
+    const prisma = getPrisma();
+    const rb = await prisma.referenceBook.findUnique({ where: { novelId: this.novelId } });
 
     if (!rb?.content) {
       await updateStepState(this.novelId, "architecture", { status: "skipped", result: null });
       return null;
     }
 
-    const annotations = await refBookRepo.getAnnotations(this.novelId) ?? {};
-    const analysisSummary = await refBookRepo.getAnalysisSummary(this.novelId);
+    const annotations = rb?.annotations ? JSON.parse(rb.annotations) : {};
+    const analysisSummary = rb?.analysisSummary ? JSON.parse(rb.analysisSummary) : null;
 
     const result: ReferenceAnalysisResult = {
       detectedArchitecture: analysisSummary?.detectedArchitecture
@@ -251,8 +246,8 @@ export class CreationPipeline {
     });
 
     // Auto-fill golden finger from reference book analysis
-    const refBookRepo = createReferenceBookRepo(prisma);
-    const refAnnotations = await refBookRepo.getAnnotations(this.novelId);
+    const refBook = await prisma.referenceBook.findUnique({ where: { novelId: this.novelId } });
+    const refAnnotations = refBook?.annotations ? JSON.parse(refBook.annotations) : null;
     let goldenFinger = params.goldenFinger ?? { abilities: [], limits: [] };
     if (!params.goldenFinger && refAnnotations?.goldenFingerBounds) {
       const bounds = refAnnotations.goldenFingerBounds as { abilities: string[]; limits: string[] };

@@ -5,7 +5,6 @@ import type { ParsedChapter, ChapterAnnotation } from "./index";
 import { REF_ANALYSIS_MAX_CHARS } from "../../../../platform/config/constants";
 
 const BASE_BATCH_SIZE = 15;
-const MAX_CHARS_PER_BATCH = REF_ANALYSIS_MAX_CHARS;
 const CONCURRENCY = 5; // Number of parallel batch groups
 
 const BatchAnnotationSchema = z.object({
@@ -67,7 +66,7 @@ export async function batchAnnotateChapters(
   onProgress?: (batch: number, total: number) => Promise<void>,
 ): Promise<ChapterAnnotation[]> {
   const avgChapterSize = chapters.reduce((s, c) => s + c.wordCount, 0) / chapters.length;
-  const batchSize = Math.max(5, Math.min(BASE_BATCH_SIZE, Math.floor(MAX_CHARS_PER_BATCH / avgChapterSize)));
+  const batchSize = Math.max(5, Math.min(BASE_BATCH_SIZE, Math.floor(REF_ANALYSIS_MAX_CHARS / avgChapterSize)));
   const totalBatches = Math.ceil(chapters.length / batchSize);
 
   const prisma = getPrisma();

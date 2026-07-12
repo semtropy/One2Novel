@@ -1,11 +1,8 @@
 /**
  * Reference Book Service — thin adapter layer for the deep ReferenceAnalyzer module.
  *
- * This file is intentionally thin. All analysis logic lives in
- * `referenceAnalyzer.ts` where each responsibility is a deep module
- * with a small interface and rich implementation.
- *
- * This file re-exports for backward compatibility with route handlers.
+ * All analysis logic lives in `referenceAnalyzer.ts`. This module exposes
+ * CRUD + analysis delegation as a plain object (no factory overhead).
  */
 
 import { getPrisma } from "../../../platform/db/client";
@@ -52,33 +49,10 @@ export interface ChapterPreview {
   estimatedWords: number;
 }
 
-// ─── Service Interface ─────────────────────────────────
+// ─── Service (plain object, no factory) ────────────────
 
-export interface ReferenceBookService {
-  upload(novelId: string, fileName: string, content: string): Promise<ReferenceBookData>;
-  get(novelId: string): Promise<ReferenceBookData | null>;
-  remove(novelId: string): Promise<void>;
-  getChapters(novelId: string): Promise<ChapterPreview[]>;
-  getChapterContent(novelId: string, chapterIndex: number): Promise<string | null>;
-  saveAnnotations(novelId: string, annotations: ReferenceAnnotation): Promise<ReferenceBookData>;
-  saveAnalysis(novelId: string, summary: unknown): Promise<ReferenceBookData>;
-  inferLoops(novelId: string): Promise<ReferenceAnnotation>;
-  inferCoolPoints(novelId: string): Promise<ReferenceAnnotation>;
-  getStatistics(novelId: string): Promise<unknown>;
-  extractWritingAssets(novelId: string): Promise<WritingAssetCollection>;
-  createStyleProfileFromAssets(novelId: string): Promise<{ profileId: string; bindingId: string }>;
-  detectArchitecture(novelId: string): Promise<ArchitectureDetection>;
-  extractHookPatterns(novelId: string): Promise<HookPatternResult>;
-  extractGoldenFingerBounds(novelId: string): Promise<GoldenFingerBounds>;
-  extractSettingTimeline(novelId: string): Promise<Array<{ chapterIndex: number; settingName: string; description: string }>>;
-  extractContentBeats(novelId: string): Promise<ContentBeatAnnotation>;
-}
-
-// ─── Service Factory ───────────────────────────────────
-
-export function createReferenceBookService(): ReferenceBookService {
-  return {
-    async upload(novelId, fileName, content) {
+export const referenceBookService = {
+    async upload(novelId: string, fileName: string, content: string): Promise<ReferenceBookData> {
       const prisma = getPrisma();
       const totalChapters = content.match(/(?:^|\n)\s*(?:第[0-9零一二三四五六七八九十百千万]+[章節节]|Chapter\s+\d+)/gmi)?.length ?? 1;
       const rb = await prisma.referenceBook.upsert({
@@ -112,7 +86,7 @@ export function createReferenceBookService(): ReferenceBookService {
       };
     },
 
-    async get(novelId) {
+    async get(novelId: string): Promise<ReferenceBookData | null> {
       const prisma = getPrisma();
       const rb = await prisma.referenceBook.findUnique({ where: { novelId } });
       if (!rb) return null;
@@ -131,12 +105,12 @@ export function createReferenceBookService(): ReferenceBookService {
       };
     },
 
-    async remove(novelId) {
+    async remove(novelId: string): Promise<void> {
       const prisma = getPrisma();
       await prisma.referenceBook.deleteMany({ where: { novelId } });
     },
 
-    async getChapters(novelId) {
+    async getChapters(novelId: string): Promise<ChapterPreview[]> {
       const prisma = getPrisma();
       const rb = await prisma.referenceBook.findUnique({ where: { novelId } });
       if (!rb?.content) return [];
@@ -146,7 +120,7 @@ export function createReferenceBookService(): ReferenceBookService {
       return chapters;
     },
 
-    async getChapterContent(novelId, chapterIndex) {
+    async getChapterContent(novelId: string, chapterIndex: number): Promise<string | null> {
       const prisma = getPrisma();
       const rb = await prisma.referenceBook.findUnique({ where: { novelId } });
       if (!rb?.content) return null;
@@ -161,7 +135,7 @@ export function createReferenceBookService(): ReferenceBookService {
       return rb.content.slice(start, end).slice(0, 8000);
     },
 
-    async saveAnnotations(novelId, annotations) {
+    async saveAnnotations(novelId: string, annotations: ReferenceAnnotation): Promise<ReferenceBookData> {
       const prisma = getPrisma();
       const rb = await prisma.referenceBook.update({
         where: { novelId },
@@ -176,7 +150,7 @@ export function createReferenceBookService(): ReferenceBookService {
       };
     },
 
-    async saveAnalysis(novelId, summary) {
+    async saveAnalysis(novelId: string, summary: unknown): Promise<ReferenceBookData> {
       const prisma = getPrisma();
       const rb = await prisma.referenceBook.update({
         where: { novelId },
@@ -195,9 +169,9 @@ export function createReferenceBookService(): ReferenceBookService {
 
     inferLoops,
     inferCoolPoints,
-    async getStatistics(novelId) { return getStatistics(novelId); },
-    async extractWritingAssets(novelId) { return extractWritingAssets(novelId); },
-    async createStyleProfileFromAssets(novelId) {
+    async getStatistics(novelId: string): Promise<unknown> { return getStatistics(novelId); },
+    async extractWritingAssets(novelId: string): Promise<WritingAssetCollection> { return extractWritingAssets(novelId); },
+    async createStyleProfileFromAssets(novelId: string): Promise<{ profileId: string; bindingId: string }> {
       const prisma = getPrisma();
       const rb = await prisma.referenceBook.findUnique({ where: { novelId } });
       if (!rb) throw new Error("No reference book");
@@ -266,5 +240,4 @@ export function createReferenceBookService(): ReferenceBookService {
     extractGoldenFingerBounds,
     extractSettingTimeline,
     extractContentBeats,
-  };
-}
+};

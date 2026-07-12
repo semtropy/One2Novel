@@ -3,7 +3,6 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { z } from "zod";
 import { getPrisma } from "../../../../../platform/db/client";
 import { createNovelRepo } from "../../../../../platform/data/repositories";
-import { listArchitectureTemplates, buildExpectationProfile } from "../../../planning/architectureEngine/architectureRegistry";
 import { generateLoopSkeleton, expandLoopToVolume } from "../../../planning/architectureEngine/loopTemplateService";
 import type { ExpandedVolume, ArchitectureType } from "../../../planning/architectureEngine/types";
 import type { LoopSkeleton } from "../../../planning/architectureEngine/types";
@@ -77,11 +76,6 @@ router.put("/:novelId/architecture", async (req: Request, res: Response, next: N
     if (req.body.goldenFinger !== undefined) data.goldenFinger = req.body.goldenFinger;
     if (req.body.centralQuestion !== undefined) data.centralQuestion = req.body.centralQuestion;
     if (req.body.endingDirection !== undefined) data.endingDirection = req.body.endingDirection;
-    // Persist expectation profile from architecture template
-    if (req.body.architectureType) {
-      const profile = buildExpectationProfile(req.body.architectureType);
-      if (profile) data.expectationProfile = profile;
-    }
     const novel = await prisma.novel.update({
       where: { id: param(req, "novelId") },
       data,
@@ -90,17 +84,10 @@ router.put("/:novelId/architecture", async (req: Request, res: Response, next: N
   } catch (e) { next(e); }
 });
 
-// Architecture templates
+// Architecture templates — stub, returns empty list (built-in templates removed)
 router.get("/:novelId/architecture/templates", async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const templates = listArchitectureTemplates().map(t => ({
-      id: t.id, name: t.name, description: t.description,
-      compatibleGenres: t.compatibleGenres, defaultLoop: t.defaultLoop,
-      defaultCoolPointRecipe: t.defaultCoolPointRecipe,
-      defaultHookProfile: t.defaultHookProfile,
-      representativeWorks: t.representativeWorks,
-    }));
-    res.json({ data: templates });
+    res.json({ data: [] });
   } catch (e) { next(e); }
 });
 
@@ -141,14 +128,7 @@ router.get("/:novelId/loop-definition", async (req: Request, res: Response, next
     }
     // Fall back to architecture default
     const novel = await prisma.novel.findUnique({ where: { id: param(req, "novelId") }, select: { architectureType: true } });
-    if (novel?.architectureType) {
-      const { getArchitectureTemplate } = await import("../../../planning/architectureEngine/architectureRegistry");
-      const tmpl = getArchitectureTemplate(novel.architectureType as ArchitectureType);
-      if (tmpl) {
-        res.json({ data: { phases: tmpl.defaultLoop.phases, source: "template" } });
-        return;
-      }
-    }
+    // Architecture template fallback removed (built-in templates removed)
     res.json({ data: null });
   } catch (e) { next(e); }
 });

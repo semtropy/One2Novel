@@ -8,7 +8,7 @@
 import { useState, useEffect } from "react";
 import { api } from "../app/api";
 import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
-import { toast } from "../lib/toast";
+import { toast } from "sonner";
 import type { ProviderInfo } from "../components/settings/ProviderConfigDialog";
 
 /** Client-side model options — kept for backward compat, prefer server API */
