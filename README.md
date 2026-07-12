@@ -66,21 +66,31 @@ One2Novel 把专业网文编辑的工作方式编码成一条 **串行流水线*
 
 分析结果可应用到任意小说，也可作为架构引擎的输入。
 
+### 参考书驾驶舱（Reference Cockpit）
+
+独立于小说的参考书深度分析工作台（`/reference-profiles`），用于对标分析和成果应用：
+
+- **档案上传** — 支持 txt / epub（百万字以上），epub 自动解析 OPF 目录和章节结构，txt 按"第X章"自动分割
+- **全量深度分析 V2** — 5 阶段管线：解析章节目录 → 批量 LLM 标注（每章 8 个维度）→ 回环检测 + 节奏分析 + 金手指提取 + 写法技法 + 读者期待链 → 合成架构蓝图
+- **分析结果可视化** — 回环叙事分析（每轮叙事功能/核心冲突/主角变化/关键事件）、节奏曲线（高潮间隔/冷却段/节奏模板）、章节结构热力图（爽点等级/章节类型/钩子类型）、金手指设计模式（能力/限制/进化路径/叙事融合）、写作手法统计（开场方式/对话比率）、读者期待链（建立→维持→兑现→新期待）
+- **应用到小说** — 将分析结果一键应用到已有小说，自动迁移架构配置（回环骨架、金手指、风格合同等）
+- **独立于小说** — 参考书档案是独立实体（ReferenceProfile），可在多个小说间复用，也可从小说参考书一键导出为独立档案
+
 ### 写作工作台（Workspace）
 
-三栏布局：左侧章节列表、中间编辑器、右侧工具箱（9 个面板）。
+三栏布局：左侧章节列表、中间编辑器、右侧工具箱（10 个面板）。
 
 每章经历完整的生产管线：
 
 1. **深度上下文组装** — `assembleChapterBlocks()` 从 12+ 个模块采集上下文：书籍合约、章节任务、前章内容、角色硬事实、实体生命周期、语义记忆、角色动力学、风格约束、参考书范例、伏笔指令、开放冲突、RAG 语义检索、分层压缩章节、当前卷上下文、时间线、世界规则、期望配置文件、内容节拍、分镜计划
 2. **AI 生成正文** — 通过 prompt 注册中心调用 LLM，注入写作 Skill 规则，SSE 流式输出
-3. **九维质检** — 开头吸引力、情节推进、人物塑造、对话质量、悬念设置、节奏控制、展示而非讲述、语言质量、题材适配（+ 跨章连贯性），按题材动态切换检查维度
+3. **十维质检** — 开头吸引力、情节推进、人物塑造、对话质量、悬念设置、节奏控制、展示而非讲述、语言质量、题材适配（+ 跨章连贯性），按题材动态切换检查维度
 4. **自动修复** — 低分触发 patch repair（轻度，temperature 0.5）或 heavy repair（深度，temperature 0.7），重新评分
 5. **持久化 + Commit** — 生成不可变的 ChapterCommit 记录，含质量门快照
 6. **异步 Projection** — 5 个 Projection Writer 并行消费 commit：state（角色状态更新）、index（卷章计划更新）、summary（章节摘要）、memory（语义记忆沉淀）、vector（RAG 存储）
-7. **写后钩子** — 时间线提取、增量摘要压缩、角色状态更新、伏笔检测、完成度检查、债务计息、卷级压缩与跨卷审计
+7. **写后钩子** — 11 个异步任务并行触发：时间线提取、增量摘要压缩、RAG 自动入库、反 AI 痕迹检测、角色状态更新、记忆沉淀、伏笔逾期检测、完成度检查、债务计息、卷级压缩与跨卷审计
 
-右侧工具箱提供 9 个面板：写法（风格档案绑定）、伏笔（状态管理）、分镜（SceneCard 编辑）、角色动态（出场调度 + 缺席提醒）、时间线（冲突检测 + 写前提醒）、审查详情（九维评分 + Skill 诊断）、统计（字数/质量趋势/伏笔完成率）、仪表盘（爽点节奏/钩子健康/写作提醒/角色状态）、编辑历史（版本对比）。
+右侧工具箱提供 10 个面板：写法（风格档案绑定）、伏笔（状态管理）、分镜（SceneCard 编辑）、角色动态（出场调度 + 缺席提醒）、时间线（冲突检测 + 写前提醒）、审查详情（十维评分 + Skill 诊断）、统计（字数/质量趋势/伏笔完成率）、仪表盘（爽点节奏/钩子健康/写作提醒/角色状态）、编辑历史（版本对比）、导演（批量自动写作）。
 
 ### 导演模式（Director）
 
@@ -105,7 +115,7 @@ One2Novel 把专业网文编辑的工作方式编码成一条 **串行流水线*
 写作管线的核心环节封装为三个独立 Agent，每个都有生命周期追踪、重试和降级：
 
 - **ContextAgent** — 组装 12+ 模块上下文，浓缩为 5 部分写作任务书（故事目标、角色状态与动机、情节节点与约束、风格指导、结尾方向）
-- **ReviewerAgent** — 九维质检，失败时自动降级为默认分数，不阻塞管线
+- **ReviewerAgent** — 十维质检，失败时自动降级为默认分数，不阻塞管线
 - **DataAgent** — 从章节文本提取结构化事实（角色状态变化、实体新增/死亡、故事事件、场景拆解），统一输出供 Projection Writers 消费，减少重复 LLM 调用
 
 ### 辅助功能
@@ -141,7 +151,7 @@ One2Novel 把专业网文编辑的工作方式编码成一条 **串行流水线*
 One2Novel/
 ├── client/                  # React 前端
 │   └── src/
-│       ├── pages/           # 6 个页面：Start / Novels / PlanningHub / Workspace / Settings / ReferenceProfiles
+│       ├── pages/           # 8 个页面：Start / Novels / PlanningHub / Workspace / Settings / ReferenceProfiles / ReferenceCockpit / NovelRedirect
 │       └── components/      # workspace / planning / pipeline / settings 等域组件
 ├── server/                  # Express 后端
 │   ├── src/
@@ -151,7 +161,7 @@ One2Novel/
 │   │   │   │   │   ├── storyCoreService.ts      # 故事核心生成
 │   │   │   │   │   ├── characterPrep/           # 角色预制（角色/关系/生命周期/资源台账/信息差）
 │   │   │   │   │   ├── architectureEngine/      # 架构引擎（模板注册、回环骨架生成、卷展开）
-│   │   │   │   │   ├── referenceBookService.ts  # 参考书分析（9 项独立分析模块）
+│   │   │   │   │   ├── referenceBookService.ts  # 参考书分析（多维度独立分析模块）
 │   │   │   │   │   ├── referenceDeepAnalysis/   # 参考书深度分析 V2（解析→标注→模块分析→合成）
 │   │   │   │   │   ├── storyMacro/              # 节拍表、约束引擎、再平衡
 │   │   │   │   │   ├── worldFrameworkService.ts # 世界规则生成
@@ -159,14 +169,14 @@ One2Novel/
 │   │   │   │   │   └── goldenFingerService.ts   # 金手指生成
 │   │   │   │   ├── production/  # 章节写作管线
 │   │   │   │   │   ├── writing/     # chapterPipeline, chapterWriter, chapterGenerator
-│   │   │   │   │   ├── quality/     # 九维质检门 + Skill 诊断规则库
+│   │   │   │   │   ├── quality/     # 十维质检门 + Skill 诊断规则库
 │   │   │   │   │   ├── repair/      # patch/heavy repair + 上下文组装
 │   │   │   │   │   ├── commit/      # 不可变提交 + 5 个异步 projection writers
 │   │   │   │   │   ├── agents/      # ContextAgent / ReviewerAgent / DataAgent
 │   │   │   │   │   ├── context/     # 上下文组装：分层压缩、RAG、语义记忆、卷压缩
 │   │   │   │   │   └── post/        # 写后钩子：时间线、摘要、角色、记忆、债务
 │   │   │   │   ├── director/    # 批量自动写作（断点恢复、超时控制、回环暂停）
-│   │   │   │   └── prompts/     # Prompt 注册中心（7 个文件，按领域注册）
+│   │   │   │   └── prompts/     # Prompt 注册中心（8 个文件，按领域注册）
 │   │   │   ├── payoff/        # 伏笔/回收账本
 │   │   │   ├── timeline/      # 时间线冲突检测
 │   │   │   └── style/         # 写法引擎（风格档案 + 绑定）
