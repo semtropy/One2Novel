@@ -28,7 +28,7 @@ router.get("/:novelId/chapters/:chapterId/commit", async (req: Request, res: Res
     const commit = await getCommit(chapterId);
 
     if (!commit) {
-      return res.status(404).json({ error: "Commit not found" });
+      return res.status(404).json({ error: { code: "NOT_FOUND", message: "Commit not found" } });
     }
 
     return res.json({
@@ -46,7 +46,7 @@ router.get("/:novelId/chapters/:chapterId/commit", async (req: Request, res: Res
     });
   } catch (e) {
     logEventError("commit.routes.get", req.params, e);
-    return res.status(500).json({ error: "Failed to fetch commit" });
+    return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Failed to fetch commit" } });
   }
 });
 
@@ -62,14 +62,14 @@ router.post("/:novelId/chapters/:chapterId/replay-projections", async (req: Requ
     });
 
     if (!chapter) {
-      return res.status(404).json({ error: "Chapter not found" });
+      return res.status(404).json({ error: { code: "NOT_FOUND", message: "Chapter not found" } });
     }
 
     const count = await replayProjections(chapterId, novelId, chapter.order);
     return res.json({ replayed: count });
   } catch (e) {
     logEventError("commit.routes.replay", req.params, e);
-    return res.status(500).json({ error: "Failed to replay projections" });
+    return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Failed to replay projections" } });
   }
 });
 
@@ -82,7 +82,7 @@ router.post("/:novelId/replay-all-projections", async (req: Request, res: Respon
     return res.json({ replayed: count });
   } catch (e) {
     logEventError("commit.routes.replayAll", req.params, e);
-    return res.status(500).json({ error: "Failed to replay all projections" });
+    return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Failed to replay all projections" } });
   }
 });
 
@@ -112,7 +112,7 @@ router.get("/:novelId/projection-status", async (req: Request, res: Response) =>
     });
   } catch (e) {
     logEventError("commit.routes.status", req.params, e);
-    return res.status(500).json({ error: "Failed to fetch projection status" });
+    return res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Failed to fetch projection status" } });
   }
 });
 

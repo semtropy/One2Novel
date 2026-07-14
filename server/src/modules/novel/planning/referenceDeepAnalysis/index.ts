@@ -9,6 +9,8 @@ import {
   extractWritingTechniques, computeCraftStats, extractExpectationChains,
 } from "./modules";
 
+import { logEventError } from "../../../../platform/logging/eventErrorLog";
+
 // ═══════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════
@@ -84,7 +86,7 @@ export interface AnalysisResultV3 {
 // ═══════════════════════════════════════════════════════════
 
 async function updateProgress(profileId: string, phase: string, detail: string, pct: number) {
-  try { await getPrisma().referenceProfile.update({ where: { id: profileId }, data: { deepAnalysisProgress: JSON.stringify({ phase, detail, pct }) } }); } catch {}
+  try { await getPrisma().referenceProfile.update({ where: { id: profileId }, data: { deepAnalysisProgress: JSON.stringify({ phase, detail, pct }) } }); } catch (e) { logEventError("referenceDeepAnalysis.updateProgress", { profileId }, e); } // intentional: fire-and-forget, failure tolerated
 }
 
 export async function deepAnalyze(profileId: string): Promise<AnalysisResultV3> {

@@ -1,5 +1,6 @@
 import { getPrisma } from "../../../platform/db/client";
 import { aiInvoke } from "../../../platform/llm/aiService";
+import { logEventError } from "../../../platform/logging/eventErrorLog";
 import { z } from "zod";
 import { REF_PROMPT_SLICE_LARGE } from "../../../platform/config/constants";
 
@@ -34,7 +35,7 @@ export async function scanConflicts(novelId: string, chapterId: string): Promise
     let prevConflictContext = "";
     if (prevChapter?.openConflicts) {
       try {
-        const prev = JSON.parse(prevChapter.openConflicts);
+        const prev = (() => { try { return JSON.parse(prevChapter.openConflicts); } catch(e) { logEventError("openConflict.scanConflicts.parsePrev", { novelId, chapterId }, e); return {}; } })();
         if (prev.conflicts?.length > 0) {
           prevConflictContext = `\n\n上一章的开放冲突（需检查是否延续/升级/解决）：\n${prev.conflicts.map((c: { title: string; status: string; description: string }) => `- [${c.status}] ${c.title}：${c.description}`).join("\n")}`;
         }

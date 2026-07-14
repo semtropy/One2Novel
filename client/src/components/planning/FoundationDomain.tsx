@@ -6,7 +6,8 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Sparkles, Globe } from "lucide-react";
-import { NovelUpdateSchema } from "@one2novel/shared/types/novel";
+import { NovelUpdateSchema, POV_OPTIONS, PACE_OPTIONS, EMOTION_OPTIONS, GENRE_OPTIONS } from "@one2novel/shared";
+import type { z } from "zod";
 import { useNovel, useUpdateNovel } from "../../api/novel";
 import { useGenerateStoryCore } from "../../api/story-core";
 import { cn } from "../../lib/cn";
@@ -15,23 +16,6 @@ interface Props {
   novelId: string;
   onComplete?: () => void;
 }
-
-const GENRE_OPTIONS = ["仙侠", "玄幻", "修真", "悬疑", "言情", "奇幻", "科幻", "历史", "都市", "武侠", "穿越", "重生", "系统/无限流", "末世", "竞技", "恐怖", "游戏", "轻小说", "其他"];
-const POV_OPTIONS = [
-  { value: "first_person", label: "第一人称" },
-  { value: "third_person", label: "第三人称" },
-  { value: "mixed", label: "混合视角" },
-];
-const PACE_OPTIONS = [
-  { value: "slow", label: "舒缓" },
-  { value: "balanced", label: "均衡" },
-  { value: "fast", label: "快节奏" },
-];
-const EMOTION_OPTIONS = [
-  { value: "low", label: "克制" },
-  { value: "medium", label: "适中" },
-  { value: "high", label: "强烈" },
-];
 
 export function FoundationDomain({ novelId, onComplete }: Props) {
   const { data: novel, refetch } = useNovel(novelId);
@@ -82,9 +66,9 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
 
   const quickSave = async (field: string, value: string) => {
     // Zod validation against shared schema
-    const fieldSchema = (NovelUpdateSchema.shape as Record<string, unknown>)[field];
-    if (fieldSchema && typeof (fieldSchema as any).safeParse === "function") {
-      const result = (fieldSchema as any).safeParse(value);
+    const fieldSchema = (NovelUpdateSchema.shape as Record<string, z.ZodType>)[field];
+    if (fieldSchema) {
+      const result = fieldSchema.safeParse(value);
       if (!result.success) {
         setFieldErrors(prev => ({ ...prev, [field]: result.error.issues[0]?.message ?? "格式不正确" }));
         return;
@@ -95,7 +79,7 @@ export function FoundationDomain({ novelId, onComplete }: Props) {
     try {
       if (field === "commercialTags") {
         const tags = value.split(",").map(s => s.trim()).filter(Boolean);
-        await updateNovel.mutateAsync({ id: novelId, commercialTags: tags } as any);
+        await updateNovel.mutateAsync({ id: novelId, commercialTags: tags });
       } else {
         await updateNovel.mutateAsync({ id: novelId, [field]: value });
       }

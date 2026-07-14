@@ -4,28 +4,12 @@
  * Extracts character state changes AND relationship changes from each newly completed
  * chapter in a single AI call (replaces the old separate state-update + dynamics.post).
  * Fire-and-forget — failures are logged but don't block the chapter write.
+ *
+ * Uses the shared characterStateExtractor to avoid duplicate LLM calls.
  */
-import { z } from "zod";
 import { getPrisma } from "../../../../platform/db/client";
-import { aiInvoke } from "../../../../platform/llm/aiService";
-import { REF_PROMPT_SLICE_LARGE } from "../../../../platform/config/constants";
 import { logEventError } from "../../../../platform/logging/eventErrorLog";
-
-const CharacterPostChapterSchema = z.object({
-  updates: z.array(z.object({
-    characterName: z.string(),
-    // State changes
-    currentStatus: z.string().optional(),
-    currentLocation: z.string().optional(),
-    currentGoal: z.string().optional(),
-    availability: z.string().optional(),
-    // Relationship changes (merged from old character.dynamics.post)
-    relationshipChanges: z.array(z.object({
-      targetName: z.string(),
-      changeDescription: z.string(),
-    })).optional(),
-  })).max(20).default([]),
-});
+import { extractCharacterStates } from "./characterStateExtractor";
 
 /**
  * Extract character state + relationship changes from a completed chapter and persist them.
@@ -63,34 +47,12 @@ export async function updateCharacterStatesAfterChapter(
       oldGoal: c.currentGoal,
     }]));
 
-    const charList = characters
-      .map(c => {
-        const parts = [`${c.name} (${c.role})`];
-        if (c.currentStatus) parts.push(`当前状态: ${c.currentStatus}`);
-        if (c.currentLocation) parts.push(`位置: ${c.currentLocation}`);
-        if (c.currentGoal) parts.push(`目标: ${c.currentGoal}`);
-        return parts.join(" · ");
-      })
-      .join("\n");
-
-    const userPrompt = [
-      `## 出场角色（当前状态）`,
-      charList,
-      "",
-      `## 第${chapterOrder}章正文`,
-      chapterContent.slice(0, REF_PROMPT_SLICE_LARGE),
-    ].join("\n");
-
-    const result = await aiInvoke({
-      assetId: "novel.character.post-chapter",
-      userPrompt,
-      schema: CharacterPostChapterSchema,
-      temperature: 0.3,
-    });
+    const extracted = await extractCharacterStates(novelId, chapterOrder, chapterContent);
+    if (!extracted) return null;
 
     // Persist state updates
     let updated = 0;
-    for (const update of result.updates) {
+    for (const update of extracted.updates) {
       const character = characters.find(c => c.name === update.characterName);
       if (!character) continue;
 
@@ -118,7 +80,7 @@ export async function updateCharacterStatesAfterChapter(
             await prisma.novelCharacterRelation.update({
               where: { id: existing.id },
               data: { summary: rel.changeDescription },
-            }).catch(() => {});
+            }).catch(e => logEventError("characterState.updateRelation", { characterId: character.id, targetId: target.id }, e)); // intentional: fire-and-forget, failure tolerated
           }
         }
       }
@@ -130,9 +92,9 @@ export async function updateCharacterStatesAfterChapter(
 
     // Collect updates for downstream consumers (entityLifecycle)
     const updates = Array.from(oldStates.entries())
-      .filter(([name]) => result.updates.some(u => u.characterName === name))
+      .filter(([name]) => extracted.updates.some(u => u.characterName === name))
       .map(([name, old]) => {
-        const newUpdate = result.updates.find(u => u.characterName === name);
+        const newUpdate = extracted.updates.find(u => u.characterName === name);
         return {
           characterId: old.characterId,
           characterName: name,

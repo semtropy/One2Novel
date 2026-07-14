@@ -31,13 +31,20 @@
     "publish:desktop:beta:reuse-stage": "node desktop/scripts/publish-desktop-beta.cjs",
     "publish:desktop:release": "pnpm run stage:desktop && node desktop/scripts/publish-desktop-release.cjs",
     "publish:desktop:release:reuse-stage": "node desktop/scripts/publish-desktop-release.cjs",
-    "release:desktop:github": "node scripts/trigger-desktop-release.cjs"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["@prisma/engines", "better-sqlite3", "esbuild", "prisma"],
-    "ignoredBuiltDependencies": ["electron", "electron-winstaller"]
+    "release:desktop:github": "node scripts/trigger-desktop-release.cjs",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"**/*.{ts,tsx,js,cjs,mjs}\" --ignore-path .prettierignore"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/testing-library__jest-dom": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.64.0",
+    "@typescript-eslint/parser": "^8.64.0",
+    "eslint": "^10.7.0",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.9.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   }
 }

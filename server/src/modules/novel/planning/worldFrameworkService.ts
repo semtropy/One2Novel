@@ -73,7 +73,7 @@ export async function generateWorldFramework(novelId: string): Promise<WorldFram
         if (dp) {
           referenceContext += `\n【对标书金手指模式】${dp.type}：${dp.coreMechanic}`;
         }
-      } catch { /* ignore parse errors */ }
+      } catch (e) { /* ignore parse errors */ console.error(`[WorldFramework] Reference JSON parse failed: ${e instanceof Error ? e.message : e}`); }
     }
   }
 
@@ -148,7 +148,7 @@ export async function generateWorldFramework(novelId: string): Promise<WorldFram
           designPatternContext = `\n【参考书设计模式（few-shot）】类型：${dp.type} — ${dp.typeDescription}\n核心机制：${dp.coreMechanic}\n获取方式：${dp.acquisitionPattern}\n进化路径：${dp.evolutionPath?.join(" → ")}\n限制策略：${dp.limitationStrategy}`;
         }
       }
-    } catch { /* ignore */ }
+    } catch (e) { /* ignore parse errors */ console.error(`[WorldFramework] Golden finger reference JSON parse failed: ${e instanceof Error ? e.message : e}`); }
   }
   const powerSummary = powerSystemTree
     ? `\n力量体系：${powerSystemTree.map((l: any) => l.name).join(" → ")}`

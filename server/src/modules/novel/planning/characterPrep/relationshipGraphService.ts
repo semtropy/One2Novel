@@ -3,6 +3,7 @@
  * ADAPTED from OP CharacterDynamicsService (1922 lines).
  */
 import { getPrisma } from "../../../../platform/db/client";
+import { logEventError } from "../../../../platform/logging/eventErrorLog";
 
 export interface RelationEdge {
   id: string;
@@ -35,7 +36,7 @@ export async function getGraph(novelId: string): Promise<RelationshipGraph> {
       id: r.id, sourceId: r.sourceCharacterId, targetId: r.targetCharacterId,
       type: r.type, attitudeSource: r.attitudeSource, attitudeTarget: r.attitudeTarget,
       stage: r.stage, currentTension: r.currentTension,
-      volumePresence: r.volumePresence ? JSON.parse(r.volumePresence) : null,
+      volumePresence: r.volumePresence ? (() => { try { return JSON.parse(r.volumePresence) as Record<string, string>; } catch(e) { logEventError("relationshipGraphService.getGraph.parseVolumePresence", { relationId: r.id }, e); return null; } })() : null,
       sourceName: r.sourceCharacter.name, targetName: r.targetCharacter.name,
     })),
   };

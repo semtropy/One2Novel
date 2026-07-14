@@ -35,7 +35,7 @@ export async function stopDirector(novelId: string): Promise<boolean> {
     const { saveCheckpoint, loadCheckpoint } = await import("./checkpointService");
     const cp = await loadCheckpoint(novelId);
     if (cp) {
-      await saveCheckpoint(novelId, { ...cp, stopRequested: true }).catch(() => {});
+      await saveCheckpoint(novelId, { ...cp, stopRequested: true }).catch(e => logEventError("director.checkpoint.stopFlag", { novelId }, e)); // intentional: fire-and-forget, failure tolerated
     }
     return true;
   }
@@ -150,7 +150,7 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
         }
 
         // Save content snapshot to checkpoint BEFORE persisting (crash recovery)
-        await saveCp("running", { pendingChapterContent: content, pendingChapterTitle: chapter.title }).catch(() => {});
+        await saveCp("running", { pendingChapterContent: content, pendingChapterTitle: chapter.title }).catch(e => logEventError("director.checkpoint.pendingContent", { novelId, chapterOrder: chapter.order }, e)); // intentional: fire-and-forget, failure tolerated
 
         await prisma.chapter.update({
           where: { id: chapter.id },
@@ -160,7 +160,7 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
         // Run full chapter pipeline: quality → repair → persist → hooks
         const pipelineResult = await processChapter(novelId, chapter.id, content, chapter.order);
         // Clear pending content after successful pipeline completion
-        await saveCp("running", { pendingChapterContent: null, pendingChapterTitle: null }).catch(() => {});
+        await saveCp("running", { pendingChapterContent: null, pendingChapterTitle: null }).catch(e => logEventError("director.checkpoint.clearPending", { novelId, chapterOrder: chapter.order }, e)); // intentional: fire-and-forget, failure tolerated
         const finalStatus = pipelineResult.status;
         const finalScore = pipelineResult.score;
 
@@ -199,6 +199,12 @@ export async function runDirector(novelId: string, maxChapters?: number): Promis
         return progress;
       }
     }
+
+    // Mark novel as completed when all chapters are done
+    await prisma.novel.update({
+      where: { id: novelId },
+      data: { projectStatus: "completed" },
+    }).catch(e => logEventError("director.projectComplete", { novelId }, e));
 
     progress.stage = "completed";
     progress.message = `全部 ${progress.totalChapters} 章完成`;

@@ -614,7 +614,8 @@ export async function getStatistics(novelId: string): Promise<ReferenceStatistic
   if (!rb) throw new Error("No reference book");
 
   const annotations: ReferenceAnnotation = rb.annotations
-    ? JSON.parse(rb.annotations) : { loopBoundaries: [], highCoolChapters: [], lowCoolChapters: [], keySettings: [] };
+    ? (() => { try { return JSON.parse(rb.annotations) as ReferenceAnnotation; } catch { return { loopBoundaries: [], highCoolChapters: [], lowCoolChapters: [], keySettings: [] }; } })()
+    : { loopBoundaries: [], highCoolChapters: [], lowCoolChapters: [], keySettings: [] };
 
   const starts = annotations.loopBoundaries.filter(b => b.type === "start").sort((a, b) => a.chapterIndex - b.chapterIndex);
   const ends = annotations.loopBoundaries.filter(b => b.type === "end").sort((a, b) => a.chapterIndex - b.chapterIndex);

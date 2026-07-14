@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveDataRoot } from "../../platform/config/appPaths";
+import { DEFAULT_CHAPTER_LENGTH } from "@one2novel/shared";
 
 const PREFS_FILE = path.join(resolveDataRoot(), "user-preferences.json");
 
@@ -38,7 +39,7 @@ const defaults: UserPreferences = {
     preferredPace: "balanced",
     preferredTone: "dramatic",
     estimatedChapterCount: null,
-    defaultChapterLength: 3000,
+    defaultChapterLength: DEFAULT_CHAPTER_LENGTH,
     creationHistory: [],
     providerModels: {},
     apiKeys: {},
@@ -52,7 +53,9 @@ export function getPreferences(): UserPreferences {
       const parsed = JSON.parse(raw);
       return { ...defaults, ...parsed, preferences: { ...defaults.preferences, ...parsed.preferences } };
     }
-  } catch {}
+  } catch (e) {
+    console.error(`[Preferences] Failed to read preferences: ${e instanceof Error ? e.message : e}`);
+  }
   return { ...defaults };
 }
 
@@ -66,21 +69,25 @@ export function savePreferences(prefs: Partial<UserPreferences["preferences"]>):
   try {
     fs.mkdirSync(path.dirname(PREFS_FILE), { recursive: true });
     fs.writeFileSync(PREFS_FILE, JSON.stringify(updated, null, 2), "utf-8");
-  } catch {}
+  } catch (e) {
+    console.error(`[Preferences] Failed to write preferences: ${e instanceof Error ? e.message : e}`);
+  }
   return updated;
 }
 
-/** Load persisted API keys into process.env on server startup */
-export function loadApiKeysFromPreferences(): void {
+/**
+ * Load persisted API keys from preferences.
+ * Returns a map of { [providerId]: rawKey } instead of modifying process.env directly.
+ * Callers decide how to use the returned keys.
+ */
+export function loadApiKeysFromPreferences(): Record<string, string> {
   try {
     const prefs = getPreferences();
-    const keys = prefs.preferences.apiKeys ?? {};
-    for (const [provider, key] of Object.entries(keys)) {
-      if (key && !process.env[`${provider.toUpperCase()}_API_KEY`]) {
-        process.env[`${provider.toUpperCase()}_API_KEY`] = key;
-      }
-    }
-  } catch {}
+    return prefs.preferences.apiKeys ?? {};
+  } catch (e) {
+    console.error(`[Preferences] Failed to load API keys: ${e instanceof Error ? e.message : e}`);
+    return {};
+  }
 }
 
 /** Save a single provider's API key to preferences */

@@ -205,8 +205,8 @@ export class CreationPipeline {
       return null;
     }
 
-    const annotations = rb?.annotations ? JSON.parse(rb.annotations) : {};
-    const analysisSummary = rb?.analysisSummary ? JSON.parse(rb.analysisSummary) : null;
+    const annotations = rb?.annotations ? (() => { try { return JSON.parse(rb.annotations); } catch { return {}; } })() : {};
+    const analysisSummary = rb?.analysisSummary ? (() => { try { return JSON.parse(rb.analysisSummary); } catch { return null; } })() : null;
 
     const result: ReferenceAnalysisResult = {
       detectedArchitecture: analysisSummary?.detectedArchitecture
@@ -247,7 +247,7 @@ export class CreationPipeline {
 
     // Auto-fill golden finger from reference book analysis
     const refBook = await prisma.referenceBook.findUnique({ where: { novelId: this.novelId } });
-    const refAnnotations = refBook?.annotations ? JSON.parse(refBook.annotations) : null;
+    const refAnnotations = refBook?.annotations ? (() => { try { return JSON.parse(refBook.annotations); } catch { return null; } })() : null;
     let goldenFinger = params.goldenFinger ?? { abilities: [], limits: [] };
     if (!params.goldenFinger && refAnnotations?.goldenFingerBounds) {
       const bounds = refAnnotations.goldenFingerBounds as { abilities: string[]; limits: string[] };

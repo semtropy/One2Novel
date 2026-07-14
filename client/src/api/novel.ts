@@ -97,7 +97,7 @@ export function useNovel(id: string | undefined) {
       return data.data as NovelDetail;
     },
     enabled: !!id,
-    staleTime: 0,
+    staleTime: 60_000,
     refetchOnMount: "always",
   });
 }

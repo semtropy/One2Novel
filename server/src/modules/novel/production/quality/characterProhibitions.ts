@@ -10,18 +10,26 @@ export interface CharacterProhibition {
   prohibitions: string[];
 }
 
+/** Split a natural-language prohibitions string into individual items. */
+function splitProhibitions(text: string): string[] {
+  return text
+    .split(/[、，;\n]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 export async function buildCharacterProhibitions(
   novelId: string,
-): Promise<CharacterProhibition[] | undefined> {
+): Promise<CharacterProhibition[]> {
   const prisma = getPrisma();
   const chars = await prisma.novelCharacter.findMany({
     where: { novelId, prohibitions: { not: null } },
     select: { name: true, prohibitions: true },
   });
-  const proh = chars
-    .filter(c => {
-      try { const p = JSON.parse(c.prohibitions ?? "[]"); return Array.isArray(p) && p.length > 0; } catch { return false; }
+  return chars
+    .map(c => {
+      const items = splitProhibitions(c.prohibitions!);
+      return items.length > 0 ? { name: c.name, prohibitions: items } : undefined;
     })
-    .map(c => ({ name: c.name, prohibitions: JSON.parse(c.prohibitions ?? "[]") as string[] }));
-  return proh.length > 0 ? proh : undefined;
+    .filter((c): c is CharacterProhibition => c !== undefined);
 }
