@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getPrisma } from "../../../../platform/db/client";
+import { logEventError } from "../../../../platform/logging/eventErrorLog";
 import { validate } from "../validate";
 import { ChapterCreateSchema, ChapterUpdateSchema } from "@one2novel/shared/types/novel";
 import { renumberWritingChaptersInVolume, renumberGlobalChapterOrders, renumberVolumes } from "../volumeChapterSync";
@@ -43,7 +44,7 @@ router.delete("/:novelId/chapters/:chapterId", async (req, res, next) => {
   try {
     const prisma = getPrisma();
     const chapter = await prisma.chapter.findUnique({ where: { id: req.params.chapterId } });
-    if (!chapter) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+    if (!chapter) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Chapter not found" } }); return; }
     const plans = await prisma.volumeChapterPlan.findMany({ where: { chapterId: req.params.chapterId } });
     for (const p of plans) {
       await prisma.volumeChapterPlan.delete({ where: { id: p.id } });
@@ -102,9 +103,14 @@ router.delete("/:novelId/volumes/:sortOrder", async (req, res, next) => {
   try {
     const prisma = getPrisma();
     const vol = await prisma.volume.findFirst({ where: { novelId: req.params.novelId, sortOrder: parseInt(req.params.sortOrder) } });
-    if (!vol) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+    if (!vol) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Volume not found" } }); return; }
     const plans = await prisma.volumeChapterPlan.findMany({ where: { volumeId: vol.id } });
-    for (const p of plans) { if (p.chapterId) await prisma.chapter.delete({ where: { id: p.chapterId } }).catch(() => {}); }
+    for (const p of plans) {
+      if (p.chapterId) {
+        await prisma.chapter.delete({ where: { id: p.chapterId } })
+          .catch(e => logEventError("volumeChapter.deleteOrphan", { volumeId: vol.id, chapterId: p.chapterId }, e)); // intentional: fire-and-forget, failure tolerated
+      }
+    }
     await prisma.volumeChapterPlan.deleteMany({ where: { volumeId: vol.id } });
     await prisma.volume.delete({ where: { id: vol.id } });
     await renumberVolumes(req.params.novelId);
@@ -149,7 +155,7 @@ router.delete("/:novelId/volumes/:sortOrder/chapters/:planId", async (req, res, 
   try {
     const prisma = getPrisma();
     const plan = await prisma.volumeChapterPlan.findUnique({ where: { id: req.params.planId } });
-    if (!plan) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+    if (!plan) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Volume chapter plan not found" } }); return; }
     if (plan.chapterId) { await prisma.chapter.delete({ where: { id: plan.chapterId } }); }
     await prisma.volumeChapterPlan.delete({ where: { id: plan.id } });
     await renumberWritingChaptersInVolume(plan.volumeId);
@@ -164,7 +170,7 @@ router.post("/:novelId/volumes/:sortOrder/beat-sheet", async (req, res, next) =>
   try {
     const prisma = getPrisma();
     const vol = await prisma.volume.findFirst({ where: { novelId: req.params.novelId, sortOrder: parseInt(req.params.sortOrder) } });
-    if (!vol) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+    if (!vol) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Volume not found" } }); return; }
     const sheet = await generateBeatSheet(req.params.novelId, vol.id);
     res.json({ data: sheet });
   } catch (e) { next(e); }
@@ -176,7 +182,7 @@ router.post("/:novelId/volumes/:sortOrder/rebalance", async (req, res, next) => 
   try {
     const prisma = getPrisma();
     const vol = await prisma.volume.findFirst({ where: { novelId: req.params.novelId, sortOrder: parseInt(req.params.sortOrder) } });
-    if (!vol) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+    if (!vol) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Volume not found" } }); return; }
     const result = await rebalanceVolume(req.params.novelId, vol.id);
     res.json({ data: result });
   } catch (e) { next(e); }

@@ -64,7 +64,7 @@ router.get("/:novelId/reference-book/chapters/:chapterIndex", async (req: Reques
   try {
     const content = await referenceBookService.getChapterContent(
       param(req, "novelId"), parseInt(param(req, "chapterIndex")));
-    if (content === null) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+    if (content === null) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Reference book chapter not found" } }); return; }
     res.json({ data: { chapterIndex: parseInt(param(req, "chapterIndex")), content } });
   } catch (e) { next(e); }
 });

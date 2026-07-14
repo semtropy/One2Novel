@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getPrisma } from "../../platform/db/client";
 import { aiInvoke } from "../../platform/llm/aiService";
+import { logEventError } from "../../platform/logging/eventErrorLog";
 
 // LLM may return string or string[] for rule fields — normalize to array
 const StringOrArray = z.union([z.array(z.string()), z.string().transform(s => [s])]).pipe(z.array(z.string()));
@@ -67,7 +68,7 @@ export async function updateRuleInProfile(id: string, field: string, index: numb
   const prisma = getPrisma();
   const profile = await prisma.styleProfile.findUnique({ where: { id } });
   if (!profile) throw new Error("Profile not found");
-  const arr: string[] = JSON.parse((profile as unknown as Record<string, string>)[field] ?? "[]");
+  const arr: string[] = (() => { try { return JSON.parse((profile as unknown as Record<string, string>)[field] ?? "[]") as string[]; } catch { return []; } })();
   if (index < 0 || index >= arr.length) throw new Error("Index out of range");
   arr[index] = text;
   await prisma.styleProfile.update({ where: { id }, data: { [field]: JSON.stringify(arr) } });
@@ -79,7 +80,7 @@ export async function addRuleToProfile(id: string, field: string, text: string) 
   const prisma = getPrisma();
   const profile = await prisma.styleProfile.findUnique({ where: { id } });
   if (!profile) throw new Error("Profile not found");
-  const arr: string[] = JSON.parse((profile as unknown as Record<string, string>)[field] ?? "[]");
+  const arr: string[] = (() => { try { return JSON.parse((profile as unknown as Record<string, string>)[field] ?? "[]") as string[]; } catch { return []; } })();
   arr.push(text);
   await prisma.styleProfile.update({ where: { id }, data: { [field]: JSON.stringify(arr) } });
   return { field, index: arr.length - 1, text };
@@ -90,7 +91,7 @@ export async function deleteRuleFromProfile(id: string, field: string, index: nu
   const prisma = getPrisma();
   const profile = await prisma.styleProfile.findUnique({ where: { id } });
   if (!profile) throw new Error("Profile not found");
-  const arr: string[] = JSON.parse((profile as unknown as Record<string, string>)[field] ?? "[]");
+  const arr: string[] = (() => { try { return JSON.parse((profile as unknown as Record<string, string>)[field] ?? "[]") as string[]; } catch { return []; } })();
   if (index < 0 || index >= arr.length) throw new Error("Index out of range");
   arr.splice(index, 1);
   await prisma.styleProfile.update({ where: { id }, data: { [field]: JSON.stringify(arr) } });

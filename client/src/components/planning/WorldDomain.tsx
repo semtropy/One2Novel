@@ -5,7 +5,7 @@
  * "AI 生成世界框架" generates rules + power + golden finger in serial pipeline.
  * Reference book analysis results automatically inject into all downstream AI calls.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, Target, Globe, BookOpen, Zap, Check } from "lucide-react";
 import { useNovel, useUpdateNovel } from "../../api/novel";
@@ -66,6 +66,9 @@ export function WorldDomain({ novelId, onComplete }: Props) {
   const [powerNodes, setPowerNodes] = useState<PowerNode[]>([]);
   const [powerGenPending, setPowerGenPending] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const mountedRef = useRef(true);
+
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   useEffect(() => {
     if (novel?.powerSystemTree) {
@@ -76,6 +79,7 @@ export function WorldDomain({ novelId, onComplete }: Props) {
   useEffect(() => {
     if (powerNodes.length === 0) return;
     const timer = setTimeout(async () => {
+      if (!mountedRef.current) return;
       try { await updateNovel.mutateAsync({ id: novelId, powerSystemTree: JSON.stringify(powerNodes) }); } catch {}
     }, 800);
     return () => clearTimeout(timer);

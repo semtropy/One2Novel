@@ -60,7 +60,7 @@ router.post("/:novelId/reference-book/save-profile", async (req: Request, res: R
 
     let annotations: Record<string, unknown> = {};
     if (rb.annotations) {
-      try { annotations = JSON.parse(rb.annotations); } catch { /* old format */ }
+      try { annotations = JSON.parse(rb.annotations); } catch (e) { /* old format */ console.error(`[ReferenceProfile] Annotations parse failed: ${e instanceof Error ? e.message : e}`); }
     }
 
     const profile = await prisma.referenceProfile.create({
@@ -248,7 +248,7 @@ router.post("/profiles/:id/apply", async (req: Request, res: Response, next: Nex
     // Migrate analysis fields from analysisResult JSON if available
     if (profile.analysisResult) {
       let ar: any = {};
-      try { ar = JSON.parse(profile.analysisResult); } catch { /* skip */ }
+      try { ar = JSON.parse(profile.analysisResult); } catch (e) { /* skip */ console.error(`[ReferenceProfile] analysisResult parse failed: ${e instanceof Error ? e.message : e}`); }
 
       const updateData: Record<string, unknown> = {};
       if (ar.architectureType) updateData.architectureType = ar.architectureType;

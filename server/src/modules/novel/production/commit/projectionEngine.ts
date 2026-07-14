@@ -223,11 +223,11 @@ export async function runProjections(
   const failed = runRecords.filter(r => !results[r.writerName]?.success);
 
   if (failed.length === 0 && completed.length > 0) {
-    await updateProjectionStatus(chapterId, 'completed').catch(() => {});
+    await updateProjectionStatus(chapterId, 'completed').catch(e => logEventError("projection.engine.updateStatus", { chapterId }, e)); // intentional: fire-and-forget, failure tolerated
   } else if (completed.length > 0) {
-    await updateProjectionStatus(chapterId, 'partially_completed').catch(() => {});
+    await updateProjectionStatus(chapterId, 'partially_completed').catch(e => logEventError("projection.engine.updateStatus", { chapterId }, e)); // intentional: fire-and-forget, failure tolerated
   } else {
-    await updateProjectionStatus(chapterId, 'failed').catch(() => {});
+    await updateProjectionStatus(chapterId, 'failed').catch(e => logEventError("projection.engine.updateStatus", { chapterId }, e)); // intentional: fire-and-forget, failure tolerated
   }
 
   return {

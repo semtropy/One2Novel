@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { getEnv, reloadEnv } from "../../platform/config/env";
-import { getPreferences, savePreferences, saveApiKey } from "../../modules/settings/preferences";
+import { getPreferences, savePreferences, saveApiKey } from "../../platform/config/preferences";
 import { setSetting } from "../../modules/settings/runtimeSettings";
 import { createLLM } from "../../platform/llm/provider";
 import type { LLMProvider } from "../../platform/llm/provider";

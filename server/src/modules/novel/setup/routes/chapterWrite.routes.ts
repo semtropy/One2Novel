@@ -117,7 +117,7 @@ router.post("/:novelId/next-chapter-preview", llmRateLimit, errorHandlerWrap(asy
     where: { novelId, chapterStatus: "completed" },
     orderBy: { order: "desc" },
     take: 3,
-    select: { order: true, title: true, content: true, expectation: true },
+    select: { id: true, order: true, title: true, content: true, expectation: true },
   });
   if (chapters.length === 0) { res.status(400).json({ error: { code: "NO_CHAPTERS", message: "至少需要一章已完成" } }); return; }
 
@@ -126,9 +126,12 @@ router.post("/:novelId/next-chapter-preview", llmRateLimit, errorHandlerWrap(asy
 
   // Find current volume context
   const plan = await prisma.volumeChapterPlan.findFirst({
-    where: { chapterId: lastChapter.order.toString() },
+    where: { chapterId: lastChapter.id },
     select: { volume: { select: { title: true, summary: true } }, loopPhase: true },
-  }).catch(() => null);
+  }).catch((err) => {
+    console.warn("[next-chapter-preview] VolumeChapterPlan lookup failed for chapter", lastChapter.id, err.message);
+    return null;
+  });
 
   const userPrompt = [
     chapters.length > 1 ? `前一章：${chapters[1].title} — ${chapters[1].expectation ?? ""}` : null,

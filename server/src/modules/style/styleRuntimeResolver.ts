@@ -52,7 +52,7 @@ export async function resolveStyleContext(
     const prisma = getPrisma();
     const profile = await prisma.styleProfile.findUnique({ where: { id: bindings[0].styleProfileId }, select: { extractedFeatures: true } });
     if (profile?.extractedFeatures) {
-      try { summary = JSON.parse(profile.extractedFeatures).overallDescription ?? ""; } catch {}
+      try { summary = JSON.parse(profile.extractedFeatures).overallDescription ?? ""; } catch (e) { console.error(`[StyleRuntime] JSON parse failed: ${e instanceof Error ? e.message : e}`); }
     }
   }
 

@@ -82,11 +82,17 @@ export async function initializeVolumePresence(novelId: string, volumeOrder: num
       : prev?.presence === "departing" ? "inactive"
       : (prev?.presence ?? "active");
 
-    await prisma.characterVolumePresence.upsert({
-      where: { novelId_characterId_volumeOrder: { novelId, characterId: char.id, volumeOrder } },
-      create: { novelId, characterId: char.id, volumeOrder, presence },
-      update: {}, // Don't overwrite if already set
-    });
+    await prisma.characterVolumePresence
+      .upsert({
+        where: { novelId_characterId_volumeOrder: { novelId, characterId: char.id, volumeOrder } },
+        create: { novelId, characterId: char.id, volumeOrder, presence },
+        update: { presence, trajectoryNote: null }, // at least one field required; trajectoryNote stays null here intentionally
+      })
+      .catch(err => {
+        // P2002 = unique constraint conflict (concurrent callers both tried to create the same record)
+        if (err?.code === "P2002") return;
+        throw err;
+      });
   }
 }
 
@@ -129,6 +135,23 @@ export async function detectLongAbsentCharacters(
   return results;
 }
 
+/** Count how many consecutive volumes (ending at volumeOrder-1) a character has been active */
+async function countConsecutiveActiveVolumes(prisma: ReturnType<typeof getPrisma>, novelId: string, characterId: string, endVolume: number): Promise<number> {
+  if (endVolume < 1) return 0;
+  let count = 0;
+  for (let v = endVolume; v >= 1; v--) {
+    const record = await prisma.characterVolumePresence.findFirst({
+      where: { novelId, characterId, volumeOrder: v, presence: "active" },
+    });
+    if (record) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
+}
+
 /** Generate a volume cast recommendation based on loop structure and character lifecycle */
 export async function recommendVolumeCast(
   novelId: string,
@@ -167,7 +190,7 @@ export async function recommendVolumeCast(
       }
     } else if (char.role === "supporting") {
       // Rotate supporting cast: after 5+ consecutive active volumes (~90 chapters), suggest rest
-      const consecutiveActive = prev?.presence === "active" ? ((prev as any).consecutiveActive ?? 1) + 1 : 0;
+      const consecutiveActive = prev?.presence === "active" ? await countConsecutiveActiveVolumes(prisma, novelId, char.id, volumeOrder - 1) : 0;
       if (!prev || prev.presence === "inactive" || prev.presence === "departing") {
         returningCharacters.push({ characterId: char.id, characterName: char.name, role: char.role, returnReason: "配角回归补充阵容" });
       } else if (consecutiveActive >= 5) {

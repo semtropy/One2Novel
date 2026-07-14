@@ -13,7 +13,7 @@ export function ReviewPanel({ novelId, chapterId, quality, diagnosis, reviewing,
 }) {
   const { data: novel } = useNovel(novelId);
   const chapter = novel?.chapters?.find(c => c.id === chapterId);
-  const scores = quality ?? (chapter?.qualityScore && chapter.qualityScore > 0 ? Object.fromEntries(QUALITY_DIMENSIONS.map(d => [d.scoreField, (chapter as any)[d.scoreField] ?? 0])) : null);
+  const scores = quality ?? (chapter?.qualityScore && chapter.qualityScore > 0 ? Object.fromEntries(QUALITY_DIMENSIONS.map(d => [d.scoreField, (chapter as unknown as Record<string, unknown>)[d.scoreField] ?? 0])) : null);
   const total = scores ? Object.values(scores).reduce((a: number, b) => a + (typeof b === 'number' ? b : 0), 0) : 0;
   const displayDiagnosis = diagnosis ?? (() => { try { return chapter?.diagnosis ? JSON.parse(chapter.diagnosis) : null; } catch { return null; } })();
 

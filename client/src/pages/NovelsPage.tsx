@@ -54,7 +54,7 @@ export function NovelsPage() {
       ) : (
         <div className="space-y-3">
           {novels.map((novel) => {
-            const tags: string[] = (() => { try { const raw = novel.commercialTags; if (Array.isArray(raw)) return raw.slice(0, 4); const t = JSON.parse(raw ?? "[]"); return Array.isArray(t) ? t.slice(0, 4) : []; } catch { return []; } })();
+            const tags: string[] = (() => { try { const raw = novel.commercialTags; if (!raw) return []; const t = JSON.parse(raw); return Array.isArray(t) ? t.slice(0, 4) : []; } catch { return []; } })();
             return (
               <div key={novel.id}
                 className="group flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 hover:border-slate-300 hover:shadow-sm transition-all cursor-pointer"

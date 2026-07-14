@@ -8,6 +8,7 @@
 import { getPrisma } from "../../../platform/db/client";
 import type { ContentBeatAnnotation } from "@one2novel/shared/types/novel";
 import { REF_BOOK_CONTENT_SLICE, REF_PROMPT_SLICE } from "../../../platform/config/constants";
+import { logEventError } from "../../../platform/logging/eventErrorLog";
 import {
   inferLoops,
   inferCoolPoints,
@@ -80,8 +81,8 @@ export const referenceBookService = {
         id: rb.id, novelId: rb.novelId, fileName: rb.fileName,
         totalChapters: rb.totalChapters, content: content.slice(0, REF_PROMPT_SLICE),
         chapters,
-        annotations: rb.annotations ? JSON.parse(rb.annotations) : null,
-        analysisSummary: rb.analysisSummary ? JSON.parse(rb.analysisSummary) : null,
+        annotations: rb.annotations ? (() => { try { return JSON.parse(rb.annotations) as ReferenceAnnotation; } catch(e) { logEventError("referenceBookService.upload.parseAnnotations", { novelId: rb.novelId }, e); return null; } })() : null,
+        analysisSummary: rb.analysisSummary ? (() => { try { return JSON.parse(rb.analysisSummary); } catch(e) { logEventError("referenceBookService.upload.parseAnalysisSummary", { novelId: rb.novelId }, e); return null; } })() : null,
         createdAt: rb.createdAt.toISOString(), updatedAt: rb.updatedAt.toISOString(),
       };
     },
@@ -99,8 +100,8 @@ export const referenceBookService = {
         id: rb.id, novelId: rb.novelId, fileName: rb.fileName,
         totalChapters: rb.totalChapters, content: rb.content,
         chapters,
-        annotations: rb.annotations ? JSON.parse(rb.annotations) : null,
-        analysisSummary: rb.analysisSummary ? JSON.parse(rb.analysisSummary) : null,
+        annotations: rb.annotations ? (() => { try { return JSON.parse(rb.annotations) as ReferenceAnnotation; } catch(e) { logEventError("referenceBookService.get.parseAnnotations", { novelId: rb.novelId }, e); return null; } })() : null,
+        analysisSummary: rb.analysisSummary ? (() => { try { return JSON.parse(rb.analysisSummary); } catch(e) { logEventError("referenceBookService.get.parseAnalysisSummary", { novelId: rb.novelId }, e); return null; } })() : null,
         createdAt: rb.createdAt.toISOString(), updatedAt: rb.updatedAt.toISOString(),
       };
     },
@@ -145,7 +146,7 @@ export const referenceBookService = {
         id: rb.id, novelId: rb.novelId, fileName: rb.fileName,
         totalChapters: rb.totalChapters, content: null, chapters: [],
         annotations,
-        analysisSummary: rb.analysisSummary ? JSON.parse(rb.analysisSummary) : null,
+        analysisSummary: rb.analysisSummary ? (() => { try { return JSON.parse(rb.analysisSummary); } catch(e) { logEventError("referenceBookService.saveAnnotations.parseAnalysisSummary", { novelId: rb.novelId }, e); return null; } })() : null,
         createdAt: rb.createdAt.toISOString(), updatedAt: rb.updatedAt.toISOString(),
       };
     },
@@ -159,7 +160,7 @@ export const referenceBookService = {
       return {
         id: rb.id, novelId: rb.novelId, fileName: rb.fileName,
         totalChapters: rb.totalChapters, content: null, chapters: [],
-        annotations: rb.annotations ? JSON.parse(rb.annotations) : null,
+        annotations: rb.annotations ? (() => { try { return JSON.parse(rb.annotations) as ReferenceAnnotation; } catch(e) { logEventError("referenceBookService.saveAnalysis.parseAnnotations", { novelId: rb.novelId }, e); return null; } })() : null,
         analysisSummary: summary,
         createdAt: rb.createdAt.toISOString(), updatedAt: rb.updatedAt.toISOString(),
       };

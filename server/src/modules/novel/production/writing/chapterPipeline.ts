@@ -12,7 +12,6 @@ import { assembleRepairContext } from "../repair/repairContext";
 import { assembleChapterContext } from "../context/contextBlockBuilders";
 import { runQualityGate, totalQualityScore } from "../quality/qualityGate";
 import { persistQualityScores } from "../quality/qualityPersist";
-import { runPostWriteHooks } from "../post/postWriteBus";
 import { finalizeChapter } from "../audit/finalization";
 import { diagnoseWorkspace } from "../revision/revisionService";
 import { formatIssuesForRepair, patchRepair, heavyRepair } from "../repair/repairService";
@@ -191,13 +190,10 @@ export async function processChapter(
     logEventError("pipeline.dataAgent", { novelId, chapterId }, e);
   }
 
-  // Dispatch projections or fall back to post-write hooks
+  // Dispatch projections (fire-and-forget)
   if (commitId) {
     runProjections(commitId, novelId, chapterId, chapterOrder, currentContent, lastQuality ? (lastQuality as unknown as Record<string, unknown>) : undefined, extractionResult)
       .catch(e => logEventError("pipeline.projections", { novelId, chapterId }, e));
-  } else {
-    // No commit — run traditional post-write hooks
-    runPostWriteHooks(novelId, chapterId, currentContent, chapterOrder);
   }
 
   const ctx = { novelId, chapterId, chapterOrder };
@@ -205,7 +201,8 @@ export async function processChapter(
   // Finalization consistency check + diagnosis (fire-and-forget)
   finalizeChapter(novelId, chapterId, chapterOrder).then(r => {
     if (r.consistencyIssues.length > 0) {
-      getPrisma().auditReport.create({
+      // Return the promise so the outer .catch() can catch sync or async errors
+      return getPrisma().auditReport.create({
         data: {
           novelId, chapterId,
           auditType: "finalization",
@@ -214,17 +211,18 @@ export async function processChapter(
           summary: r.summary,
           details: JSON.stringify(r.consistencyIssues),
         },
-      }).catch(e => logEventError("pipeline.finalizationReport", ctx, e));
+      });
     }
-  }).catch(e => logEventError("pipeline.finalize", ctx, e));
+  }).catch(e => logEventError("pipeline.finalizationReport", ctx, e));
 
   if (finalStatus === "completed") {
     diagnoseWorkspace(novelId, chapterId).then(diag => {
-      getPrisma().chapter.update({
+      // Return the promise so the outer .catch() can catch sync or async errors
+      return getPrisma().chapter.update({
         where: { id: chapterId },
         data: { diagnosis: JSON.stringify(diag) },
-      }).catch(e => logEventError("pipeline.diagnosis", ctx, e));
-    }).catch(e => logEventError("pipeline.diagnose", ctx, e));
+      });
+    }).catch(e => logEventError("pipeline.diagnosis", ctx, e));
   }
 
   return { content: currentContent, status: finalStatus, score: Math.round(finalScore), repairAttempts };

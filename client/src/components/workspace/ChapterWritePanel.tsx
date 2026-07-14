@@ -92,7 +92,11 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
     setSavedContent(chapter?.content ?? "");
   }, [chapterId]);
 
-  const displayContent = content || chapter?.content || "";
+  // Track whether the user has explicitly edited content via the editor
+  const userEditedRef = useRef(false);
+
+  // displayContent: use user-edited content when available; only fall back to server content when the user hasn't touched the editor
+  const displayContent = userEditedRef.current ? content : (content || chapter?.content || "");
   const hasContent = displayContent.replace(/<[^>]*>/g, "").trim().length > 50;
 
   const handleRevisionOperation = useCallback((op: RevisionOperation) => {
@@ -152,10 +156,19 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
     }
   }, [isDirty, savedContent, draftKey]);
 
+  // Mutex to prevent concurrent autosave and manual save
+  const savingRef = useRef(false);
+
   useEffect(() => {
-    if (!generating && displayContent) {
+    if (!generating && displayContent && !savingRef.current) {
       const t = setTimeout(async () => {
-        try { await api.patch(`/novels/${novelId}/chapters/${chapterId}`, { content: displayContent }); setSaved(true); setTimeout(() => setSaved(false), 1500); } catch {}
+        try {
+          savingRef.current = true;
+          await api.patch(`/novels/${novelId}/chapters/${chapterId}`, { content: displayContent });
+          setSaved(true);
+          setTimeout(() => setSaved(false), 1500);
+        } catch {}
+        finally { savingRef.current = false; }
       }, 2000);
       return () => clearTimeout(t);
     }
@@ -201,6 +214,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
       let buffer = "";
 
       while (true) {
+        if (controller.signal.aborted) break;
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -277,12 +291,12 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
 
   // Resume generation from interrupted state
   const handleResumeGeneration = useCallback(async () => {
-    // The user has partial content in the editor. They can click "Generate" again
-    // to regenerate. The partial content is preserved in the editor state.
+    // Restore the interrupted content so the user can continue editing or regenerate
+    setContent(interruptedContent);
+    userEditedRef.current = true;
     setGenerationInterrupted(false);
     setInterruptedContent("");
-    // The user can manually continue from the saved content
-  }, []);
+  }, [interruptedContent]);
 
   // Save interrupted draft to server before leaving
   useEffect(() => {
@@ -299,7 +313,9 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
   }, [generationInterrupted, interruptedContent, novelId, chapterId]);
 
   const handleSave = useCallback(async () => {
+    if (savingRef.current) return;
     try {
+      savingRef.current = true;
       const { data } = await api.put(`/novels/${novelId}/chapters/${chapterId}/content`, { content: displayContent });
       setSavedContent(displayContent);
       if (data?.data?.score != null) {
@@ -312,6 +328,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
       }
       refetch();
     } catch {}
+    finally { savingRef.current = false; }
   }, [novelId, chapterId, displayContent, refetch]);
 
   const handleSaveTitle = useCallback(async () => {
@@ -376,7 +393,7 @@ export function ChapterWritePanel({ novelId, chapterId, reviewing, onReview }: P
       <div className="flex-1 min-h-0 relative">
         {hasContent && !generating && <div className="absolute top-2 right-4 z-10 text-[11px] text-slate-300 select-none pointer-events-none">选中正文文字可唤起 AI 改写工具</div>}
         <div className="h-full overflow-y-auto rounded-xl border border-slate-200 bg-white">
-          <ChapterEditor content={displayContent} onChange={setContent} readOnly={generating} aiGenerated={aiGenerated} onUserEdit={() => setAiGenerated(false)} onParagraphSelect={handleParagraphSelect} />
+          <ChapterEditor content={displayContent} onChange={(c) => { setContent(c); userEditedRef.current = true; }} readOnly={generating} aiGenerated={aiGenerated} onUserEdit={() => { setAiGenerated(false); userEditedRef.current = true; }} onParagraphSelect={handleParagraphSelect} />
         </div>
       </div>
 

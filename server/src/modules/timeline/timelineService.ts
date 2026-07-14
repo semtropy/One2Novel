@@ -177,8 +177,8 @@ async function detectAndStoreConflicts(
       for (const c of conflicts) {
         const itemA = items.find(i => i.title === c.itemA.title && i.sortOrder === c.itemA.sortOrder);
         const itemB = items.find(i => i.title === c.itemB.title && i.sortOrder === c.itemB.sortOrder);
-        if (itemA) await prisma.timelineItem.update({ where: { id: itemA.id }, data: { status: "violated" } }).catch(() => {});
-        if (itemB) await prisma.timelineItem.update({ where: { id: itemB.id }, data: { status: "violated" } }).catch(() => {});
+        if (itemA) await prisma.timelineItem.update({ where: { id: itemA.id }, data: { status: "violated" } }).catch(e => logEventError("timeline.violatedUpdate", { itemId: itemA.id }, e)); // intentional: fire-and-forget, failure tolerated
+        if (itemB) await prisma.timelineItem.update({ where: { id: itemB.id }, data: { status: "violated" } }).catch(e => logEventError("timeline.violatedUpdate", { itemId: itemB.id }, e)); // intentional: fire-and-forget, failure tolerated
       }
     }
 

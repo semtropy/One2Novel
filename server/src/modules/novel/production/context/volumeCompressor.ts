@@ -9,6 +9,7 @@
  */
 import { getPrisma } from "../../../../platform/db/client";
 import { aiInvoke } from "../../../../platform/llm/aiService";
+import { logEventError } from "../../../../platform/logging/eventErrorLog";
 import { z } from "zod";
 
 // ─── Types ───────────────────────────────────────────────
@@ -144,9 +145,9 @@ export async function buildCurrentVolumeContext(
   const lines = ["【当前卷增量摘要 — 本章所在卷的前面章节的 LLM 结构化摘要。】"];
 
   for (const s of summaries) {
-    const keyEvents = JSON.parse(s.keyEvents ?? "[]") as string[];
-    const charChanges = JSON.parse(s.characterChanges ?? "[]") as string[];
-    const worldReveals = JSON.parse(s.worldReveals ?? "[]") as string[];
+    const keyEvents = (() => { try { return JSON.parse(s.keyEvents ?? "[]") as string[]; } catch { return [] as string[]; } })();
+    const charChanges = (() => { try { return JSON.parse(s.characterChanges ?? "[]") as string[]; } catch { return [] as string[]; } })();
+    const worldReveals = (() => { try { return JSON.parse(s.worldReveals ?? "[]") as string[]; } catch { return [] as string[]; } })();
 
     lines.push(`\n== 第${s.startChapter}-${s.endChapter}章 ==`);
     lines.push(`概要：${s.summary.slice(0, 500)}`);

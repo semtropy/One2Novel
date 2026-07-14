@@ -183,7 +183,9 @@ export async function getDebtSummary(novelId: string, currentChapter?: number): 
         select: { currentAmount: true },
       }),
       prisma.chaseDebt.findMany({
-        where: { novelId, status: "active", dueChapter: { lt: currentChapter } },
+        where: currentChapter != null
+          ? { novelId, status: "active", dueChapter: { lt: currentChapter } }
+          : { novelId, status: "active" },
       }),
       prisma.overrideContract.findMany({
         where: { novelId },
@@ -194,7 +196,7 @@ export async function getDebtSummary(novelId: string, currentChapter?: number): 
     const totalDebt = activeDebts.reduce((sum: number, d: { currentAmount: number }) => sum + d.currentAmount, 0);
     const totalOverrides = allContracts.length;
     const pendingOverdue = allContracts.filter(
-      (c: { status: string; dueChapter: number }) => c.status === "pending" && c.dueChapter < 0, // 简化：实际应比较章节号
+      (c: { status: string; dueChapter: number }) => c.status === "pending" && currentChapter != null && c.dueChapter < currentChapter,
     ).length;
 
     // 趋势判断（简化版）
@@ -208,7 +210,8 @@ export async function getDebtSummary(novelId: string, currentChapter?: number): 
       pendingOverdue,
       trend,
     };
-  } catch {
+  } catch (e) {
+    logEventError("debt.getSummary", { novelId }, e);
     return {
       totalDebt: 0, activeDebts: 0, overdueDebts: 0,
       totalOverrides: 0, pendingOverdue: 0, trend: "stable",

@@ -2,6 +2,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { z } from "zod";
 import { getPrisma } from "../../../../../platform/db/client";
+import { logEventError } from "../../../../../platform/logging/eventErrorLog";
 import { createNovelRepo } from "../../../../../platform/data/repositories";
 import { generateLoopSkeleton, expandLoopToVolume } from "../../../planning/architectureEngine/loopTemplateService";
 import type { ExpandedVolume, ArchitectureType } from "../../../planning/architectureEngine/types";
@@ -150,9 +151,9 @@ router.post("/:novelId/loops/generate-skeleton", async (req: Request, res: Respo
     // Auto-initialize character presence for all loops
     import("../../../planning/characterPrep/characterLifecycleService").then(m => {
       Promise.all(skeleton.loops.map((_, i) =>
-        m.initializeVolumePresence(param(req, "novelId"), i + 1).catch(() => {})
-      )).catch(() => {});
-    }).catch(() => {});
+        m.initializeVolumePresence(param(req, "novelId"), i + 1).catch(e => logEventError("architecture.charPresenceInit", { novelId: param(req, "novelId"), loopIndex: i + 1 }, e)) // intentional: fire-and-forget, failure tolerated
+      )).catch(e => logEventError("architecture.charPresenceInit", { novelId: param(req, "novelId") }, e)); // intentional: fire-and-forget, failure tolerated
+    }).catch(e => logEventError("architecture.charPresenceImport", { novelId: param(req, "novelId") }, e)); // intentional: fire-and-forget, failure tolerated
     res.json({ data: skeleton });
   } catch (e) { next(e); }
 });
@@ -162,7 +163,7 @@ router.patch("/:novelId/loops", async (req: Request, res: Response, next: NextFu
   try {
     const prisma = getPrisma();
     const novel = await prisma.novel.findUnique({ where: { id: param(req, "novelId") } });
-    if (!novel?.loopSkeleton) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+    if (!novel?.loopSkeleton) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Loop skeleton not found" } }); return; }
     const skeleton: LoopSkeleton = parseSkeleton(novel.loopSkeleton);
     const { loops: updatedLoops } = req.body;
     if (!Array.isArray(updatedLoops)) {

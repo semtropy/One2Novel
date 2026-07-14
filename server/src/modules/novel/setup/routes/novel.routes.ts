@@ -7,7 +7,7 @@ import { validate } from "../validate";
 import { AppError } from "../../../../platform/errors/AppError";
 import { generateTitles } from "../titleService";
 import { generateStoryCore } from "../../planning/storyCoreService";
-import { getPreferences, recordCreation } from "../../../settings/preferences";
+import { getPreferences, recordCreation } from "../../../../platform/config/preferences";
 import { errorHandlerWrap } from "../../../../platform/errors/requestErrorHandler";
 
 const router = Router();
@@ -28,11 +28,11 @@ router.post("/", errorHandlerWrap(async (req, res) => {
   const data: Record<string, unknown> = { ...input };
   if (!data.narrativePov && prefs.writingPov) data.narrativePov = prefs.writingPov;
   if (!data.pacePreference && prefs.pacePreference) data.pacePreference = prefs.pacePreference;
-  if (!data.styleTone && prefs.styleTone) data.styleTone = prefs.styleTone;
+  if (!data.tonePitch && prefs.styleTone) data.tonePitch = prefs.styleTone;
   if (!data.genre && prefs.favoriteGenre) data.genre = prefs.favoriteGenre;
   if (!data.defaultChapterLength && prefs.defaultChapterLength) data.defaultChapterLength = prefs.defaultChapterLength;
   if (!data.estimatedChapterCount && prefs.estimatedChapterCount) data.estimatedChapterCount = prefs.estimatedChapterCount;
-  const novel = await repo.create({ title: input.title, description: input.description, genre: data.genre as string | undefined, writingScale: (data.writingScale as string) ?? "long", narrativePov: data.narrativePov as "first_person" | "third_person" | "mixed" | undefined, pacePreference: data.pacePreference as string | undefined, tonePitch: data.styleTone as string | undefined, defaultChapterLength: data.defaultChapterLength as number | undefined, estimatedChapterCount: data.estimatedChapterCount as number | undefined });
+  const novel = await repo.create({ title: input.title, description: input.description, genre: data.genre as string | undefined, writingScale: (data.writingScale as string) ?? "long", narrativePov: data.narrativePov as "first_person" | "third_person" | "mixed" | undefined, pacePreference: data.pacePreference as string | undefined, tonePitch: data.tonePitch as string | undefined, defaultChapterLength: data.defaultChapterLength as number | undefined, estimatedChapterCount: data.estimatedChapterCount as number | undefined });
   recordCreation({ title: novel.title, genre: novel.genre ?? undefined, createdAt: novel.createdAt });
   res.status(201).json({ data: novel });
 }));

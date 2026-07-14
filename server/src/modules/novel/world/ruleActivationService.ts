@@ -4,6 +4,7 @@
  */
 
 import { getPrisma } from "../../../platform/db/client";
+import { logEventError } from "../../../platform/logging/eventErrorLog";
 import { listRules, type WorldRuleData } from "./worldRuleService";
 
 // ─── LRU in-memory cache (max 100 entries, TTL: 1 hour) ──
@@ -106,7 +107,7 @@ export async function activateRulesForChapter(
   // Update each rule's activatedAt
   for (const ruleId of ruleIds) {
     const rule = await prisma.worldRule.findUnique({ where: { id: ruleId } });
-    const activated: string[] = rule?.activatedAt ? JSON.parse(rule.activatedAt) : [];
+    const activated: string[] = rule?.activatedAt ? (() => { try { return JSON.parse(rule.activatedAt) as string[]; } catch(e) { logEventError("ruleActivationService.activateRules.parseActivatedAt", { ruleId }, e); return []; } })() : [];
     if (!activated.includes(chapterId)) {
       activated.push(chapterId);
       await prisma.worldRule.update({

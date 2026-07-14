@@ -11,9 +11,7 @@
 
 import { getPrisma } from "../../../../../platform/db/client";
 import { logEventError } from "../../../../../platform/logging/eventErrorLog";
-import { aiInvoke } from "../../../../../platform/llm/aiService";
-import { REF_PROMPT_SLICE_LARGE } from "../../../../../platform/config/constants";
-import { z } from "zod";
+import { extractCharacterStates } from "../../post/characterStateExtractor";
 
 export interface StateProjectionResult {
   itemsProcessed: number;
@@ -23,16 +21,6 @@ export interface StateProjectionResult {
   success: boolean;
   error?: string;
 }
-
-const CharacterPostChapterSchema = z.object({
-  updates: z.array(z.object({
-    characterName: z.string(),
-    currentStatus: z.string().optional(),
-    currentLocation: z.string().optional(),
-    currentGoal: z.string().optional(),
-    availability: z.string().optional(),
-  })).max(20).default([]),
-});
 
 /**
  * Run state projection for a committed chapter.
@@ -113,11 +101,11 @@ export async function run(
       }
     }
 
-    // If no deltas from extraction, fall back to LLM
+    // If no deltas from extraction, fall back to shared extractor
     if (stateDeltas.length === 0 && content) {
-      const llmResult = await extractStatesFromContent(novelId, chapterId, chapterOrder, content);
-      if (llmResult) {
-        for (const u of llmResult.updates) {
+      const extracted = await extractCharacterStates(novelId, chapterOrder, content);
+      if (extracted) {
+        for (const u of extracted.updates) {
           if (u.currentStatus) {
             stateDeltas.push({
               characterName: u.characterName,
@@ -287,52 +275,6 @@ function resolveEventType(field: string, newValue: string): string {
   if (field === 'currentLocation') return 'location_change';
   if (field === 'currentGoal') return 'goal_change';
   return 'character_state_change';
-}
-
-/**
- * Fall back to LLM extraction when no extractionResult is available.
- */
-async function extractStatesFromContent(
-  novelId: string,
-  chapterId: string,
-  chapterOrder: number,
-  content: string,
-): Promise<Awaited<ReturnType<typeof aiInvoke>> & { updates: Array<{ characterName: string; currentStatus?: string; currentLocation?: string; currentGoal?: string }> } | null> {
-  try {
-    const prisma = getPrisma();
-    const characters = await prisma.novelCharacter.findMany({
-      where: { novelId },
-      select: { id: true, name: true, role: true, currentStatus: true, currentLocation: true, currentGoal: true },
-    });
-
-    if (characters.length === 0) return null;
-
-    const charList = characters.map((c: { id: string; name: string; role: string; currentStatus: string | null; currentLocation: string | null; currentGoal: string | null }) => {
-      const parts = [`${c.name} (${c.role})`];
-      if (c.currentStatus) parts.push(`当前状态: ${c.currentStatus}`);
-      if (c.currentLocation) parts.push(`位置: ${c.currentLocation}`);
-      if (c.currentGoal) parts.push(`目标: ${c.currentGoal}`);
-      return parts.join(' · ');
-    }).join('\n');
-
-    const result = await aiInvoke({
-      assetId: 'novel.character.post-chapter',
-      userPrompt: [
-        `## 出场角色（当前状态）`,
-        charList,
-        '',
-        `## 第${chapterOrder}章正文`,
-        content.slice(0, REF_PROMPT_SLICE_LARGE),
-      ].join('\n'),
-      schema: CharacterPostChapterSchema,
-      temperature: 0.3,
-    });
-
-    return result;
-  } catch (e) {
-    logEventError("projection.stateWriter.llmFallback", { chapterId }, e);
-    return null;
-  }
 }
 
 /**

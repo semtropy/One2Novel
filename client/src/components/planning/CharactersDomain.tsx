@@ -121,7 +121,7 @@ export function CharactersDomain({ novelId, onComplete }: Props) {
       quirks: char.quirks ?? "",
       factionLabel: char.factionLabel ?? "",
       flaw: char.prohibitions ?? "",
-      characterArc: (char as any).characterArc ?? "",
+      characterArc: char.characterArc ?? "",
     });
   };
 

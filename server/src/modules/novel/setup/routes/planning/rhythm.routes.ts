@@ -21,7 +21,7 @@ router.get("/:novelId/chapters/:chapterId/hook-check", async (req: Request, res:
     const chapter = await prisma.chapter.findUnique({
       where: { id: param(req, "chapterId") }, select: { content: true, hook: true },
     });
-    if (!chapter) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+    if (!chapter) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Chapter not found" } }); return; }
     const { checkChapterHook } = await import("../../../production/audit/hookDensityChecker");
     res.json({ data: checkChapterHook(chapter.content ?? "", chapter.hook) });
   } catch (e) { next(e); }
@@ -50,7 +50,7 @@ router.get("/:novelId/volumes/:sortOrder/rhythm-report", async (req: Request, re
         },
       },
     });
-    if (!volume) { res.status(404).json({ error: { code: "NOT_FOUND" } }); return; }
+    if (!volume) { res.status(404).json({ error: { code: "NOT_FOUND", message: "Volume not found" } }); return; }
     res.json({ data: validateVolumeRhythm({
       sortOrder: volume.sortOrder, title: volume.title,
       chapters: volume.chapterPlans.map(cp => ({

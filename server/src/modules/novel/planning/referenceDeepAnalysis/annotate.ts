@@ -3,6 +3,7 @@ import { getPrisma } from "../../../../platform/db/client";
 import { aiInvoke } from "../../../../platform/llm/aiService";
 import type { ParsedChapter, ChapterAnnotation } from "./index";
 import { REF_ANALYSIS_MAX_CHARS } from "../../../../platform/config/constants";
+import { logEventError } from "../../../../platform/logging/eventErrorLog";
 
 const BASE_BATCH_SIZE = 15;
 const CONCURRENCY = 5; // Number of parallel batch groups
@@ -74,7 +75,7 @@ export async function batchAnnotateChapters(
   let results: ChapterAnnotation[] = [];
   let doneIndices = new Set<number>();
   if (existing?.chapterAnnotations) {
-    try { const saved = JSON.parse(existing.chapterAnnotations) as ChapterAnnotation[]; results = saved; doneIndices = new Set(saved.map(a => a.chapterIndex)); console.log(`[Batch] Resuming: ${results.length} already annotated`); } catch {}
+    try { const saved = JSON.parse(existing.chapterAnnotations) as ChapterAnnotation[]; results = saved; doneIndices = new Set(saved.map(a => a.chapterIndex)); console.log(`[Batch] Resuming: ${results.length} already annotated`); } catch (e) { console.error(`[Batch] Resume parse failed: ${e instanceof Error ? e.message : e}`); }
   }
 
   // Build pending batch indices (skip already-completed batches)
@@ -108,7 +109,7 @@ export async function batchAnnotateChapters(
     await prisma.referenceProfile.update({
       where: { id: profileId },
       data: { chapterAnnotations: JSON.stringify(results.sort((a, b) => a.chapterIndex - b.chapterIndex)) },
-    }).catch(() => {});
+    }).catch(e => logEventError("annotate.persist", { profileId }, e)); // intentional: fire-and-forget, failure tolerated
 
     const lastInGroup = group[group.length - 1] + 1;
     console.log(`[Batch] ~${lastInGroup}/${totalBatches}: ${completedCount} total annotated (${Math.round(completedCount / chapters.length * 100)}%)`);

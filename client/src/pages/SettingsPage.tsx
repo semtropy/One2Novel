@@ -10,6 +10,7 @@ import { api } from "../app/api";
 import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import type { ProviderInfo } from "../components/settings/ProviderConfigDialog";
+import { POV_OPTIONS, PACE_OPTIONS, DEFAULT_CHAPTER_LENGTH } from "@one2novel/shared";
 
 /** Client-side model options — kept for backward compat, prefer server API */
 /** Updated to match server PROVIDER_REGISTRY */
@@ -192,9 +193,7 @@ export function SettingsPage() {
                   onChange={e => { const v = e.target.value; setPrefs(p => ({ ...p, preferredPerspective: v })); savePref("preferredPerspective", v); }}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none bg-white"
                 >
-                  <option value="third_person">第三人称</option>
-                  <option value="first_person">第一人称</option>
-                  <option value="mixed">混合视角</option>
+                  {POV_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div className="flex-1">
@@ -204,16 +203,14 @@ export function SettingsPage() {
                   onChange={e => { const v = e.target.value; setPrefs(p => ({ ...p, preferredPace: v })); savePref("preferredPace", v); }}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none bg-white"
                 >
-                  <option value="slow">慢节奏 · 细腻铺垫</option>
-                  <option value="balanced">均衡 · 张弛有度</option>
-                  <option value="fast">快节奏 · 强冲突推进</option>
+                  {PACE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div className="flex-1">
                 <div className="text-xs text-slate-500 font-medium mb-1.5">默认章节字数</div>
                 <input type="number" min={500} max={50000} step={500}
-                  value={(prefs.defaultChapterLength as number) ?? 3000}
-                  onChange={e => { setPrefs(p => ({ ...p, defaultChapterLength: parseInt(e.target.value) || 3000 })); }}
+                  value={(prefs.defaultChapterLength as number) ?? DEFAULT_CHAPTER_LENGTH}
+                  onChange={e => { setPrefs(p => ({ ...p, defaultChapterLength: parseInt(e.target.value) || DEFAULT_CHAPTER_LENGTH })); }}
                   onBlur={() => savePref("defaultChapterLength", prefs.defaultChapterLength)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-300 focus:outline-none"
                 />

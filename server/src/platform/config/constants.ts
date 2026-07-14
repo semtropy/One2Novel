@@ -26,8 +26,8 @@ export const MAX_CONNECTION_AGE_MS = 3_600_000;
 
 // ─── Novel / Shared ─────────────────────────────────────────
 
-/** Default chapter count for long-form web novels (~1.5M chars ÷ 3K chars/chapter) */
-export const LONG_FORM_DEFAULT_CHAPTERS = 500;
+// Re-exported from shared — single source of truth
+export { LONG_FORM_DEFAULT_CHAPTERS } from "@one2novel/shared";
 
 // ─── Quality Gate ───────────────────────────────────────────
 

@@ -102,7 +102,7 @@ export interface StorySeedSnapshot {
   bookSellingPoint: string | null;
   competingFeel: string | null;
   first30ChapterPromise: string | null;
-  commercialTags: string[];
+  commercialTags: string | null;
   frozenAt: string;
 }
 
@@ -199,6 +199,7 @@ export interface VolumeDetail {
     coolPointType?: CoolPointType | null;
     hookType?: HookType | null;
     chapterType?: ChapterType | null;
+    contentBeat?: string | null;
     chapter?: { id: string; title: string; content?: string | null; chapterStatus: ChapterStatusLabel } | null;
   }>;
 }
@@ -220,7 +221,7 @@ export interface NovelDetail {
   bookSellingPoint?: string | null;
   competingFeel?: string | null;
   first30ChapterPromise?: string | null;
-  commercialTags?: string[] | null;
+  commercialTags?: string | null;
   titleSuggestions?: string | null;
   projectStatus?: ProjectProgressStatus;
   updatedAt: string;
@@ -250,6 +251,7 @@ export interface NovelDetail {
     prohibitions?: string | null; loopFunctionTag?: string | null;
     currentState?: string | null;
     currentLocation?: string | null; availability?: string | null;
+    characterArc?: string | null;
   }>;
   volumes: VolumeDetail[];
   timelineItems: Array<{ title: string; category: string; sortOrder: number; status?: string }>;
@@ -278,6 +280,39 @@ export interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
 }
+
+// ─── Creative Param Options ─────────────────────────────
+
+export const GENRE_OPTIONS = [
+  "仙侠", "玄幻", "修真", "悬疑", "言情", "奇幻", "科幻", "历史", "都市",
+  "武侠", "穿越", "重生", "系统/无限流", "末世", "竞技", "恐怖", "游戏",
+  "轻小说", "其他",
+] as const;
+export type GenreOption = (typeof GENRE_OPTIONS)[number];
+
+export const POV_OPTIONS = [
+  { value: "first_person" as const, label: "第一人称" },
+  { value: "third_person" as const, label: "第三人称" },
+  { value: "mixed" as const, label: "混合视角" },
+] as const;
+export type PovOption = (typeof POV_OPTIONS)[number];
+
+export const PACE_OPTIONS = [
+  { value: "slow" as const, label: "舒缓" },
+  { value: "balanced" as const, label: "均衡" },
+  { value: "fast" as const, label: "快节奏" },
+] as const;
+export type PaceOption = (typeof PACE_OPTIONS)[number];
+
+export const EMOTION_OPTIONS = [
+  { value: "low" as const, label: "克制" },
+  { value: "medium" as const, label: "适中" },
+  { value: "high" as const, label: "强烈" },
+] as const;
+export type EmotionOption = (typeof EMOTION_OPTIONS)[number];
+
+/** Default chapter word count used across the app */
+export const DEFAULT_CHAPTER_LENGTH = 3000;
 
 // ─── Phase 0: Long-form web novel types ────────────────
 
@@ -393,6 +428,9 @@ export interface ReferenceProfileDetail {
   contentBeatPatterns?: string | null;
   writingAssets?: string | null;
   settingTimeline?: string | null;
+  analysisResult?: string | null;
+  content?: string | null;
+  deepAnalysisProgress?: string | null;
   createdAt: string;
 }
 

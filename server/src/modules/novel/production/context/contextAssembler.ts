@@ -17,6 +17,7 @@ import { getPrisma } from "../../../../platform/db/client";
 import { createNovelRepo, type NovelRepo } from "../../../../platform/data/repositories";
 import { createContextBlock } from "../../../../platform/llm/contextSelection";
 import type { PromptContextBlock } from "../../../../platform/llm/promptTypes";
+import { logEventError } from "../../../../platform/logging/eventErrorLog";
 
 // ── Internal imports — all behind the seam ──
 
@@ -336,7 +337,7 @@ export async function assembleChapterBlocks(
     chapterPlan?.volume?.summary ?? "", liveChars ?? "",
   ].join(" ");
   const relevantRules = await selectRelevantRules(novelId, chapterContextForActivation);
-  activateRulesForChapter(novelId, chapter.id, chapterContextForActivation).catch(() => {});
+  activateRulesForChapter(novelId, chapter.id, chapterContextForActivation).catch(e => logEventError("contextAssembler.activateRules", { novelId, chapterId: chapter.id }, e)); // intentional: fire-and-forget, failure tolerated
   const worldRules = getActiveRulesContext(relevantRules);
   if (worldRules) {
     blocks.push(createContextBlock({

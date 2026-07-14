@@ -34,6 +34,11 @@ export type {
   PacePreference,
   EmotionIntensity,
   ProjectProgressStatus,
+  // Creative param options
+  GenreOption,
+  PovOption,
+  PaceOption,
+  EmotionOption,
   // Phase 0: Long-form types
   WritingScale,
   ArchitectureType,
@@ -56,4 +61,15 @@ export type {
   LoopContentBeatPattern,
   ContentBeatAnnotation,
   ReferenceProfileDetail,
+} from "./types/novel.js";
+
+// ─── Constants ──────────────────────────────────────────
+
+export {
+  LONG_FORM_DEFAULT_CHAPTERS,
+  DEFAULT_CHAPTER_LENGTH,
+  GENRE_OPTIONS,
+  POV_OPTIONS,
+  PACE_OPTIONS,
+  EMOTION_OPTIONS,
 } from "./types/novel.js";
