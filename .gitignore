@@ -1,15 +1,35 @@
+# Dependencies and generated artifacts
 node_modules/
 dist/
-.env
-.env.local
-*.db*
-.DS_Store
+build/
+coverage/
+.cache/
 .vite/
-.agents/
-.claude/
 *.tsbuildinfo
-*.log
-temp_*
+playwright-report/
+test-results/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.local
+*.local.json
+
+# New personal runtime data
 data/
-server/user-preferences.json
-desktop/build/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.log
+
+# Editor and agent-local state
+.idea/
+.vscode/
+.claude/
+.codex/
+.DS_Store
+Thumbs.db
