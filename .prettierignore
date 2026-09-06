@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+.cache
+pnpm-lock.yaml
+PRD.md
+TECHNICAL_PLAN.md
+DEVELOPMENT_SPEC.md

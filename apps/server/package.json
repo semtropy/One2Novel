@@ -1,0 +1,29 @@
+{
+  "name": "@one2novel/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "start": "node --env-file-if-exists=../../.env dist/main.js",
+    "build": "tsup src/main.ts --format esm --out-dir dist --no-splitting --external @prisma/client",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "@one2novel/contracts": "workspace:*",
+    "@prisma/client": "7.5.0",
+    "@prisma/adapter-better-sqlite3": "7.5.0",
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "openai": "^6.27.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "prisma": "7.5.0",
+    "@types/express": "^5.0.6",
+    "@types/better-sqlite3": "^7.6.13",
+    "tsup": "^8.5.1"
+  }
+}

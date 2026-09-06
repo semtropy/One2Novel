@@ -1,7 +1,8 @@
 # One2Novel V2 技术方案
 
 > 日期：2026-09-05。用途：作为后续开发的统一依据。
-> 当前只完成旧实现归档、开发分支准备与方案编写；下列应用目录和功能均为待开发内容。
+> 实施状态（2026-09-06）：第一版 MVP 已建立，实际已实现范围、启动方法与验收见 README.md 和 docs/MVP_ACCEPTANCE.md。本文仍描述完整 V2 目标，不能将所有目标视为已实现。
+> 更具体的默认数据结构、算法、状态机、接口与验收见 `DEVELOPMENT_SPEC.md`；用户可直接修改该文档。两份设计细节不一致时以开发细则及用户最新修改为准。
 
 ## 1. 项目目标与范围
 
@@ -178,7 +179,7 @@ Framework 与 Asset Pack 独立绑定。原始资产须经过清洗/改编并发
 - KnowledgeItem / KnowledgeVersion / ProjectKnowledgeBinding：知识分类、发布版本与项目绑定。
 - PlanVersion：Book、Volume、Arc、Chapter 层级，父计划和依赖版本；规划结果不可覆盖。
 - Chapter / ContentVersion：章节身份与追加保存的候选正文版本。编辑器自动保存可更新工作草稿，但不修改已审核版本。
-- EvaluationRun：绑定正文版本及审核策略/模型版本，输出 PASS / FAIL / WARN、issues、suggestions、metrics。
+- EvaluationRun：绑定正文版本及审核策略/模型版本，输出 PASS / FAIL、issues、suggestions、metrics。
 - StoryEvent / StoryStateDelta / StoryStateSnapshot：正文证据、状态变更与历史事实快照。
 - Job / JobAttempt / JobEvent：任务、阶段尝试、顺序事件；与章节业务状态分开。
 
@@ -186,22 +187,26 @@ Framework 与 Asset Pack 独立绑定。原始资产须经过清洗/改编并发
 
 人物状态、关系、地点、物品、组织、世界规则、角色知识、时间线、Narrative Promise、冲突与目标按类型校验。Custom State 也必须有显式 schema。每个事实可追溯到初始 Canon 或正文版本与来源片段。
 
-快照先以每个完成章节一份规范化 JSON 实现，另存 Delta 和事件；数量、压缩和加载性能以长篇基准测试决定优化时机。常用身份、状态、顺序、引用使用关系字段和索引，JSON 不替代所有数据约束。
+每章保存逻辑 Snapshot 元数据和 Delta；State 0 及每 20 章保存压缩 Checkpoint。读取严格沿父链重放并核对哈希；Checkpoint 与正文/Delta 同事务生效，序列化压缩在事务外准备。常用身份、状态、顺序、引用使用关系字段和索引，JSON 不替代所有数据约束。
 
 正文持久化采用规范化纯文本作为生成、审核、抽取和版本哈希的共同输入；TipTap 文档经单一转换器映射为段落文本。首版不支持任意富文本、图片与复杂排版，避免审核文本与编辑文本不一致。
 
 ### 6.3 章节执行与原子提交
 
+评审修订以 `DEVELOPMENT_SPEC.md` v0.2 为执行契约：命题保存不可变时间版本，角色认知引用获知事件与观察版本；客观世界变化不自动改写角色态度。PlanAssumption/PlanDependency追踪计划前提，硬失配使计划失效，软失配需复核。PromiseSchedule的章号是软提示，显式required动作才进入门禁。
+
+审核采用代码注册Evaluator、版本化EvaluationPolicy与通用results列表，默认八项可扩展，硬约束/状态Core不可关闭。SkillDefinition与后台SkillConfig分离，Job冻结策略和配置。Reference采用版本化实体Registry与有界检索，Production通过StateContextResolver组装必要事实。提交同步保存规划重查标记，下一章必须消费；可丢失的派生索引不能承担此职责。P2实现逻辑快照与时间语义，P3实现计划前提，P4实现审核注册/配置后台，P6实现Reference Registry，P7仅优化规模与检索。
+
 ```text
 PLANNED → CONTEXT_BUILDING → WRITING → EVALUATING
-                                      ├─ FAIL/WARN → REVISING → EVALUATING
+                                      ├─ FAIL → REVISING → EVALUATING
                                       └─ PASS → APPROVED
 APPROVED → EXTRACTING_STATE_DELTA → VALIDATING_STATE
                                    ├─ 不通过 → 修复 Delta → 再验证
                                    └─ PASS → COMMITTING → COMPLETED
 ```
 
-任何阶段失败进入 FAILED，并保留 failedStage、attempt、输入版本和已完成产物；取消进入任务 CANCELLED，不把章节改成 COMPLETED。只有 PASS 放行；WARN 可查看、可修复，但没有“强制忽略后提交”入口。
+任何阶段失败进入 FAILED，并保留 failedStage、attempt、输入版本和已完成产物；取消进入任务 CANCELLED，不把章节改成 COMPLETED。只有 PASS 放行；required 检查出现 MINOR 也为 FAIL；optional 只提供诊断，Core 不可关闭。
 
 PRD 中的 `Commit Content` 在最终提交前解释为保存不可变候选正文，不移动正式 active 指针。事件抽取失败时可以重用该候选正文，不要求重写全文。
 
@@ -211,7 +216,7 @@ LLM 调用全部在数据库事务外执行。最终短事务一次完成：检�
 
 ### 6.4 互斥、恢复和幂等
 
-- 首版一个服务进程、一个后台执行器，全局只运行一个模型任务；按小说维护独占活动任务约束。单用户多标签页仍需要数据库约束。
+- 首版 Platform 部署一个服务进程、一个后台执行器，modelConcurrency=1；这是可调整的部署策略。领域独立按小说维护独占活动任务约束和串行权威链。单用户多标签页仍需要数据库约束。
 - 开始任务在短事务中检查活动任务并登记。重复点击使用 Idempotency-Key 返回同一个 job；手动、批量、修复入口共用用例。
 - 活动任务期间拒绝外部同小说的计划启用、正式正文修改、事实修订等影响输入的命令；任务自身的规划更新须由同一执行链校验并记录依赖版本。允许另存私人工作草稿。仅在无活动任务时可将工作草稿应用为新候选版本；修改已完成章节必须走历史重写与后续失效命令。
 - 单实例锁防止同一 data 目录启动第二个 Worker；锁失效清理由启动检测验证，不因超时自动启动另一生产链。
@@ -257,7 +262,7 @@ SSE 事件包含 eventId、jobId、stage 和时间。阶段事件持久化，支
 - 写作：章节目录 + 居中正文 + 默认折叠辅助面板；宽屏三栏，窄屏切换抽屉。
 - 白底、灰阶、一个强调色；正文 16px、约 1.9 行高、约 760px 阅读宽度作为起点，实测调整。
 - 自动保存显示待保存/保存中/已保存/失败；切章前处理未保存输入；生成结果不能覆盖用户正在编辑的草稿。
-- 普通用户不注册或启停 Skill；内部 Skill 先由代码显式注册与配置启用，不搭建后台管理产品。
+- 普通工作区不注册或启停 Skill；SkillDefinition 由代码注册，SkillConfig 由独立本机 /admin 后台版本化配置，使用独立管理员会话，任务冻结配置；后台不提供任意代码上传。
 - UI 不展示内部模块目录、Prompt 拼接、队列实现等技术细节；失败界面展示原因、当前阶段和可用操作。
 
 ## 8. 开发顺序与阶段验收
@@ -273,7 +278,7 @@ SSE 事件包含 eventId、jobId、stage 和时间。阶段事件持久化，支
 | P4 可用写作闭环 | Context、正文生成、审核/修复、抽取/验证、草稿编辑、SSE、TXT/Markdown 导出 | 从灵感创建项目并完成连续两章；只有 PASS + 状态提交才放行；浏览器断线可恢复观察 |
 | P5 版本与连续生产 | 历史重写、后续失效、人工修改后重审、批量生产、滚动重规划 | 重写前章不污染当前链；失败停在当章；批量最多 10 章；批次结束不等于全书完结 |
 | P6 Reference / Knowledge | TXT/EPUB 导入、逐章分析聚合、来源与覆盖度；Framework、资产清洗改编、Style、Template | 全文不截断；失败章节可重试；知识独立版本与绑定；不能把参考事实直接写入新状态 |
-| P7 长篇上下文 | Narrative Promise、角色知识等全量状态类型；中文检索、分层摘要；按需启用 ChatAnyWhere Embedding | 跨远距离事实、角色信息差、未兑现伏笔可召回；排除未来/失效版本；可测成本与耗时 |
+| P7 长篇上下文 | 全部状态类型在 P2 定义并验证；本阶段优化中文检索、分层摘要、StateContextResolver 与 Checkpoint 性能，按需启用 ChatAnyWhere Embedding | 跨远距离事实、角色信息差、未兑现伏笔可召回；排除未来/失效版本；可测成本与耗时 |
 | P8 收尾验收 | 页面可用性、键盘/窄屏、备份恢复、启动说明、长篇基准、故障恢复 | 固定样本验收；干净环境可启动；新数据可备份恢复；无桌面依赖与旧代码复制 |
 
 P2 使用与生产相同的模型接口注入假模型；P3/P4 替换适配器，不绕过已建立的状态机。P3 全书方向稳定、当前卷及 Arc 有概要、近期默认 5 章详细化；每章完成后检查规划依赖，默认剩余详细计划不足 2 章时补足到 5 章，发生关键偏离时先重规划再继续。
@@ -306,7 +311,7 @@ P7 先实现中文文本检索与版本过滤。Embedding 为显式启用项；�
 | ChatAnyWhere 模型参数差异 | 能力档案、明确错误、固定配置版本 | 不支持参数、模型失效、JSON 不合法、空流/截断 |
 | 多轮审核成本放大 | 有限重试/修复、用量统计、可取消 | 429 与格式错误叠加仍有总调用边界 |
 | SQLite 写锁与进程中断 | 单进程 Worker、短事务、持久化阶段 | 提交各写入点故障注入；重启后不半提交 |
-| WARN 或异常被放行 | 统一 EvaluationResult 与完成判定 | FAIL/WARN/审核超时都不进入下一章 |
+| 审核违规或异常被放行 | 统一 EvaluationResult 与完成判定 | FAIL/审核超时都不进入下一章 |
 | 错误事实累积 | 证据定位、旧值前置条件、角色知识状态 | 同名角色、角色死亡、异地、知识泄露、物品归属 |
 | 重写造成旧后文失效 | 回退当前链、标记后续过期、逐章重审 | N 重写后不能使用旧 N+1 状态 |
 | 编辑与生成相互覆盖 | 工作草稿/候选/正式版本隔离，revision 冲突 | 多标签页、切章、生成期间编辑与自动保存 |

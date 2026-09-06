@@ -1,0 +1,88 @@
+# One2Novel · 第一版 MVP
+
+仅在本机运行的个人小说写作 Web 应用。从一句灵感出发，确认全书方向与初始事实，再逐章生成、审核和提交。旧代码、旧数据库与旧凭据均未导入。
+
+## 启动
+
+需要 Node.js 24、pnpm 10。工作区已锁定依赖版本。
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm db:generate
+pnpm db:migrate
+pnpm dev
+```
+
+开发页面：<http://127.0.0.1:7457>。服务端：`127.0.0.1:7456`。
+
+生产方式：
+
+```powershell
+pnpm build
+pnpm start
+```
+
+生产页面：<http://127.0.0.1:7456>。所有数据位于根目录 `data/`，重启不会丢失。迁移只通过 `pnpm db:migrate` 执行，不在运行时补列。
+
+## 配置模型
+
+首次配置时，将 `.env.example` 复制为 `.env`，填写服务端 `CHATANYWHERE_API_KEY`，然后重启服务。密钥不在浏览器输入，也不写进数据库或 Git。
+
+打开「模型设置」，添加实际可用的模型 ID，按供应商信息填写上下文、最大输出及支持的参数。默认所有角色可使用同一模型；「多模型与角色映射」支持分别配置规划、正文、审核、抽取和修复模型。
+
+保存不会发送模型请求。「测试已保存配置」会执行一次显式连通测试。仅允许 ChatAnyWhere 的两个服务地址；没有其他供应商回退。没有密钥时应用仍可启动、创建项目和保存草稿，模型操作会明确提示未配置。
+
+## 第一条创作流程
+
+1. 新建小说，输入灵感、题材、目标字数和创作要求。
+2. 生成开书方案，检查全书方向和开篇前事实。可修改结构化候选；逐项确认警告后启用设定。
+3. 点击「生成本章」，后台依次规划、写作、审核、必要修复、提取事件、验证状态、原子提交。
+4. 只有正式提交后才能「写下一章」。也可自行写草稿，点击「审核并提交草稿」进入相同门禁。
+5. 从「版本」查看历史候选；重写已完成章节会先回退到前一章，后续旧正文退出当前事实链。旧版本保留可读。
+6. 「导出」生成当前已提交章节的 Markdown；API 使用 `format=txt` 可导出纯文本。
+
+草稿自动保存并使用版本号防止多标签覆盖。未保存的本地输入暂存在当前浏览器会话中，刷新或切换章节后可恢复。版本冲突时保留本地输入，可先导出或明确重新保存。生成中断的文本可载入工作草稿，不能作为已审核正文直接提交。
+
+取消会中止在途调用并保持旧事实。服务重启不会自动继续调用模型；任务面板提供显式恢复。恢复保持原配置与累计额度，额度耗尽可显式增加。更换模型配置仅作用于新任务。
+
+## 独立配置后台
+
+在 `.env` 设置 `ONE2NOVEL_ADMIN_TOKEN`，重启后直接访问 `/admin`。后台不出现在普通创作导航中。
+
+可版本化配置 Skill 启停/强度/适用条件、required/optional 审核策略。可载入上一版本并保存为新版本。硬约束和状态一致性 Core 不可关闭或降低阈值。管理员会话一小时过期，服务重启后失效。
+
+## 实现范围与边界
+
+已实现首版主流程、三角色以上的模型映射、版本化候选、默认八项可配置审核、正文自动修复、独立状态验证、任务互斥/幂等/预算/取消/恢复、逻辑快照与每20章Checkpoint、历史回退、草稿和导出。
+
+这是首版 MVP，不等于完整 V2。以下尚未交付：Reference TXT/EPUB 导入及实体 Registry、用户知识资产工作台、批量生产、PromiseSchedule 的软期限管理、完整书级完结管理、长篇 BM25/Embedding 检索优化、回收站和备份恢复。
+
+当前上下文保留完整基础事实与命题版本，并标记必要实体；过大时明确失败，不自动丢弃硬事实。长篇有界状态检索在 P7 完善。滚动计划复用仍有效的窗口，低于两章时重新校验并补充当前窗口。恢复已完成正文候选时会重做审核及状态抽取，避免借用失效 PASS；更细粒度的抽取阶段复用留待后续。
+
+模型输出的结构、引用、硬规则与提交原子性由程序校验，但语义审核与文学质量仍依赖实际模型。此次验收未使用真实 ChatAnyWhere 凭据；离线测试通过不代表某个具体模型已验证兼容或文字质量已达标。
+
+## 检查
+
+```powershell
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm test:e2e
+```
+
+端到端测试默认使用本机 Chrome，独立监听 `7466`，使用临时 SQLite 与测试模型；生产入口没有 FakeModel 开关。可通过 `PLAYWRIGHT_CHANNEL=msedge` 使用 Edge。测试不会调用真实 API。
+
+`python tests/e2e/browser_smoke.py` 可只读检查正在运行的生产页面（需要 Python Playwright）。具体验收证据和限制见 [MVP 验收记录](docs/MVP_ACCEPTANCE.md)。开发细则仍是后续 V2 规范；尚未实现项不能因文档中存在而视为完成。
+
+## 代码入口
+
+- `apps/web/src/pages`：书架、工作区、模型设置与独立后台。
+- `apps/web/src/features`：开书、编辑器、规划/审核/事实展示。
+- `packages/contracts/src/index.ts`：严格 Zod 数据契约。
+- `apps/server/src/orchestrator`：任务与跨领域编排、配置冻结。
+- `apps/server/src/production/commit.ts`：唯一正式提交事务。
+- `apps/server/src/story-state`：确定性 Delta 转换、校验与快照回放。
+- `apps/server/src/platform/llm.ts`：统一 ChatAnyWhere 调用、超时、取消与计数。
+- `apps/server/prisma/migrations`：从空数据库建立的正式迁移。
+
+实现时核对了 [OpenAI JavaScript SDK 官方文档](https://developers.openai.com/api/reference/typescript) 与 [ChatAnyWhere 官方项目说明](https://github.com/chatanywhere/GPT_API_free)；SDK仅作为客户端，实际请求地址由 ChatAnyWhere 白名单限定。

@@ -19,6 +19,8 @@ platform/
 
 ## 1. Reference
 
+长篇分析使用版本化Reference Entity Registry，保存稳定身份、名称/别名、来源片段和最近出现位置。每个单元按名称命中、近期实体和历史检索构造有界候选，不把全量历史实体摘要逐章塞入Prompt。同名歧义保留待整理，恢复固定输入Registry版本，禁止读取未来分析结果。
+
 职责：
 
 > 将外部参考作品解析为系统可理解的结构化模型。
@@ -141,7 +143,7 @@ Framework 与 Asset Pack 相互独立。
 
 ### Skill
 
-Skill 是系统内部可插拔能力。
+Skill 是系统内部可插拔能力。SkillDefinition由代码注册，定义指令、参数schema和审核绑定；SkillConfig通过独立本机后台版本化配置启停、参数和适用条件。后台不进入普通工作区，不能上传任意代码。任务冻结配置版本，修改只影响新任务。
 
 普通用户不直接操作。
 
@@ -200,6 +202,8 @@ Evaluation
 ---
 
 ## 3. Planning
+
+计划必须声明PlanAssumption：以状态集合、实体键、字段、比较操作和预期值表达成立前提。PlanDependency是这些前提的反向索引；Constraint表示剧情必须满足的义务，二者分离。每章提交后检查变化影响：硬前提失配使计划失效，软前提失配要求复核；下一章使用计划前必须完成检查。
 
 职责：
 
@@ -294,6 +298,8 @@ commit/
 
 ### Context Builder
 
+StateContextResolver先从本章角色、事件、地点、计划前提、required Promise、活动冲突/目标及近期事件提取必要事实闭包，再由Context Builder按预算装配。角色当前观察版本与客观当前版本同时保留；硬事实超预算明确失败，不静默删减。
+
 负责动态组装当前章节需要的上下文。
 
 可能包含：
@@ -343,6 +349,8 @@ StoryStateSnapshot
 StoryStateDelta
 ```
 
+Snapshot是每章可寻址的逻辑状态，不要求每章复制完整JSON。物理存储采用State 0与每20章的Checkpoint，加逐章不可变Delta；读取沿该快照父链重放并验证哈希。Checkpoint、Delta和正式正文在同一提交事务生效。
+
 Story State 可以包含：
 
 ```text
@@ -363,6 +371,8 @@ Custom State
 
 ### Narrative Promise
 
+Promise是正文已建立的读者期待。Planning中的dueChapter只提供软期限提醒和重规划信号，不直接导致审核失败。只有ChapterPlan中required的推进/兑现动作，以及BookPlan显式最终兑现义务构成门禁；修改规划期限不修改事实状态。
+
 统一管理：
 
 ```text
@@ -376,18 +386,14 @@ Custom State
 
 ### Knowledge State
 
-记录角色知道什么。
+记录角色在何时获知命题的哪个版本，以及KNOWS/BELIEVES/SUSPECTS/REJECTS态度。客观命题版本与角色观察版本分离。
 
 例如：
 
 ```text
-某事实系统已知
-
-角色 A：
-known = true
-
-角色 B：
-known = false
+E10：门开，客观版本V1；角色A观察V1，learnedAtEvent=E10，attitude=KNOWS
+E11：门关，客观版本V2；角色A未观察，仍引用V1，派生标记OUTDATED
+角色B没有认知记录，不等于知道门关
 ```
 
 避免角色获得不应知道的信息。
@@ -402,7 +408,9 @@ known = false
 
 Evaluation 是强制质量门禁，不是可选审核。
 
-至少包含：
+Evaluator由代码注册，EvaluationPolicy配置required/optional和参数，结果使用通用列表。默认策略包含下列八项；新增审核器不修改公共结果枚举。硬约束及状态一致性Core必须required且不能关闭，独立Delta验证同样不可关闭。
+
+默认包含：
 
 ```text
 Chapter Quality
@@ -423,7 +431,6 @@ EvaluationResult
 status:
 PASS
 FAIL
-WARN
 
 issues
 
@@ -433,6 +440,8 @@ metrics
 ```
 
 只有 PASS 才允许继续。
+
+required中的BLOCKER、MAJOR、MINOR或低于阈值均FAIL，INFO可通过；required执行错误使任务失败，不补默认分数。optional只提供建议和诊断，不阻断提交。正文修改后重新执行冻结策略的审核。
 
 ---
 

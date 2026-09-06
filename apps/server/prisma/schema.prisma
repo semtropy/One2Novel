@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "sqlite"
+}
+model Project {
+  id String @id
+  title String
+  idea String
+  genre String
+  requirements Json
+  targetCount Int
+  targetLength Int
+  status String @default("DRAFT")
+  revision Int @default(0)
+  chainEpoch Int @default(0)
+  headChapter Int @default(0)
+  headSnapshotId String?
+  openingId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  chapters Chapter[]
+  artifacts Artifact[]
+  snapshots Snapshot[]
+  jobs Job[]
+  command ActiveCommand?
+}
+model Chapter {
+  id String @id
+  projectId String
+  project Project @relation(fields:[projectId],references:[id])
+  number Int
+  title String
+  status String @default("PLANNED")
+  activeContentId String?
+  revision Int @default(0)
+  draft String @default("")
+  draftRevision Int @default(0)
+  contents Content[]
+  @@unique([projectId,number])
+}
+model Artifact {
+  id String @id
+  projectId String
+  project Project @relation(fields:[projectId],references:[id])
+  kind String
+  payload Json
+  hash String
+  baseSnapshotId String?
+  jobId String?
+  createdAt DateTime @default(now())
+  @@index([projectId,kind,createdAt])
+}
+model Content {
+  id String @id
+  chapterId String
+  chapter Chapter @relation(fields:[chapterId],references:[id])
+  text String
+  hash String
+  origin String
+  parentId String?
+  contextId String
+  createdAt DateTime @default(now())
+}
+model Snapshot {
+  id String @id
+  projectId String
+  project Project @relation(fields:[projectId],references:[id])
+  chapterNo Int
+  parentId String?
+  parent Snapshot? @relation("SnapshotChain",fields:[parentId],references:[id])
+  children Snapshot[] @relation("SnapshotChain")
+  canonId String
+  deltaId String? @unique
+  delta Delta? @relation(fields:[deltaId],references:[id])
+  validationId String?
+  contentId String?
+  stateHash String
+  schemaVersion Int @default(1)
+  checkpoint Bytes?
+  createdAt DateTime @default(now())
+  @@index([projectId,chapterNo])
+}
+model Delta {
+  id String @id
+  projectId String
+  baseSnapshotId String
+  contentId String
+  payload Json
+  hash String
+  snapshot Snapshot?
+}
+model StoryEvent {
+  id String @id
+  projectId String
+  contentId String
+  snapshotId String
+  eventOrder Int
+  payload Json
+  @@unique([contentId,eventOrder])
+}
+model PropositionVersion {
+  id String @id
+  projectId String
+  propositionId String
+  snapshotId String
+  payload Json
+  @@index([projectId,snapshotId])
+}
+model Job {
+  id String @id
+  projectId String
+  project Project @relation(fields:[projectId],references:[id])
+  kind String
+  status String @default("QUEUED")
+  stage String @default("QUEUED")
+  number Int?
+  revision Int @default(0)
+  chainEpoch Int
+  baseSnapshotId String?
+  input Json
+  config Json
+  artifactRefs Json
+  httpUsed Int @default(0)
+  httpLimit Int @default(40)
+  bodyRepairs Int @default(0)
+  deltaRepairs Int @default(0)
+  bodyRepairLimit Int @default(2)
+  deltaRepairLimit Int @default(2)
+  attempt Int @default(0)
+  generationText String @default("")
+  generationComplete Boolean @default(false)
+  cancelRequested Boolean @default(false)
+  errorCode String?
+  errorMessage String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  events JobEvent[]
+  command ActiveCommand?
+  @@index([status,createdAt])
+}
+model ActiveCommand {
+  projectId String @id
+  project Project @relation(fields:[projectId],references:[id])
+  jobId String @unique
+  job Job @relation(fields:[jobId],references:[id])
+}
+model JobEvent {
+  id Int @id @default(autoincrement())
+  jobId String
+  job Job @relation(fields:[jobId],references:[id])
+  type String
+  payload Json
+  createdAt DateTime @default(now())
+  @@index([jobId,id])
+}
+model Receipt {
+  id String @id
+  scope String
+  key String
+  requestHash String
+  response Json
+  @@unique([scope,key])
+}
+model CommitReceipt {
+  jobId String @id
+  snapshotId String
+  contentId String
+}
+model PlanningRecheck {
+  snapshotId String @id
+  projectId String
+  processed Boolean @default(false)
+}
+model ConfigVersion {
+  id String @id
+  kind String
+  payload Json
+  createdAt DateTime @default(now())
+}
+model ConfigPointer {
+  kind String @id
+  versionId String
+  revision Int @default(0)
+}
