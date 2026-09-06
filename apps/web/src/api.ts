@@ -50,6 +50,12 @@ export type Chapter = {
 };
 export type Job = {
   id: string;
+  kind: string;
+  parentId: string | null;
+  children?: Job[];
+  input: { count?: number; fromChapter?: number; endChapter?: number };
+  pauseRequested: boolean;
+  cancelRequested: boolean;
   status: string;
   stage: string;
   number: number | null;

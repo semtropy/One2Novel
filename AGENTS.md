@@ -13,4 +13,4 @@
 - PlanAssumption是计划前提，Constraint是剧情义务；Promise软期限只触发规划复核。审核使用可注册Evaluator与冻结Policy，状态仅PASS/FAIL，Core不可关闭。
 - SkillDefinition代码注册，SkillConfig由独立本机后台版本化管理，普通工作区不开放。Reference实体检索有界且隔离版本；全局模型并发1是Platform首版策略，同小说权威链串行是领域约束。
 - 按技术方案阶段推进。没有实现的功能、未运行的测试、未验证的模型能力必须如实标明。
-- 第一版 MVP 已实现，实际功能与验收以 `README.md`、`docs/MVP_ACCEPTANCE.md` 为准；DEVELOPMENT_SPEC 描述完整 V2，不代表49项均已实现。文档任务仍不得擅自启动额外产品开发。
+- 第一版 MVP 与 P5 连续生产增量已实现，实际功能与验收以 `README.md`、`docs/MVP_ACCEPTANCE.md`、`docs/P5_ACCEPTANCE.md` 为准；DEVELOPMENT_SPEC 描述完整 V2，不代表49项均已实现。文档任务仍不得擅自启动额外产品开发。

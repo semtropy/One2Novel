@@ -133,6 +133,11 @@ export function JobPanel({
   onAction: (f: () => Promise<unknown>) => Promise<void>;
 }) {
   if (!job) return null;
+  const isBatch = job.kind === 'BATCH',
+    children = job.children || [],
+    child = children.find((j) => j.status !== 'SUCCEEDED'),
+    budgetJob = isBatch ? child : job,
+    resumable = ['PAUSED', 'FAILED', 'INTERRUPTED'].includes(job.status);
   return (
     <div className="job-panel">
       <div className="job-title">
@@ -145,17 +150,57 @@ export function JobPanel({
         )}
         <strong>{stageLabels[active(job) ? job.stage : job.status] || job.status}</strong>
       </div>
-      <p className="hint">
-        模型调用 {job.httpUsed} / {job.httpLimit}
-      </p>
+      {isBatch ? (
+        <>
+          <p className="batch-progress">
+            本批已提交 {children.filter((j) => j.status === 'SUCCEEDED').length} / {job.input.count}{' '}
+            章
+          </p>
+          <p className="hint">
+            第 {job.input.fromChapter}–{job.input.endChapter} 章 · 累计调用{' '}
+            {children.reduce((sum, j) => sum + j.httpUsed, 0)} 次
+          </p>
+          {child && (
+            <p className="hint">
+              第 {child.number} 章 ·{' '}
+              {stageLabels[active(child) ? child.stage : child.status] || child.status} · 调用{' '}
+              {child.httpUsed}/{child.httpLimit}
+            </p>
+          )}
+          {job.pauseRequested && active(job) && <p className="hint">当前章完成后暂停</p>}
+          {job.status === 'SUCCEEDED' && <p className="hint">本批创作结束，未自动标记全书完结。</p>}
+        </>
+      ) : (
+        <p className="hint">
+          模型调用 {job.httpUsed} / {job.httpLimit}
+        </p>
+      )}
+      {job.cancelRequested && active(job) && <p className="hint">正在取消…</p>}
       {job.errorMessage && <p className="job-error">{job.errorMessage}</p>}
       <div className="actions wrap">
         {active(job) ? (
-          <button onClick={() => void onAction(() => api(`/jobs/${job.id}/cancel`, 'POST', {}))}>
-            <Square size={12} />
-            取消任务
-          </button>
-        ) : job.status !== 'SUCCEEDED' ? (
+          <>
+            {isBatch && (
+              <button
+                disabled={job.pauseRequested || job.cancelRequested}
+                onClick={() =>
+                  void onAction(() =>
+                    api(`/jobs/${job.id}/pause`, 'POST', { expectedRevision: job.revision }),
+                  )
+                }
+              >
+                本章后暂停
+              </button>
+            )}
+            <button
+              disabled={job.cancelRequested}
+              onClick={() => void onAction(() => api(`/jobs/${job.id}/cancel`, 'POST', {}))}
+            >
+              <Square size={12} />
+              取消任务
+            </button>
+          </>
+        ) : resumable ? (
           <>
             <button
               onClick={() =>
@@ -167,20 +212,29 @@ export function JobPanel({
               <RotateCcw size={13} />
               恢复任务
             </button>
-            <button
-              onClick={() =>
-                void onAction(() =>
-                  api(`/jobs/${job.id}/budget`, 'POST', {
-                    expectedRevision: job.revision,
-                    httpLimit: job.httpLimit + 20,
-                    bodyRepairLimit: job.bodyRepairLimit + 2,
-                    deltaRepairLimit: job.deltaRepairLimit + 2,
-                  }),
-                )
-              }
-            >
-              增加额度
-            </button>
+            {budgetJob && (
+              <button
+                onClick={() =>
+                  void onAction(() =>
+                    api(`/jobs/${budgetJob.id}/budget`, 'POST', {
+                      expectedRevision: budgetJob.revision,
+                      httpLimit: budgetJob.httpLimit + 20,
+                      bodyRepairLimit: budgetJob.bodyRepairLimit + 2,
+                      deltaRepairLimit: budgetJob.deltaRepairLimit + 2,
+                    }),
+                  )
+                }
+              >
+                增加额度
+              </button>
+            )}
+            {isBatch && (
+              <button
+                onClick={() => void onAction(() => api(`/jobs/${job.id}/cancel`, 'POST', {}))}
+              >
+                结束此批次
+              </button>
+            )}
           </>
         ) : null}
       </div>

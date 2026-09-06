@@ -405,6 +405,9 @@ export type Opening = z.infer<typeof openingSchema>;
 export type EvaluatorResult = z.infer<typeof evaluatorResultSchema>;
 export type Issue = z.infer<typeof issueSchema>;
 export const stageLabels: Record<string, string> = {
+  NEXT: '准备下一章',
+  CHILD_RUNNING: '连续创作中',
+  PAUSED: '已暂停',
   QUEUED: '等待执行',
   PLANNING: '规划章节',
   OPENING: '构思全书',
@@ -420,3 +423,14 @@ export const stageLabels: Record<string, string> = {
   INTERRUPTED: '运行中断',
   CANCELLED: '已取消',
 };
+export const writeRequestSchema = z
+  .strictObject({
+    expectedRevision: z.number().int().nonnegative(),
+    mode: z.enum(['GENERATE', 'AUDIT_DRAFT']).default('GENERATE'),
+    draftRevision: z.number().int().nonnegative().nullable().default(null),
+    count: z.number().int().min(1).max(10).default(1),
+  })
+  .refine(
+    (v) => v.mode !== 'AUDIT_DRAFT' || (v.count === 1 && v.draftRevision !== null),
+    '审核工作草稿只能执行一章，并须提供草稿版本',
+  );

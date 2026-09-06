@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { createServer } from 'node:http';
@@ -8,15 +8,11 @@ import { seedConfig, saveConfig } from '../../apps/server/src/orchestrator/confi
 import { Orchestrator } from '../../apps/server/src/orchestrator/service.js';
 import { createApp } from '../../apps/server/src/http.js';
 import { FakeModel, testSettings } from '../fixtures/fake-model.js';
+import { migrateTestDb } from '../fixtures/migrate.js';
 const dir = mkdtempSync(resolve(tmpdir(), 'one2novel-browser-')),
   file = resolve(dir, 'test.db');
 const native = new Database(file);
-native.exec(
-  readFileSync(
-    resolve('apps/server/prisma/migrations/20260905000000_initial/migration.sql'),
-    'utf8',
-  ),
-);
+migrateTestDb(native);
 native.close();
 const db = createDb(`file:${file.replaceAll('\\', '/')}`);
 await initializeDb(db);

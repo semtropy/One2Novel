@@ -4,7 +4,13 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { z } from 'zod';
-import { openingSchema, projectInputSchema, id, text } from '@one2novel/contracts';
+import {
+  openingSchema,
+  projectInputSchema,
+  writeRequestSchema,
+  id,
+  text,
+} from '@one2novel/contracts';
 import { artifact, getArtifact, workspaceRoot, type DB } from './platform/db.js';
 import { asJson, AppError, hash, normalize, requireThat, uuid } from './platform/core.js';
 import { getConfig, saveConfig } from './orchestrator/config.js';
@@ -45,7 +51,7 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
     res.status(status).json({ data, requestId: res.locals.requestId });
   const key = (req: express.Request) => id.parse(req.get('idempotency-key'));
   const revision = z.number().int().nonnegative();
-  app.get('/api/v1/health', (_req, res) => send(res, { ready: true, schemaVersion: 1 }));
+  app.get('/api/v1/health', (_req, res) => send(res, { ready: true, schemaVersion: 2 }));
   app.get('/api/v1/session', (_req, res) => send(res, { token: localToken }));
   app.get('/api/v1/projects', async (req, res) => {
     const limit = Math.min(100, Number(req.query.limit) || 20);
@@ -74,7 +80,12 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
     requireThat(p, 'NOT_FOUND', '小说不存在', 404);
     const [chapters, jobs, artifacts] = await Promise.all([
       db.chapter.findMany({ where: { projectId: p.id }, orderBy: { number: 'asc' } }),
-      db.job.findMany({ where: { projectId: p.id }, orderBy: { createdAt: 'desc' }, take: 20 }),
+      db.job.findMany({
+        where: { projectId: p.id, parentId: null },
+        include: { children: { orderBy: { number: 'asc' } } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
       db.artifact.findMany({
         where: {
           projectId: p.id,
@@ -140,23 +151,27 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
       ),
     );
   });
-  app.post('/api/v1/projects/:id/write', async (req, res) => {
-    const b = z
-      .strictObject({
-        expectedRevision: revision,
-        mode: z.enum(['GENERATE', 'AUDIT_DRAFT']),
-        draftRevision: revision.nullable(),
-      })
-      .parse(req.body);
-    send(
-      res,
-      await engine.startJob(id.parse(req.params.id), 'CHAPTER', b.expectedRevision, key(req), {
-        mode: b.mode,
-        draftRevision: b.draftRevision,
-      }),
-      202,
-    );
-  });
+  app.post(
+    ['/api/v1/projects/:id/write', '/api/v1/projects/:id/production-runs'],
+    async (req, res) => {
+      const b = writeRequestSchema.parse(req.body);
+      send(
+        res,
+        await engine.startJob(
+          id.parse(req.params.id),
+          b.count > 1 ? 'BATCH' : 'CHAPTER',
+          b.expectedRevision,
+          key(req),
+          {
+            mode: b.mode,
+            draftRevision: b.draftRevision,
+            count: b.count,
+          },
+        ),
+        202,
+      );
+    },
+  );
   app.get('/api/v1/projects/:id/chapters/:number', async (req, res) => {
     const c = await db.chapter.findUnique({
       where: {
@@ -326,7 +341,10 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
     res.type('text/plain; charset=utf-8').send(result.text);
   });
   app.get('/api/v1/jobs/:id', async (req, res) => {
-    const j = await db.job.findUnique({ where: { id: id.parse(req.params.id) } });
+    const j = await db.job.findUnique({
+      where: { id: id.parse(req.params.id) },
+      include: { children: { orderBy: { number: 'asc' } } },
+    });
     requireThat(j, 'NOT_FOUND', '任务不存在', 404);
     send(res, j);
   });
@@ -343,6 +361,15 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
   app.post('/api/v1/jobs/:id/cancel', async (req, res) =>
     send(res, await engine.cancel(id.parse(req.params.id))),
   );
+  app.post('/api/v1/jobs/:id/pause', async (req, res) =>
+    send(
+      res,
+      await engine.pause(
+        id.parse(req.params.id),
+        z.strictObject({ expectedRevision: revision }).parse(req.body).expectedRevision,
+      ),
+    ),
+  );
   app.post('/api/v1/jobs/:id/budget', async (req, res) => {
     const b = z
       .strictObject({
@@ -354,8 +381,18 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
       .parse(req.body);
     const j = await db.$transaction(async (tx) => {
       const j = await tx.job.findUniqueOrThrow({ where: { id: id.parse(req.params.id) } });
+      requireThat(j.kind !== 'BATCH', 'BATCH_CHILD_BUDGET', '请调整批次中未完成章节的额度');
+      if (j.parentId) {
+        const parent = await tx.job.findUniqueOrThrow({ where: { id: j.parentId } });
+        requireThat(
+          ['PAUSED', 'INTERRUPTED', 'FAILED'].includes(parent.status),
+          'INVALID_JOB_STATE',
+          '请先停止所属批次',
+          409,
+        );
+      }
       requireThat(
-        j.revision === b.expectedRevision && !['RUNNING', 'QUEUED', 'SUCCEEDED'].includes(j.status),
+        j.revision === b.expectedRevision && ['FAILED', 'PAUSED', 'INTERRUPTED'].includes(j.status),
         'REVISION_CONFLICT',
         '请在任务停止时调整额度',
         409,
@@ -521,12 +558,10 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
                 error.issues.map((i) => ({ path: i.path, message: i.message })),
               )
             : new AppError('INTERNAL_ERROR', '操作未完成，请刷新后重试', 500);
-      res
-        .status(e.status)
-        .json({
-          error: { code: e.code, message: e.message, ...(e.details ? { details: e.details } : {}) },
-          requestId: res.locals.requestId,
-        });
+      res.status(e.status).json({
+        error: { code: e.code, message: e.message, ...(e.details ? { details: e.details } : {}) },
+        requestId: res.locals.requestId,
+      });
     },
   );
   return app;

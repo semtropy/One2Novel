@@ -110,6 +110,10 @@ model PropositionVersion {
 }
 model Job {
   id String @id
+  parentId String?
+  parent Job? @relation("BatchChildren",fields:[parentId],references:[id])
+  children Job[] @relation("BatchChildren")
+  pauseRequested Boolean @default(false)
   projectId String
   project Project @relation(fields:[projectId],references:[id])
   kind String
@@ -139,6 +143,7 @@ model Job {
   events JobEvent[]
   command ActiveCommand?
   @@index([status,createdAt])
+  @@unique([parentId,number])
 }
 model ActiveCommand {
   projectId String @id

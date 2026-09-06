@@ -9,12 +9,14 @@ export class FakeModel implements ModelGateway {
   minor = false;
   invalidState = false;
   delay = 0;
+  beforeCall?: (request: ModelRequest<any>) => Promise<void>;
   ready() {
     return true;
   }
   async call<T>(r: ModelRequest<T>): Promise<T> {
     await r.reserve();
     this.calls.push({ prompt: r.prompt, input: r.input });
+    await this.beforeCall?.(r);
     if (this.delay) await new Promise((resolve) => setTimeout(resolve, this.delay));
     r.signal.throwIfAborted();
     if (r.prompt === this.failAt) throw new Error('Injected failure');

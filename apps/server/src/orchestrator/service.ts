@@ -1,4 +1,5 @@
 import { commitChapter } from '../production/commit.js';
+import { scheduleBatch, retryBatch, pauseBatch } from './batch.js';
 import { loadSnapshot, pack } from '../story-state/snapshot.js';
 import { z } from 'zod';
 import {
@@ -86,11 +87,21 @@ export class Orchestrator {
   }
   async startJob(
     projectId: string,
-    kind: 'OPENING' | 'CHAPTER',
+    kind: 'OPENING' | 'CHAPTER' | 'BATCH',
     revision: number,
     key: string,
     input: Record<string, unknown> = {},
   ) {
+    if (kind === 'BATCH') {
+      requireThat(
+        Number.isInteger(input.count) &&
+          Number(input.count) >= 2 &&
+          Number(input.count) <= 10 &&
+          input.mode === 'GENERATE',
+        'INVALID_BATCH',
+        '连续生产只能生成2到10章',
+      );
+    }
     const config = await freezeConfig(this.db);
     requireThat(
       this.gateway.ready(),
@@ -149,6 +160,19 @@ export class Orchestrator {
         );
         input = { ...input, text: normalize(c.draft) };
       }
+      if (kind === 'BATCH') {
+        requireThat(
+          p.headChapter + Number(input.count) <= p.targetCount,
+          'INVALID_BATCH',
+          '批次不能超出剩余目标章节',
+        );
+        input = {
+          mode: 'GENERATE',
+          count: input.count,
+          fromChapter: p.headChapter + 1,
+          endChapter: p.headChapter + Number(input.count),
+        };
+      }
       const job = await tx.job.create({
         data: {
           id: uuid(),
@@ -175,22 +199,24 @@ export class Orchestrator {
     return this.db.$transaction(async (tx) => {
       const j = await tx.job.findUniqueOrThrow({ where: { id: jobId } }),
         p = await tx.project.findUniqueOrThrow({ where: { id: j.projectId } });
+      requireThat(!j.parentId, 'BATCH_CONTROL_REQUIRED', '请通过所属批次恢复当前章节', 409);
       requireThat(j.revision === revision, 'REVISION_CONFLICT', '任务已变化', 409);
       requireThat(
-        ['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(j.status),
+        ['FAILED', 'INTERRUPTED', 'PAUSED'].includes(j.status),
         'INVALID_JOB_STATE',
         '此任务不能恢复',
-      );
-      requireThat(
-        j.chainEpoch === p.chainEpoch && j.baseSnapshotId === p.headSnapshotId,
-        'STALE_INPUT',
-        '故事基础已变化，请重新启动任务',
-        409,
       );
       requireThat(
         !(await tx.activeCommand.findUnique({ where: { projectId: p.id } })),
         'PROJECT_BUSY',
         '小说已有活动任务',
+        409,
+      );
+      if (j.kind === 'BATCH') return retryBatch(tx, j);
+      requireThat(
+        j.chainEpoch === p.chainEpoch && j.baseSnapshotId === p.headSnapshotId,
+        'STALE_INPUT',
+        '故事基础已变化，请重新启动任务',
         409,
       );
       await tx.activeCommand.create({ data: { projectId: p.id, jobId } });
@@ -206,23 +232,49 @@ export class Orchestrator {
       });
     });
   }
+  async pause(jobId: string, revision: number) {
+    return pauseBatch(this.db, jobId, revision);
+  }
   async cancel(jobId: string) {
+    const abortIds: string[] = [];
     const result = await this.db.$transaction(async (tx) => {
       const j = await tx.job.findUniqueOrThrow({ where: { id: jobId } });
-      if (j.status === 'SUCCEEDED') return j;
-      const queued = j.status !== 'RUNNING';
+      requireThat(!j.parentId, 'BATCH_CONTROL_REQUIRED', '请通过所属批次取消任务', 409);
+      if (['SUCCEEDED', 'CANCELLED'].includes(j.status)) return j;
+      let running = j.status === 'RUNNING';
+      if (j.kind === 'BATCH') {
+        const children = await tx.job.findMany({
+          where: { parentId: j.id, status: { notIn: ['SUCCEEDED', 'CANCELLED'] } },
+        });
+        running = children.some((c) => c.status === 'RUNNING');
+        for (const c of children) {
+          abortIds.push(c.id);
+          await tx.job.update({
+            where: { id: c.id },
+            data: {
+              cancelRequested: true,
+              ...(c.status !== 'RUNNING' ? { status: 'CANCELLED' } : {}),
+              revision: { increment: 1 },
+            },
+          });
+        }
+      }
       const v = await tx.job.update({
         where: { id: jobId },
         data: {
           cancelRequested: true,
-          ...(queued ? { status: 'CANCELLED' } : {}),
+          ...(!running ? { status: 'CANCELLED' } : {}),
           revision: { increment: 1 },
         },
       });
-      if (queued) await tx.activeCommand.deleteMany({ where: { jobId } });
+      if (!running) await tx.activeCommand.deleteMany({ where: { jobId } });
+      await tx.jobEvent.create({
+        data: { jobId, type: 'progress', payload: { cancelRequested: true, status: v.status } },
+      });
       return v;
     });
     this.controllers.get(jobId)?.abort();
+    for (const childId of abortIds) this.controllers.get(childId)?.abort();
     return result;
   }
   async tick() {
@@ -231,7 +283,7 @@ export class Orchestrator {
     try {
       const j = await this.db.job.findFirst({
         where: { status: 'QUEUED' },
-        orderBy: { createdAt: 'asc' },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       });
       if (j) await this.execute(j);
     } finally {
@@ -239,8 +291,21 @@ export class Orchestrator {
     }
   }
   private async stage(jobId: string, stage: string) {
-    await this.db.job.update({ where: { id: jobId }, data: { stage, revision: { increment: 1 } } });
-    await this.emit(jobId, 'stage', { stage });
+    await this.db.$transaction(async (tx) => {
+      const j = await tx.job.update({
+        where: { id: jobId },
+        data: { stage, revision: { increment: 1 } },
+      });
+      await tx.jobEvent.create({ data: { jobId, type: 'stage', payload: { stage } } });
+      if (j.parentId)
+        await tx.jobEvent.create({
+          data: {
+            jobId: j.parentId,
+            type: 'progress',
+            payload: { childId: j.id, number: j.number, stage },
+          },
+        });
+    });
   }
   private async saveRef(jobId: string, key: string, id: string) {
     const j = await this.db.job.findUniqueOrThrow({ where: { id: jobId } });
@@ -308,12 +373,21 @@ export class Orchestrator {
   private async execute(initial: Job) {
     const controller = new AbortController();
     this.controllers.set(initial.id, controller);
-    const j = await this.db.job.update({
-      where: { id: initial.id },
-      data: { status: 'RUNNING', attempt: { increment: 1 }, revision: { increment: 1 } },
+    const j = await this.db.$transaction(async (tx) => {
+      const current = await tx.job.findUniqueOrThrow({ where: { id: initial.id } });
+      if (current.status !== 'QUEUED' || current.cancelRequested) return null;
+      return tx.job.update({
+        where: { id: current.id },
+        data: { status: 'RUNNING', attempt: { increment: 1 }, revision: { increment: 1 } },
+      });
     });
+    if (!j) {
+      this.controllers.delete(initial.id);
+      return;
+    }
     try {
-      if (j.kind === 'OPENING') await this.opening(j);
+      if (j.kind === 'BATCH') await scheduleBatch(this.db, j.id);
+      else if (j.kind === 'OPENING') await this.opening(j);
       else await this.chapter(j);
     } catch (error) {
       const e =
@@ -327,17 +401,48 @@ export class Orchestrator {
             );
       await this.db.$transaction(async (tx) => {
         const latest = await tx.job.findUniqueOrThrow({ where: { id: j.id } });
-        if (latest.status === 'SUCCEEDED') return;
+        if (['SUCCEEDED', 'CANCELLED', 'PAUSED'].includes(latest.status)) return;
+        const status = latest.cancelRequested
+          ? 'CANCELLED'
+          : this.stopped
+            ? 'INTERRUPTED'
+            : j.kind === 'BATCH'
+              ? 'PAUSED'
+              : 'FAILED';
         await tx.job.update({
           where: { id: j.id },
           data: {
-            status: latest.cancelRequested ? 'CANCELLED' : this.stopped ? 'INTERRUPTED' : 'FAILED',
+            status,
             errorCode: e.code,
             errorMessage: e.message,
             revision: { increment: 1 },
           },
         });
-        await tx.activeCommand.deleteMany({ where: { jobId: j.id } });
+        if (j.parentId) {
+          const parent = await tx.job.findUniqueOrThrow({ where: { id: j.parentId } });
+          const parentStatus = parent.cancelRequested
+            ? 'CANCELLED'
+            : this.stopped
+              ? 'INTERRUPTED'
+              : 'PAUSED';
+          await tx.job.update({
+            where: { id: parent.id },
+            data: {
+              status: parentStatus,
+              errorCode: e.code,
+              errorMessage: `第${j.number}章未完成：${e.message}`,
+              revision: { increment: 1 },
+            },
+          });
+          await tx.jobEvent.create({
+            data: {
+              jobId: parent.id,
+              type: 'error',
+              payload: { childId: j.id, number: j.number, status: parentStatus, code: e.code },
+            },
+          });
+        }
+        await tx.activeCommand.deleteMany({ where: { jobId: j.parentId || j.id } });
       });
       await this.emit(j.id, 'error', { code: e.code, message: e.message });
     } finally {

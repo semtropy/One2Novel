@@ -32,8 +32,17 @@ export async function commitChapter(
     const latest = await tx.job.findUniqueOrThrow({ where: { id: j.id } }),
       p = await tx.project.findUniqueOrThrow({ where: { id: j.projectId } }),
       owner = await tx.activeCommand.findUnique({ where: { projectId: p.id } });
+    const parent = latest.parentId
+      ? await tx.job.findUniqueOrThrow({ where: { id: latest.parentId } })
+      : null;
     requireThat(
-      owner?.jobId === j.id &&
+      owner?.jobId === (latest.parentId || j.id) &&
+        (!parent ||
+          (parent.kind === 'BATCH' &&
+            parent.projectId === p.id &&
+            parent.status === 'RUNNING' &&
+            !parent.cancelRequested)) &&
+        latest.status === 'RUNNING' &&
         !latest.cancelRequested &&
         p.chainEpoch === j.chainEpoch &&
         p.headSnapshotId === j.baseSnapshotId &&
@@ -158,7 +167,38 @@ export async function commitChapter(
       where: { id: j.id },
       data: { status: 'SUCCEEDED', stage: 'SUCCEEDED', revision: { increment: 1 } },
     });
-    await tx.activeCommand.delete({ where: { projectId: p.id } });
+    if (parent) {
+      const range = parent.input as { fromChapter: number; endChapter: number; count: number };
+      requireThat(
+        j.number! >= range.fromChapter && j.number! <= range.endChapter,
+        'COMMIT_CONFLICT',
+        '章节不属于批次范围',
+      );
+      const status =
+        j.number === range.endChapter ? 'SUCCEEDED' : parent.pauseRequested ? 'PAUSED' : 'QUEUED';
+      await tx.job.update({
+        where: { id: parent.id },
+        data: {
+          status,
+          stage: status === 'QUEUED' ? 'NEXT' : status,
+          revision: { increment: 1 },
+        },
+      });
+      await tx.jobEvent.create({
+        data: {
+          jobId: parent.id,
+          type: status === 'QUEUED' ? 'progress' : 'done',
+          payload: {
+            status,
+            childId: j.id,
+            number: j.number,
+            completed: j.number! - range.fromChapter + 1,
+            count: range.count,
+          },
+        },
+      });
+      if (status !== 'QUEUED') await tx.activeCommand.delete({ where: { projectId: p.id } });
+    } else await tx.activeCommand.delete({ where: { projectId: p.id } });
     await tx.jobEvent.create({
       data: { jobId: j.id, type: 'committed', payload: { snapshotId, contentId, evaluationId } },
     });

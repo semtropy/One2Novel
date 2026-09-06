@@ -18,23 +18,31 @@ export function Workspace() {
     [tab, setTab] = useState('plan'),
     [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false),
+    [batchOpen, setBatchOpen] = useState(false),
+    [batchCount, setBatchCount] = useState(2),
     [rewrite, setRewrite] = useState<unknown>(null);
   const qc = useQueryClient();
   const p = q.data,
-    job = p?.jobs.find(active) || p?.jobs[0],
-    number = selected ?? (p?.headChapter ? p.headChapter : 1);
+    command = p?.jobs.find(active) || p?.jobs[0],
+    job =
+      command?.kind === 'BATCH'
+        ? command.children?.find(active) || command.children?.at(-1)
+        : command,
+    number =
+      selected ??
+      (command?.kind === 'BATCH' && job && active(job) ? job.number! : p?.headChapter || 1);
   const refresh = async () => {
     await qc.invalidateQueries({ queryKey: ['project', id] });
     await qc.invalidateQueries({ queryKey: ['chapter', id] });
   };
   useEffect(() => {
-    if (!job || !active(job)) return;
-    const events = new EventSource(`/api/v1/jobs/${job.id}/events`);
+    if (!command || !active(command)) return;
+    const events = new EventSource(`/api/v1/jobs/${command.id}/events`);
     const update = () => void refresh();
-    for (const name of ['stage', 'done', 'error', 'committed'])
+    for (const name of ['stage', 'done', 'error', 'committed', 'progress'])
       events.addEventListener(name, update);
     return () => events.close();
-  }, [job?.id, job?.status]);
+  }, [command?.id, command?.status]);
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
@@ -66,7 +74,11 @@ export function Workspace() {
         a.kind === 'PLAN' && (a.payload as { chapterRange: number[] }).chapterRange?.[0] === number,
     ),
     evaluation = p.artifacts.find(
-      (a) => a.kind === 'EVALUATION' && p.jobs.some((j) => j.number === number && j.id === a.jobId),
+      (a) =>
+        a.kind === 'EVALUATION' &&
+        p.jobs
+          .flatMap((j) => [j, ...(j.children || [])])
+          .some((j) => j.number === number && j.id === a.jobId),
     );
   return (
     <Shell>
@@ -81,10 +93,23 @@ export function Workspace() {
             {p.genre} · 已完成 {p.headChapter} 章
           </span>
         </div>
-        <a className="button" href={`/api/v1/projects/${p.id}/export?format=md`}>
-          <Download size={15} />
-          导出
-        </a>
+        <div className="actions">
+          {p.headSnapshotId && p.targetCount - p.headChapter >= 2 && (
+            <button
+              disabled={busy || isActive}
+              onClick={() => {
+                setBatchCount(Math.min(3, p.targetCount - p.headChapter));
+                setBatchOpen(true);
+              }}
+            >
+              连续创作
+            </button>
+          )}
+          <a className="button" href={`/api/v1/projects/${p.id}/export?format=md`}>
+            <Download size={15} />
+            导出
+          </a>
+        </div>
       </div>
       <div className="workspace">
         <aside className="chapters">
@@ -183,9 +208,62 @@ export function Workspace() {
           ) : (
             <StateView project={p} />
           )}
-          <JobPanel job={job} onAction={run} />
+          <JobPanel job={command} onAction={run} />
         </aside>
       </div>
+      {batchOpen && (
+        <Modal title="连续创作" onClose={() => setBatchOpen(false)}>
+          <p>从第 {next} 章开始，逐章审核并提交。某章未通过时会暂停，可处理后继续。</p>
+          <label>
+            本批章数
+            <input
+              aria-label="本批章数"
+              type="number"
+              min={2}
+              max={Math.min(10, p.targetCount - p.headChapter)}
+              value={batchCount}
+              onChange={(e) => setBatchCount(Number(e.target.value))}
+            />
+          </label>
+          <p className="hint">
+            每章最多 40 次模型请求，初始最多修订正文及状态各 2
+            次。可在当前章完成后暂停，或立即取消剩余任务。
+          </p>
+          <ErrorBox error={error} />
+          <div className="actions">
+            <button onClick={() => setBatchOpen(false)}>取消</button>
+            <button
+              className="primary"
+              disabled={
+                busy ||
+                isActive ||
+                !Number.isInteger(batchCount) ||
+                batchCount < 2 ||
+                batchCount > Math.min(10, p.targetCount - p.headChapter)
+              }
+              onClick={() =>
+                void run(async () => {
+                  await api(
+                    `/projects/${p.id}/production-runs`,
+                    'POST',
+                    {
+                      expectedRevision: p.revision,
+                      mode: 'GENERATE',
+                      draftRevision: null,
+                      count: batchCount,
+                    },
+                    true,
+                  );
+                  setSelected(null);
+                  setBatchOpen(false);
+                })
+              }
+            >
+              开始连续创作
+            </button>
+          </div>
+        </Modal>
+      )}
       {!!rewrite && (
         <Modal title={`从第 ${number} 章开始重写`} onClose={() => setRewrite(null)}>
           <p>
