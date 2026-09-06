@@ -25,6 +25,7 @@ model Project {
   snapshots Snapshot[]
   jobs Job[]
   command ActiveCommand?
+  knowledgeBindings KnowledgeBinding[]
 }
 model Chapter {
   id String @id
@@ -114,8 +115,8 @@ model Job {
   parent Job? @relation("BatchChildren",fields:[parentId],references:[id])
   children Job[] @relation("BatchChildren")
   pauseRequested Boolean @default(false)
-  projectId String
-  project Project @relation(fields:[projectId],references:[id])
+  projectId String?
+  project Project? @relation(fields:[projectId],references:[id])
   kind String
   status String @default("QUEUED")
   stage String @default("QUEUED")
@@ -142,6 +143,7 @@ model Job {
   updatedAt DateTime @updatedAt
   events JobEvent[]
   command ActiveCommand?
+  libraryCommand LibraryCommand?
   @@index([status,createdAt])
   @@unique([parentId,number])
 }
@@ -188,4 +190,119 @@ model ConfigPointer {
   kind String @id
   versionId String
   revision Int @default(0)
+}
+model LibraryCommand {
+  scope String @id
+  jobId String @unique
+  job Job @relation(fields:[jobId],references:[id])
+}
+model ReferenceSource {
+  id String @id
+  title String
+  originalHash String @unique
+  original Bytes
+  format String
+  encoding String
+  textId String @unique
+  text String
+  textHash String
+  revision Int @default(0)
+  activeSplitId String?
+  activeModelId String?
+  createdAt DateTime @default(now())
+  splits ReferenceSplit[]
+  analyses ReferenceAnalysis[]
+}
+model ReferenceSplit {
+  id String @id
+  sourceId String
+  source ReferenceSource @relation(fields:[sourceId],references:[id])
+  payload Json
+  hash String
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  analyses ReferenceAnalysis[]
+}
+model ReferenceAnalysis {
+  id String @id
+  sourceId String
+  source ReferenceSource @relation(fields:[sourceId],references:[id])
+  splitId String
+  split ReferenceSplit @relation(fields:[splitId],references:[id])
+  jobId String @unique
+  status String @default("UNANALYZED")
+  totalChars Int
+  completedChars Int @default(0)
+  registryHead Int @default(0)
+  summary String?
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  units ReferenceUnit[]
+  entities ReferenceEntity[]
+  aggregates ReferenceAggregate[]
+}
+model ReferenceUnit {
+  id String @id
+  analysisId String
+  analysis ReferenceAnalysis @relation(fields:[analysisId],references:[id])
+  number Int
+  chapterNo Int
+  start Int
+  end Int
+  inputStart Int
+  inputHash String
+  registryVersion Int
+  retrieval Json?
+  payload Json?
+  hash String?
+  @@unique([analysisId,number])
+}
+model ReferenceEntity {
+  rowId String @id
+  entityId String
+  analysisId String
+  analysis ReferenceAnalysis @relation(fields:[analysisId],references:[id])
+  throughUnit Int
+  chapterNo Int
+  payload Json
+  @@unique([analysisId,entityId,throughUnit])
+  @@index([analysisId,throughUnit])
+}
+model ReferenceAggregate {
+  id String @id
+  analysisId String
+  analysis ReferenceAnalysis @relation(fields:[analysisId],references:[id])
+  inputHash String
+  payload Json
+  @@unique([analysisId,inputHash])
+}
+model KnowledgeItem {
+  id String @id
+  kind String
+  title String
+  revision Int @default(0)
+  activeVersionId String?
+  createdAt DateTime @default(now())
+  versions KnowledgeVersion[]
+}
+model KnowledgeVersion {
+  id String @id
+  itemId String
+  item KnowledgeItem @relation(fields:[itemId],references:[id])
+  number Int
+  payload Json
+  hash String
+  sourceVersionId String?
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  bindings KnowledgeBinding[]
+  @@unique([itemId,number])
+}
+model KnowledgeBinding {
+  id String @id
+  projectId String
+  project Project @relation(fields:[projectId],references:[id])
+  versionId String
+  version KnowledgeVersion @relation(fields:[versionId],references:[id])
+  @@unique([projectId,versionId])
 }

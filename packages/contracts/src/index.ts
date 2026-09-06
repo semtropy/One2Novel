@@ -290,6 +290,16 @@ export const chapterPlanSchema = z.strictObject({
   ),
 });
 export const openingSchema = z.strictObject({
+  adaptationMap: z
+    .array(
+      z.strictObject({
+        sourceNodeId: id,
+        newPlanNodeId: id,
+        retainedFunction: text,
+        changedPremise: text.min(1),
+      }),
+    )
+    .default([]),
   book: bookSchema,
   state: stateSchema,
   initialEvents: z.array(z.strictObject({ id, canonVersionId: id, description: text })),
@@ -405,6 +415,9 @@ export type Opening = z.infer<typeof openingSchema>;
 export type EvaluatorResult = z.infer<typeof evaluatorResultSchema>;
 export type Issue = z.infer<typeof issueSchema>;
 export const stageLabels: Record<string, string> = {
+  ANALYZE_UNIT: '分析参考章节',
+  AGGREGATE: '归纳参考结构',
+  BUILD_KNOWLEDGE: '整理创作知识',
   NEXT: '准备下一章',
   CHILD_RUNNING: '连续创作中',
   PAUSED: '已暂停',
@@ -434,3 +447,212 @@ export const writeRequestSchema = z
     (v) => v.mode !== 'AUDIT_DRAFT' || (v.count === 1 && v.draftRevision !== null),
     '审核工作草稿只能执行一章，并须提供草稿版本',
   );
+
+export const narrativeFunction = z.enum([
+  'SETUP',
+  'GOAL',
+  'OBSTACLE',
+  'ESCALATION',
+  'REVEAL',
+  'TURN',
+  'CLIMAX',
+  'RESOLUTION',
+  'TRANSITION',
+]);
+export const assetKind = z.enum([
+  'CHARACTER',
+  'LOCATION',
+  'ITEM',
+  'ORGANIZATION',
+  'ABILITY',
+  'WORLD_RULE',
+  'SETTING',
+  'RELATIONSHIP',
+  'DIALOGUE',
+  'CONCEPT',
+  'OTHER',
+]);
+export const referenceChapterSchema = z.strictObject({
+  id,
+  order: z.number().int().positive(),
+  title: text.min(1).max(200),
+  start: z.number().int().nonnegative(),
+  end: z.number().int().positive(),
+});
+export const splitSchema = z.array(referenceChapterSchema).min(1).max(10000);
+export const referenceEntitySchema = z.strictObject({
+  id,
+  kind: assetKind,
+  name: text.min(1).max(100),
+  aliases: z.array(text.min(1).max(100)).max(20),
+  description: text.max(200),
+  evidence: z.array(spanSchema).min(1).max(3),
+});
+const emotion = z.strictObject({
+  valence: z.number().int().min(-2).max(2),
+  arousal: z.number().int().min(0).max(4),
+  label: text.max(50),
+});
+export const referenceResultSchema = z.strictObject({
+  summary: text.min(1).max(1000),
+  coverageNotes: text.max(1000),
+  entities: z.array(referenceEntitySchema).max(60),
+  scenes: z.array(
+    z.strictObject({
+      id,
+      participantIds: z.array(id),
+      locationId: id.nullable(),
+      timeId: id.nullable(),
+      summary: text.max(500),
+      span: spanSchema,
+    }),
+  ),
+  events: z.array(
+    z.strictObject({
+      id,
+      actorIds: z.array(id),
+      action: text.max(500),
+      result: text.max(500),
+      evidence: spanSchema,
+      sceneId: id.nullable(),
+      sequence: z.number().int().nonnegative(),
+    }),
+  ),
+  beats: z.array(
+    z.strictObject({
+      id,
+      eventIds: z.array(id),
+      function: narrativeFunction,
+      summary: text.max(500),
+      intensity: z.number().int().min(0).max(4),
+      emotionBefore: emotion,
+      emotionAfter: emotion,
+      evidence: z.array(spanSchema).min(1),
+    }),
+  ),
+  stateChanges: z.array(
+    z.strictObject({
+      entityId: id,
+      field: text.max(100),
+      before: json,
+      after: json,
+      eventId: id,
+      evidence: z.array(spanSchema).min(1),
+    }),
+  ),
+  hooks: z.array(
+    z.strictObject({
+      id,
+      kind: z.enum(['QUESTION', 'DANGER', 'REWARD', 'SECRET', 'UNFINISHED_ACTION']),
+      promptedQuestion: text.max(500),
+      evidence: spanSchema,
+      resolvedAtEventId: id.nullable(),
+    }),
+  ),
+  timeline: z.array(
+    z.strictObject({
+      id,
+      description: text.max(500),
+      beforeIds: z.array(id),
+      afterIds: z.array(id),
+      exactTime: text.nullable(),
+      evidence: z.array(spanSchema).min(1),
+    }),
+  ),
+  promises: z.array(
+    z.strictObject({
+      id,
+      description: text.max(500),
+      status: z.enum(['OPEN', 'ADVANCED', 'RESOLVED', 'ABANDONED']),
+      evidence: z.array(spanSchema).min(1),
+    }),
+  ),
+  unresolvedIdentities: z.array(
+    z.strictObject({
+      candidateId: id,
+      possibleEntityIds: z.array(id).min(1),
+      reason: text.max(500),
+    }),
+  ),
+});
+export type ReferenceResult = z.infer<typeof referenceResultSchema>;
+export type ReferenceEntityData = z.infer<typeof referenceEntitySchema>;
+export const aggregateSchema = z.strictObject({
+  summary: text.min(1).max(2000),
+  unitIds: z.array(id).min(1),
+});
+export const frameworkSchema = z.strictObject({
+  sourceModelVersionId: id,
+  nodes: z.array(
+    z.strictObject({
+      id,
+      position: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]),
+      function: narrativeFunction,
+      sourceSummary: text.max(1000),
+      prerequisiteNodeIds: z.array(id),
+      expectedEffects: z.array(text.max(500)),
+      beatFunctions: z.array(narrativeFunction),
+    }),
+  ),
+  cycles: z
+    .array(z.strictObject({ id, nodeIds: z.array(id), escalationRule: text.max(1000) }))
+    .max(3),
+  curves: z.array(
+    z.strictObject({
+      position: z.number().min(0).max(1),
+      intensity: z.number().min(0).max(4),
+      valence: z.number().min(-2).max(2),
+      arousal: z.number().min(0).max(4),
+    }),
+  ),
+  statistics: z.strictObject({
+    climaxGapMean: z.number().nonnegative().nullable(),
+    hookRate: z.number().min(0).max(1),
+    beatDistribution: z.record(narrativeFunction, z.number().min(0).max(1)),
+  }),
+});
+export const assetSchema = z.strictObject({
+  id,
+  kind: assetKind,
+  name: text.min(1).max(100),
+  description: text.max(2000),
+  attributes: obj,
+  relationAssetIds: z.array(id),
+  sourceSpans: z.array(spanSchema).min(1),
+  originAssetId: id.nullable(),
+});
+export const assetPackSchema = z.strictObject({
+  stage: z.enum(['RAW', 'CLEAN', 'ADAPTED']),
+  assets: z.array(assetSchema),
+  sourceVersionId: id,
+  adaptationBrief: text.max(4000).nullable(),
+  mapping: z.array(
+    z.strictObject({ oldId: id, newId: id, changes: z.array(text.min(1).max(500)).min(1) }),
+  ),
+});
+export const styleSchema = z.strictObject({
+  pov: z.enum(['FIRST', 'THIRD_LIMITED', 'OMNISCIENT']),
+  tense: z.enum(['PAST', 'PRESENT']),
+  tone: z.array(text.max(100)).max(20),
+  sentenceLength: z.enum(['SHORT', 'MIXED', 'LONG']),
+  dialogueRatio: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]),
+  bannedPhrases: z.array(text.min(1).max(100)).max(100),
+  instructions: z.array(text.max(500)).max(30),
+});
+export const templateSchema = z.strictObject({
+  target: z.enum(['BOOK', 'VOLUME', 'ARC', 'CHAPTER']),
+  schemaId: text.min(1),
+  defaults: obj,
+  guidance: z.array(text.max(500)).max(30),
+});
+export const knowledgeKind = z.enum(['FRAMEWORK', 'ASSET_PACK', 'STYLE', 'TEMPLATE']);
+export type KnowledgeKind = z.infer<typeof knowledgeKind>;
+export const defaultStyle = {
+  pov: 'THIRD_LIMITED',
+  tense: 'PAST',
+  tone: [],
+  sentenceLength: 'MIXED',
+  dialogueRatio: [0, 1],
+  bannedPhrases: [],
+  instructions: [],
+} as const;

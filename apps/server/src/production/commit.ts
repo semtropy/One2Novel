@@ -21,6 +21,8 @@ export async function commitChapter(
   state: Parameters<typeof pack>[0],
   validationId: string,
 ) {
+  requireThat(j.projectId, 'INVALID_JOB', '正式提交需要小说归属');
+  const projectId = j.projectId;
   const frozen = j.config as unknown as CommitConfig,
     policy = validatePolicy(frozen.policy.payload),
     snapshotId = uuid(),
@@ -30,7 +32,7 @@ export async function commitChapter(
     const receipt = await tx.commitReceipt.findUnique({ where: { jobId: j.id } });
     if (receipt) return receipt;
     const latest = await tx.job.findUniqueOrThrow({ where: { id: j.id } }),
-      p = await tx.project.findUniqueOrThrow({ where: { id: j.projectId } }),
+      p = await tx.project.findUniqueOrThrow({ where: { id: projectId } }),
       owner = await tx.activeCommand.findUnique({ where: { projectId: p.id } });
     const parent = latest.parentId
       ? await tx.job.findUniqueOrThrow({ where: { id: latest.parentId } })

@@ -99,6 +99,7 @@ export function deterministicIssues(
   contentId: string,
   plan: ChapterPlan,
   recent: string[],
+  bannedPhrases: string[] = [],
 ): Issue[] {
   const issues: Issue[] = [];
   const add = (ruleId: string, message: string) =>
@@ -113,6 +114,9 @@ export function deterministicIssues(
       suggestion: '修改正文以满足该要求',
     });
   const length = bodyLength(body);
+  bannedPhrases.forEach((phrase, i) => {
+    if (body.includes(phrase)) add(`knowledge:banned:${i}`, `出现风格禁用词：${phrase}`);
+  });
   if (length < plan.targetLength * 0.8 || length > plan.targetLength * 1.2)
     add(
       'length',
@@ -142,7 +146,7 @@ export function deterministicIssues(
     for (let i = 0; i + 80 <= chars.length; i++) {
       const fragment = chars.slice(i, i + 80).join('');
       if (prior.includes(fragment) && !plan.allowedQuotes.some((q) => q.text.includes(fragment))) {
-        add('repeated-passage', '与近期正文存在至少80字符连续重复');
+        add('repeated-passage', '与既有正文或参考原文存在至少80字符连续重复');
         break outer;
       }
     }

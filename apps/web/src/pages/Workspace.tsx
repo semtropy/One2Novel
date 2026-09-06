@@ -5,6 +5,7 @@ import { ArrowLeft, Download, BookOpen, Check } from 'lucide-react';
 import { api, active, type Project } from '../api';
 import { Shell, Modal, ErrorBox, Loading } from '../components/ui';
 import { OpeningPanel } from '../features/OpeningPanel';
+import { KnowledgeBindings } from '../features/KnowledgeBindings';
 import { ChapterEditor } from '../features/ChapterEditor';
 import { PlanView, EvaluationView, StateView, JobPanel } from '../features/Inspector';
 export function Workspace() {
@@ -19,6 +20,7 @@ export function Workspace() {
     [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false),
     [batchOpen, setBatchOpen] = useState(false),
+    [bindingsOpen, setBindingsOpen] = useState(false),
     [batchCount, setBatchCount] = useState(2),
     [rewrite, setRewrite] = useState<unknown>(null);
   const qc = useQueryClient();
@@ -94,6 +96,9 @@ export function Workspace() {
           </span>
         </div>
         <div className="actions">
+          <button disabled={busy || isActive} onClick={() => setBindingsOpen(true)}>
+            创作知识
+          </button>
           {p.headSnapshotId && p.targetCount - p.headChapter >= 2 && (
             <button
               disabled={busy || isActive}
@@ -264,6 +269,7 @@ export function Workspace() {
           </div>
         </Modal>
       )}
+      {bindingsOpen && <KnowledgeBindings project={p} onClose={() => setBindingsOpen(false)} />}
       {!!rewrite && (
         <Modal title={`从第 ${number} 章开始重写`} onClose={() => setRewrite(null)}>
           <p>

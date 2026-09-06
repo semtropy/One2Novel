@@ -1,5 +1,6 @@
 import { settingsSchema, skillSchema, type Settings } from '@one2novel/contracts';
 import type { DB } from '../platform/db.js';
+import { promptVersion } from '../platform/prompts.js';
 import { asJson, requireThat, uuid } from '../platform/core.js';
 import { defaultPolicy, validatePolicy, evaluators } from '../evaluation/service.js';
 import { defaultSkills, skillDefinitions } from '../knowledge/service.js';
@@ -73,7 +74,7 @@ export async function freezeConfig(db: DB) {
     models,
     policy,
     skills,
-    promptVersion: '1',
+    promptVersion,
     stateRuleVersion: '1',
     evaluatorVersions: Object.fromEntries(evaluators.map((e) => [e.id, e.version])),
   };

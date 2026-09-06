@@ -1,9 +1,13 @@
 import { loadSnapshot, pack } from './story-state/snapshot.js';
 import express from 'express';
+import multer from 'multer';
+import { referenceRoutes } from './reference/routes.js';
+import { knowledgeRoutes } from './knowledge/routes.js';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { z } from 'zod';
+import { resolveKnowledge, validateOpeningKnowledge } from './knowledge/library.js';
 import {
   openingSchema,
   projectInputSchema,
@@ -51,7 +55,9 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
     res.status(status).json({ data, requestId: res.locals.requestId });
   const key = (req: express.Request) => id.parse(req.get('idempotency-key'));
   const revision = z.number().int().nonnegative();
-  app.get('/api/v1/health', (_req, res) => send(res, { ready: true, schemaVersion: 2 }));
+  app.get('/api/v1/health', (_req, res) => send(res, { ready: true, schemaVersion: 3 }));
+  referenceRoutes(app, db, engine);
+  knowledgeRoutes(app, db, engine);
   app.get('/api/v1/session', (_req, res) => send(res, { token: localToken }));
   app.get('/api/v1/projects', async (req, res) => {
     const limit = Math.min(100, Number(req.query.limit) || 20);
@@ -127,6 +133,7 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
         '请等待当前任务结束',
         409,
       );
+      validateOpeningKnowledge(b.payload, await resolveKnowledge(tx, projectId));
       const a = await artifact(tx, projectId, 'OPENING', b.payload);
       await tx.project.update({ where: { id: projectId }, data: { revision: { increment: 1 } } });
       return a;
@@ -550,14 +557,16 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
       const e =
         error instanceof AppError
           ? error
-          : error instanceof z.ZodError
-            ? new AppError(
-                'VALIDATION_ERROR',
-                '输入格式不正确',
-                422,
-                error.issues.map((i) => ({ path: i.path, message: i.message })),
-              )
-            : new AppError('INTERNAL_ERROR', '操作未完成，请刷新后重试', 500);
+          : error instanceof multer.MulterError
+            ? new AppError('IMPORT_LIMIT', '上传超过20MiB或表单不符合限制', 413)
+            : error instanceof z.ZodError
+              ? new AppError(
+                  'VALIDATION_ERROR',
+                  '输入格式不正确',
+                  422,
+                  error.issues.map((i) => ({ path: i.path, message: i.message })),
+                )
+              : new AppError('INTERNAL_ERROR', '操作未完成，请刷新后重试', 500);
       res.status(e.status).json({
         error: { code: e.code, message: e.message, ...(e.details ? { details: e.details } : {}) },
         requestId: res.locals.requestId,

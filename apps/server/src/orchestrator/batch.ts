@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import type { Job } from '@prisma/client';
 import type { DB, Tx } from '../platform/db.js';
-import { asJson, requireThat, uuid } from '../platform/core.js';
+import { asJson, hash, requireThat, uuid } from '../platform/core.js';
 
 export const batchInputSchema = z.strictObject({
+  knowledge: z.json().optional(),
   mode: z.literal('GENERATE'),
   count: z.number().int().min(2).max(10),
   fromChapter: z.number().int().positive(),
@@ -13,6 +14,7 @@ export const batchInputSchema = z.strictObject({
 // A batch owns the project lock throughout every child and every scheduling gap.
 // Its frozen input never moves; successful child receipts describe its current base.
 export async function batchPosition(tx: Tx, parent: Job) {
+  requireThat(parent.projectId, 'INVALID_BATCH', '批次需要小说归属');
   const input = batchInputSchema.parse(parent.input);
   requireThat(
     input.endChapter === input.fromChapter + input.count - 1,
@@ -62,6 +64,7 @@ export async function batchPosition(tx: Tx, parent: Job) {
 export async function scheduleBatch(db: DB, parentId: string) {
   return db.$transaction(async (tx) => {
     const parent = await tx.job.findUniqueOrThrow({ where: { id: parentId } });
+    requireThat(parent.projectId, 'INVALID_BATCH', '批次需要小说归属');
     if (['PAUSED', 'CANCELLED'].includes(parent.status)) return;
     const owner = await tx.activeCommand.findUnique({ where: { projectId: parent.projectId } });
     requireThat(
@@ -92,7 +95,13 @@ export async function scheduleBatch(db: DB, parentId: string) {
         number: next,
         chainEpoch: parent.chainEpoch,
         baseSnapshotId: base,
-        input: { mode: 'GENERATE' },
+        input: asJson({
+          mode: 'GENERATE',
+          knowledge: (parent.input as { knowledge?: unknown }).knowledge || {
+            items: [],
+            hash: hash([]),
+          },
+        }),
         config: asJson(parent.config),
         artifactRefs: {},
       },
@@ -117,6 +126,7 @@ export async function scheduleBatch(db: DB, parentId: string) {
 }
 
 export async function retryBatch(tx: Tx, parent: Job) {
+  requireThat(parent.projectId, 'INVALID_BATCH', '批次需要小说归属');
   const { pending } = await batchPosition(tx, parent);
   if (pending) {
     requireThat(

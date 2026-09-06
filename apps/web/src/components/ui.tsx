@@ -55,6 +55,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <span>One2Novel</span>
         </Link>
         <span className="header-note">从一句灵感，写到下一章。</span>
+        <Link to="/library" className="text-link">参考与知识</Link>
         <Link to="/settings" className="text-link">
           <SettingsIcon size={17} />
           <span>模型设置</span>

@@ -21,10 +21,12 @@
     "@playwright/test": "^1.58.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.0.0",
+    "@types/yazl": "^3.3.1",
     "better-sqlite3": "^12.6.2",
     "prettier": "3.8.1",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "yazl": "^3.3.1"
   }
 }

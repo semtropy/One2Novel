@@ -35,7 +35,93 @@ export class FakeModel implements ModelGateway {
       goals: [],
       assumptions: [],
     });
-    if (r.prompt === 'planning.book') {
+    if (r.prompt === 'reference.chapter') {
+      const offset = x.primaryStart - x.inputStart,
+        primary = [...x.text].slice(offset).join('');
+      const position = primary.indexOf('陆砚'),
+        entityId = x.candidates.find((e: any) => e.name === '陆砚')?.id || uuid();
+      const quote = position >= 0 ? '陆砚' : [...primary].slice(0, 10).join('');
+      const start = x.primaryStart + (position >= 0 ? [...primary.slice(0, position)].length : 0);
+      const evidence = {
+        textVersionId: x.textVersionId,
+        start,
+        end: start + [...quote].length,
+        quote,
+      };
+      const eventId = uuid(),
+        emotion = { valence: 0, arousal: 2, label: '好奇' };
+      result = {
+        summary: '陆砚沿旧地图寻找钟楼，线索引出新的疑问。',
+        coverageNotes: '按测试样本完整覆盖本单元',
+        entities:
+          position >= 0
+            ? [
+                {
+                  id: entityId,
+                  kind: 'CHARACTER',
+                  name: '陆砚',
+                  aliases: [],
+                  description: '寻找钟楼的旅人',
+                  evidence: [evidence],
+                },
+              ]
+            : [],
+        scenes: [],
+        events: [
+          {
+            id: eventId,
+            actorIds: position >= 0 ? [entityId] : [],
+            action: '调查旧地图',
+            result: '发现新的线索',
+            evidence,
+            sceneId: null,
+            sequence: 0,
+          },
+        ],
+        beats: [
+          {
+            id: uuid(),
+            eventIds: [eventId],
+            function: 'REVEAL',
+            summary: '线索带来新的疑问',
+            intensity: 2,
+            emotionBefore: emotion,
+            emotionAfter: emotion,
+            evidence: [evidence],
+          },
+        ],
+        stateChanges: [],
+        hooks: [],
+        timeline: [],
+        promises: [],
+        unresolvedIdentities: [],
+      };
+    } else if (r.prompt === 'reference.aggregate') {
+      result = {
+        summary: '旅人逐步发现旧地图的秘密。',
+        unitIds: x.children.flatMap((c: any) => c.unitIds),
+      };
+    } else if (r.prompt === 'knowledge.adapt') {
+      const mapping = new Map<string, string>(x.source.assets.map((a: any) => [a.id, uuid()]));
+      result = {
+        stage: 'ADAPTED',
+        sourceVersionId: x.sourceVersionId,
+        adaptationBrief: x.adaptationBrief,
+        assets: x.source.assets.map((a: any) => ({
+          ...a,
+          id: mapping.get(a.id),
+          name: '星港' + a.name,
+          description: '在星港寻找失踪信使的新人物',
+          originAssetId: a.id,
+          relationAssetIds: a.relationAssetIds.map((id: string) => mapping.get(id)),
+        })),
+        mapping: x.source.assets.map((a: any) => ({
+          oldId: a.id,
+          newId: mapping.get(a.id),
+          changes: ['重设为星港背景与全新目标'],
+        })),
+      };
+    } else if (r.prompt === 'planning.book') {
       const state = emptyState(x.projectId, x.canonId),
         characterId = uuid(),
         locationId = uuid();
@@ -218,6 +304,24 @@ export class FakeModel implements ModelGateway {
         reason: '全部检查通过',
       };
     else result = 'OK';
+    if (
+      r.prompt === 'planning.book' &&
+      x.knowledge?.items.some((i: any) => i.kind === 'FRAMEWORK')
+    ) {
+      const o = result as Opening;
+      o.adaptationMap = x.knowledge.items
+        .filter((i: any) => i.kind === 'FRAMEWORK')
+        .flatMap((i: any) =>
+          i.payload.nodes
+            .slice(0, 1)
+            .map((n: any) => ({
+              sourceNodeId: n.id,
+              newPlanNodeId: o.book.id,
+              retainedFunction: n.function,
+              changedPremise: '将旧地图的线索结构改编为渡口来信',
+            })),
+        );
+    }
     return r.schema ? r.schema.parse(result) : (result as T);
   }
 }

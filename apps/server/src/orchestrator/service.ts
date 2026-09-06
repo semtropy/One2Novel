@@ -1,4 +1,11 @@
 import { commitChapter } from '../production/commit.js';
+import { runLibrary } from './library.js';
+import {
+  referenceTexts,
+  resolveKnowledge,
+  validateOpeningKnowledge,
+  type KnowledgeContext,
+} from '../knowledge/library.js';
 import { scheduleBatch, retryBatch, pauseBatch } from './batch.js';
 import { loadSnapshot, pack } from '../story-state/snapshot.js';
 import { z } from 'zod';
@@ -30,7 +37,7 @@ import {
 } from '../platform/core.js';
 import { freezeConfig, type FrozenConfig } from './config.js';
 import type { ModelGateway } from '../platform/llm.js';
-import type { PromptId } from '../platform/prompts.js';
+import { promptVersion, type PromptId } from '../platform/prompts.js';
 import { assumptionChecks, checkSpan, simulate, validateOpening } from '../story-state/service.js';
 import { validateBook, validateConstraints } from '../planning/service.js';
 import {
@@ -64,6 +71,7 @@ export class Orchestrator {
         },
       });
       await tx.activeCommand.deleteMany();
+      await tx.libraryCommand.deleteMany();
     });
   }
   start() {
@@ -173,6 +181,7 @@ export class Orchestrator {
           endChapter: p.headChapter + Number(input.count),
         };
       }
+      input = { ...input, knowledge: await resolveKnowledge(tx, projectId) };
       const job = await tx.job.create({
         data: {
           id: uuid(),
@@ -197,14 +206,48 @@ export class Orchestrator {
   }
   async retry(jobId: string, revision: number) {
     return this.db.$transaction(async (tx) => {
-      const j = await tx.job.findUniqueOrThrow({ where: { id: jobId } }),
-        p = await tx.project.findUniqueOrThrow({ where: { id: j.projectId } });
+      const j = await tx.job.findUniqueOrThrow({ where: { id: jobId } });
       requireThat(!j.parentId, 'BATCH_CONTROL_REQUIRED', '请通过所属批次恢复当前章节', 409);
       requireThat(j.revision === revision, 'REVISION_CONFLICT', '任务已变化', 409);
       requireThat(
         ['FAILED', 'INTERRUPTED', 'PAUSED'].includes(j.status),
         'INVALID_JOB_STATE',
         '此任务不能恢复',
+      );
+      if (!j.projectId) {
+        const input = j.input as { scope: string; itemId?: string; revision: number };
+        requireThat(
+          !(await tx.libraryCommand.findUnique({ where: { scope: input.scope } })),
+          'PROJECT_BUSY',
+          '该参考或知识已有活动任务',
+          409,
+        );
+        if (input.itemId)
+          requireThat(
+            (await tx.knowledgeItem.findUniqueOrThrow({ where: { id: input.itemId } })).revision ===
+              input.revision,
+            'STALE_INPUT',
+            '知识版本已修改，请创建新任务',
+            409,
+          );
+        await tx.libraryCommand.create({ data: { scope: input.scope, jobId } });
+        return tx.job.update({
+          where: { id: jobId },
+          data: {
+            status: 'QUEUED',
+            errorCode: null,
+            errorMessage: null,
+            revision: { increment: 1 },
+          },
+        });
+      }
+      const p = await tx.project.findUniqueOrThrow({ where: { id: j.projectId } });
+      const knowledge = (j.input as { knowledge?: KnowledgeContext }).knowledge;
+      requireThat(
+        !knowledge || knowledge.hash === (await resolveKnowledge(tx, p.id)).hash,
+        'STALE_INPUT',
+        '知识绑定已改变，请创建新任务',
+        409,
       );
       requireThat(
         !(await tx.activeCommand.findUnique({ where: { projectId: p.id } })),
@@ -267,7 +310,10 @@ export class Orchestrator {
           revision: { increment: 1 },
         },
       });
-      if (!running) await tx.activeCommand.deleteMany({ where: { jobId } });
+      if (!running) {
+        await tx.activeCommand.deleteMany({ where: { jobId } });
+        await tx.libraryCommand.deleteMany({ where: { jobId } });
+      }
       await tx.jobEvent.create({
         data: { jobId, type: 'progress', payload: { cancelRequested: true, status: v.status } },
       });
@@ -315,6 +361,7 @@ export class Orchestrator {
     });
   }
   private async saveArtifact(j: Job, key: string, payload: unknown) {
+    requireThat(j.projectId, 'INVALID_JOB', '产物需要小说归属');
     const a = await artifact(this.db, j.projectId, key, payload, j.baseSnapshotId, j.id);
     await this.saveRef(j.id, key, a.id);
     return a.id;
@@ -328,7 +375,7 @@ export class Orchestrator {
   ): Promise<T> {
     const config = j.config as unknown as FrozenConfig;
     requireThat(
-      config.promptVersion === '1' && config.stateRuleVersion === '1',
+      config.promptVersion === promptVersion && config.stateRuleVersion === '1',
       'CONFIG_VERSION_UNAVAILABLE',
       '任务引用旧实现版本，无法静默替换',
     );
@@ -386,7 +433,8 @@ export class Orchestrator {
       return;
     }
     try {
-      if (j.kind === 'BATCH') await scheduleBatch(this.db, j.id);
+      if (!j.projectId) await runLibrary(this.db, j, (...args) => this.call(...args));
+      else if (j.kind === 'BATCH') await scheduleBatch(this.db, j.id);
       else if (j.kind === 'OPENING') await this.opening(j);
       else await this.chapter(j);
     } catch (error) {
@@ -443,6 +491,7 @@ export class Orchestrator {
           });
         }
         await tx.activeCommand.deleteMany({ where: { jobId: j.parentId || j.id } });
+        await tx.libraryCommand.deleteMany({ where: { jobId: j.id } });
       });
       await this.emit(j.id, 'error', { code: e.code, message: e.message });
     } finally {
@@ -450,8 +499,13 @@ export class Orchestrator {
     }
   }
   private async opening(j: Job) {
+    requireThat(j.projectId, 'INVALID_JOB', '开书任务需要小说');
     await this.stage(j.id, 'OPENING');
     const project = await this.db.project.findUniqueOrThrow({ where: { id: j.projectId } });
+    const knowledge = (j.input as { knowledge?: KnowledgeContext }).knowledge || {
+      items: [],
+      hash: hash([]),
+    };
     const refs = j.artifactRefs as Refs;
     const canonId = uuid();
     let candidate = refs.OPENING
@@ -459,17 +513,23 @@ export class Orchestrator {
       : await this.call(
           j,
           'planning.book',
-          { project, projectId: project.id, canonId },
+          { project, projectId: project.id, canonId, knowledge },
           openingSchema,
         );
-    if (!refs.OPENING) candidate = remapProposal(candidate, new Set([project.id, canonId]));
+    if (!refs.OPENING)
+      candidate = remapProposal(
+        candidate,
+        identifiers({ projectId: project.id, canonId, knowledge }),
+      );
+    candidate.book.knowledgeVersionIds = knowledge.items.map((i) => i.versionId);
+    validateOpeningKnowledge(candidate, knowledge);
     validateOpening(candidate, project.id);
     validateBook(candidate, project.targetCount);
     const id = refs.OPENING || (await this.saveArtifact(j, 'OPENING', candidate));
     const validation = await this.call(
       j,
       'planning.validate',
-      { project, opening: candidate },
+      { project, opening: candidate, knowledge },
       planningValidationSchema,
     );
     await this.saveArtifact(j, 'OPENING_VALIDATION', validation);
@@ -485,7 +545,7 @@ export class Orchestrator {
         where: { id: j.id },
         data: { status: 'SUCCEEDED', stage: 'SUCCEEDED', revision: { increment: 1 } },
       });
-      await tx.activeCommand.delete({ where: { projectId: j.projectId } });
+      await tx.activeCommand.delete({ where: { projectId: project.id } });
     });
     await this.emit(j.id, 'done', { openingId: id });
   }
@@ -519,6 +579,8 @@ export class Orchestrator {
         409,
       );
       validateBook(opening, p.targetCount);
+      const currentKnowledge = await resolveKnowledge(tx, projectId);
+      validateOpeningKnowledge(opening, currentKnowledge);
       const state = opening.state;
       await tx.snapshot.create({
         data: {
@@ -553,6 +615,7 @@ export class Orchestrator {
     });
   }
   private async chapter(j: Job) {
+    requireThat(j.projectId, 'INVALID_JOB', '章节任务需要小说');
     const p = await this.db.project.findUniqueOrThrow({ where: { id: j.projectId } });
     requireThat(
       p.headSnapshotId === j.baseSnapshotId && p.chainEpoch === j.chainEpoch,
@@ -562,6 +625,15 @@ export class Orchestrator {
     );
     const base = await loadSnapshot(this.db, j.baseSnapshotId!, p.id),
       opening = await getArtifact<Opening>(this.db, p.openingId!, p.id);
+    const knowledge = (j.input as { knowledge?: KnowledgeContext }).knowledge || {
+      items: [],
+      hash: hash([]),
+    };
+    const knowledgeIds = knowledge.items.map((i) => i.versionId).sort();
+    const sourceTexts = await referenceTexts(this.db, knowledge);
+    const bannedPhrases = knowledge.items
+      .filter((i) => i.kind === 'STYLE')
+      .flatMap((i) => i.payload.bannedPhrases as string[]);
     let refs = { ...(j.artifactRefs as Refs) };
     const frozen = j.config as unknown as FrozenConfig,
       policy = validatePolicy(frozen.policy.payload);
@@ -589,6 +661,7 @@ export class Orchestrator {
         const parsed = rollingSchema.parse(window.payload);
         const remaining = parsed.chapters.filter(
           (c) =>
+            hash([...c.knowledgeVersionIds].sort()) === hash(knowledgeIds) &&
             c.chapterRange[0] >= n &&
             assumptionChecks(c, base.state, base.versions).every((a) => a.result === 'MATCH'),
         );
@@ -616,6 +689,7 @@ export class Orchestrator {
             baseSnapshotId: base.meta.id,
             requestedRange: [n, Math.min(n + 4, arcEnd)],
             targetLength: p.targetLength,
+            knowledge,
           },
           rollingSchema,
         );
@@ -626,6 +700,7 @@ export class Orchestrator {
             state: base.state,
             versions: base.versions,
             baseSnapshotId: base.meta.id,
+            knowledge,
           }),
         );
         requireThat(
@@ -656,6 +731,7 @@ export class Orchestrator {
           '卷/Arc范围错误',
         );
         for (const c of plans.chapters) {
+          c.knowledgeVersionIds = [...knowledgeIds];
           validateConstraints(c);
           for (const characterId of c.castIds) {
             requireThat(
@@ -711,7 +787,7 @@ export class Orchestrator {
         const validation = await this.call(
           j,
           'planning.validate',
-          { project: p, book: opening.book, plans, state: base.state },
+          { project: p, book: opening.book, plans, state: base.state, knowledge },
           planningValidationSchema,
         );
         await this.saveArtifact(j, 'PLAN_VALIDATION', validation);
@@ -771,7 +847,10 @@ export class Orchestrator {
       plan,
       ...resolveStateContext(plan, base.state, base.versions),
       recent: recent.slice(0, 2).map((c) => ({ id: c.id, text: c.text })),
-      style: '清晰、具体、少空泛修辞；以行动和对白承载信息。',
+      style:
+        knowledge.items.find((i) => i.kind === 'STYLE')?.payload ||
+        '清晰、具体、少空泛修辞；以行动和对白承载信息。',
+      knowledge,
       skills,
     };
     const contextId = refs.CONTEXT || (await this.saveArtifact(j, 'CONTEXT', context));
@@ -844,7 +923,8 @@ export class Orchestrator {
         content.text,
         content.id,
         plan,
-        recent.map((c) => c.text),
+        [...recent.map((c) => c.text), ...sourceTexts],
+        bannedPhrases,
       );
       hard.issues.push(...local);
       if (local.length) hard.score = 0;

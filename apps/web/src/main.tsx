@@ -8,6 +8,7 @@ import { Shelf } from './pages/Shelf';
 import { Workspace } from './pages/Workspace';
 import { SettingsPage } from './pages/Settings';
 import { Admin } from './pages/Admin';
+import { Library } from './pages/Library';
 import './styles.css';
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -18,6 +19,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/projects/:id" element={<Workspace />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/library" element={<Library />} />
           <Route
             path="*"
             element={
