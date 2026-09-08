@@ -1,3 +1,8 @@
+import { zipFiles, epubEntries } from '../fixtures/epub.js';
+import {
+  decodeUploadFilename,
+  referenceDisplayTitle,
+} from '../../apps/server/src/reference/filename.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -385,6 +390,83 @@ describe('参考 → 知识 → 新小说闭环', () => {
     expect(await db.libraryCommand.count()).toBe(0);
   }, 30000);
 
+  it('模型伪造引用豁免无效，只有用户授权引用可以通过重复门禁', async () => {
+    const quote =
+        '陆砚沿着旧街寻找钟楼，手里的地图边缘写满潮湿的暗号，他在石阶旁停下，听见远处钟声一下一下落进河面，又看见摆渡人留下的铜扣压住半封没有署名的信。信纸背面还有一排细小刻痕，像是有人故意把回程路线藏进潮水涨落的次序里。',
+      source = await imported(`第一章 引文\n${quote}\n\n第二章 收束\n陆砚确认地图来自渡口。`);
+    let job = await startAnalysis(source);
+    await done(job.id);
+    let detail = await request(`/references/${source.id}`);
+    await request(`/references/${source.id}/publish`, 'POST', {
+      analysisVersionId: detail.analyses[0].id,
+      expectedRevision: detail.revision,
+    });
+    detail = await request(`/references/${source.id}`);
+    const framework = await derived(detail.analyses[0].id, 'FRAMEWORK'),
+      sourceRef = {
+        kind: 'REFERENCE_ANALYSIS',
+        id: source.id,
+        versionId: detail.analyses[0].id,
+      };
+
+    let p = await project();
+    await request(`/projects/${p.id}/knowledge-bindings`, 'PUT', {
+      versionIds: [framework.activeVersionId],
+      expectedRevision: p.revision,
+    });
+    p = await db.project.findUniqueOrThrow({ where: { id: p.id } });
+    model.bodyPrefix = quote;
+    model.forgedAllowedQuotes = [{ text: quote, sourceRef }];
+    job = await engine.startJob(p.id, 'OPENING', p.revision, uuid());
+    job = await done(job.id);
+    await engine.confirmOpening(p.id, (job.artifactRefs as any).OPENING, p.revision, []);
+    p = await db.project.findUniqueOrThrow({ where: { id: p.id } });
+    job = await engine.startJob(p.id, 'CHAPTER', p.revision, uuid());
+    await engine.tick();
+    const failed = await db.job.findUniqueOrThrow({ where: { id: job.id } });
+    expect(failed.status).toBe('FAILED');
+    expect(failed.errorCode).toBe('BODY_REPAIR_EXHAUSTED');
+    const forgedPlan = await db.artifact.findFirstOrThrow({
+      where: { projectId: p.id, kind: 'PLAN', jobId: job.id },
+    });
+    expect((forgedPlan.payload as any).allowedQuotes).toEqual([]);
+
+    model.bodyPrefix = quote;
+    model.forgedAllowedQuotes = [{ text: quote, sourceRef }];
+    let allowed = await project();
+    await request(`/projects/${allowed.id}/knowledge-bindings`, 'PUT', {
+      versionIds: [framework.activeVersionId],
+      expectedRevision: allowed.revision,
+    });
+    allowed = await db.project.findUniqueOrThrow({ where: { id: allowed.id } });
+    await request(
+      `/projects/${allowed.id}/authorized-quotes`,
+      'POST',
+      {
+        expectedRevision: allowed.revision,
+        text: quote,
+        sourceRef,
+      },
+      201,
+    );
+    allowed = await db.project.findUniqueOrThrow({ where: { id: allowed.id } });
+    job = await engine.startJob(allowed.id, 'OPENING', allowed.revision, uuid());
+    job = await done(job.id);
+    await engine.confirmOpening(
+      allowed.id,
+      (job.artifactRefs as any).OPENING,
+      allowed.revision,
+      [],
+    );
+    allowed = await db.project.findUniqueOrThrow({ where: { id: allowed.id } });
+    job = await engine.startJob(allowed.id, 'CHAPTER', allowed.revision, uuid());
+    await done(job.id);
+    const authorizedPlan = await db.artifact.findFirstOrThrow({
+      where: { projectId: allowed.id, kind: 'PLAN', jobId: job.id },
+    });
+    expect((authorizedPlan.payload as any).allowedQuotes).toEqual([{ text: quote, sourceRef }]);
+  }, 30000);
+
   it('失败只保留已分析覆盖；不能发布PARTIAL；恢复不重复前单元且候选版本隔离', async () => {
     const source = await imported();
     const j = await startAnalysis(source);
@@ -523,5 +605,48 @@ describe('参考 → 知识 → 新小说闭环', () => {
     expect(a.units.reduce((n, u) => n + u.end - u.start, 0)).toBe([...text].length);
     expect(a.units[1].start - a.units[1].inputStart).toBe(300);
     await engine.cancel(j.id);
+  });
+});
+
+describe('中文上传文件名', () => {
+  it('中文EPUB名称正确落库，旧乱码列表/详情/重复导入兼容且不改变正文', async () => {
+    const filename = '我家老婆来自一千年前(花还没开).epub';
+    const buffer = await zipFiles(epubEntries);
+    const upload = () => {
+      const form = new FormData();
+      form.append(
+        'file',
+        new Blob([new Uint8Array(buffer)], { type: 'application/epub+zip' }),
+        filename,
+      );
+      return form;
+    };
+    const source = await request('/references', 'POST', upload(), 201);
+    expect(source.title).toBe(filename);
+    const stored = await db.referenceSource.findUniqueOrThrow({ where: { id: source.id } });
+    expect(stored.title).toBe(filename);
+    expect(stored.text).toContain('陆砚展开旧地图');
+    await db.referenceSource.update({
+      where: { id: source.id },
+      data: { title: Buffer.from(filename).toString('latin1') },
+    });
+    expect((await request('/references'))[0].title).toBe(filename);
+    expect((await request(`/references/${source.id}`)).title).toBe(filename);
+    const duplicate = await request('/references', 'POST', upload(), 201);
+    expect(duplicate.id).toBe(source.id);
+    expect(duplicate.title).toBe(filename);
+    const after = await db.referenceSource.findUniqueOrThrow({ where: { id: source.id } });
+    expect(after.textHash).toBe(stored.textHash);
+    expect(after.revision).toBe(stored.revision);
+  });
+  it('保留显式作品名，不重复解码正确中文或破坏西文文件名', async () => {
+    for (const name of ['正确中文.txt', 'café.txt', 'plain.txt', '小说🌙.epub']) {
+      expect(decodeUploadFilename(name)).toBe(name);
+      expect(referenceDisplayTitle(name)).toBe(name);
+    }
+    const form = new FormData();
+    form.append('file', new Blob([sample]), '中文参考.txt');
+    form.append('title', '自定义中文标题');
+    expect((await request('/references', 'POST', form, 201)).title).toBe('自定义中文标题');
   });
 });

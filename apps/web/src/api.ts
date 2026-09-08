@@ -36,6 +36,7 @@ export type Artifact = {
   payload: unknown;
   createdAt: string;
   jobId: string | null;
+  baseSnapshotId: string | null;
 };
 export type Content = { id: string; text: string; origin: string; createdAt: string };
 export type Chapter = {
@@ -50,6 +51,7 @@ export type Chapter = {
 };
 export type Job = {
   id: string;
+  projectId: string | null;
   kind: string;
   parentId: string | null;
   children?: Job[];
@@ -73,6 +75,7 @@ export type Job = {
   createdAt: string;
 };
 export type Project = {
+  activeBook?: import('@one2novel/contracts').Opening['book'] | null;
   id: string;
   title: string;
   idea: string;

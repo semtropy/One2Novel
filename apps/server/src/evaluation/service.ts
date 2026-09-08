@@ -98,8 +98,9 @@ export function deterministicIssues(
   body: string,
   contentId: string,
   plan: ChapterPlan,
-  recent: string[],
+  recent: (string | { text: string; textVersionId: string })[],
   bannedPhrases: string[] = [],
+  constraints: ChapterPlan['constraints'] = plan.constraints,
 ): Issue[] {
   const issues: Issue[] = [];
   const add = (ruleId: string, message: string) =>
@@ -122,7 +123,7 @@ export function deterministicIssues(
       'length',
       `正文 ${length} 字，应为 ${Math.ceil(plan.targetLength * 0.8)}～${Math.floor(plan.targetLength * 1.2)} 字`,
     );
-  for (const c of plan.constraints.filter((c) => c.severity === 'HARD' && c.kind === 'TEXT_RULE')) {
+  for (const c of constraints.filter((c) => c.severity === 'HARD' && c.kind === 'TEXT_RULE')) {
     const v = c.value as { rule: string; argument: unknown };
     if (v.rule === 'BANNED_PHRASE' && typeof v.argument === 'string' && body.includes(v.argument))
       add(c.id, `出现禁用词：${v.argument}`);
@@ -143,10 +144,34 @@ export function deterministicIssues(
     }
   const chars = [...body];
   outer: for (const prior of recent) {
+    const priorText = typeof prior === 'string' ? prior : prior.text;
     for (let i = 0; i + 80 <= chars.length; i++) {
       const fragment = chars.slice(i, i + 80).join('');
-      if (prior.includes(fragment) && !plan.allowedQuotes.some((q) => q.text.includes(fragment))) {
-        add('repeated-passage', '与既有正文或参考原文存在至少80字符连续重复');
+      const normalizedFragment = fragment.trim();
+      const authorized = plan.allowedQuotes.some(
+        (q) => q.text.includes(fragment) || q.text.includes(normalizedFragment),
+      );
+      const priorStart = priorText.indexOf(fragment);
+      if (priorStart >= 0 && !authorized) {
+        issues.push({
+          id: uuid(),
+          evaluatorId: 'core.hard-constraints',
+          severity: 'BLOCKER',
+          ruleId: 'repeated-passage',
+          message:
+            'Repeated passage overlaps existing prose or a reference source by at least 80 characters',
+          spans: [
+            { textVersionId: contentId, start: i, end: i + 80, quote: fragment },
+            {
+              textVersionId: typeof prior === 'string' ? contentId : prior.textVersionId,
+              start: priorStart,
+              end: priorStart + 80,
+              quote: fragment,
+            },
+          ],
+          relatedRefs: [{ kind: 'ChapterPlan', id: plan.id, versionId: plan.id }],
+          suggestion: 'Revise the prose, or authorize this quote from the referenced source',
+        });
         break outer;
       }
     }

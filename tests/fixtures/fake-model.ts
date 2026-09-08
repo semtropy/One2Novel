@@ -8,7 +8,10 @@ export class FakeModel implements ModelGateway {
   failAt: string | null = null;
   minor = false;
   invalidState = false;
+  flipFirstPropositionTruth = false;
   delay = 0;
+  forgedAllowedQuotes: ChapterPlan['allowedQuotes'] = [];
+  bodyPrefix = '';
   beforeCall?: (request: ModelRequest<any>) => Promise<void>;
   ready() {
     return true;
@@ -177,9 +180,11 @@ export class FakeModel implements ModelGateway {
         ...common('VOLUME', [1, x.project.targetCount], x.book.id),
         entrySituation: '收到线索',
         exitGoal: '抵达钟楼',
-        arcDirections: [
-          { order: 1, chapterRange: [1, Math.min(10, x.project.targetCount)], goal: '调查来信' },
-        ],
+        arcDirections: Array.from({ length: Math.ceil(x.project.targetCount / 10) }, (_, i) => ({
+          order: i + 1,
+          chapterRange: [i * 10 + 1, Math.min(i * 10 + 10, x.project.targetCount)],
+          goal: '调查来信',
+        })),
       };
       const start = Math.floor((x.requestedRange[0] - 1) / 10) * 10 + 1;
       const a = {
@@ -202,7 +207,7 @@ export class FakeModel implements ModelGateway {
           hook: { required: false, kind: null, question: null },
           promiseActions: [],
           targetLength: x.targetLength,
-          allowedQuotes: [],
+          allowedQuotes: this.forgedAllowedQuotes,
         })),
       };
     } else if (r.prompt === 'planning.validate') result = { violations: [], uncertain: [] };
@@ -211,7 +216,8 @@ export class FakeModel implements ModelGateway {
       const chars = Array.from({ length: c.targetLength }, (_, i) =>
         String.fromCodePoint(0x4e00 + ((c.chapterRange[0] * 521 + i) % 12000)),
       ).join('');
-      result = `林舟检查了桌上的旧钟。\n\n${chars.slice(0, c.targetLength - 11)}`;
+      const prefix = this.bodyPrefix || '林舟检查了桌上的旧钟。';
+      result = `${prefix}\n\n${chars.slice(0, Math.max(0, c.targetLength - [...prefix].length))}`;
       await r.onText?.(result as string);
     } else if (r.prompt === 'evaluation.run')
       result = {
@@ -237,7 +243,7 @@ export class FakeModel implements ModelGateway {
               : [],
           metrics: {},
           reason: '逐项检查通过',
-          checkedConstraintIds: [],
+          checkedConstraintIds: x.requiredConstraintIds || [],
           errorCode: null,
         })),
       };
@@ -246,6 +252,8 @@ export class FakeModel implements ModelGateway {
         eventId = uuid(),
         characterId = Object.keys(x.state.characters)[0],
         old = x.state.characters[characterId].conditions;
+      const assertions = [];
+      const changes = [];
       const change = {
         collection: 'characters' as const,
         key: characterId,
@@ -255,6 +263,45 @@ export class FakeModel implements ModelGateway {
         eventId,
         order: 0,
       };
+      changes.push(change);
+      const propositionId = Object.keys(x.state.propositions)[0];
+      if (this.flipFirstPropositionTruth && propositionId) {
+        const currentVersionId = x.state.propositions[propositionId].currentVersionId;
+        const propositionVersion = {
+          id: uuid(),
+          propositionId,
+          truth: 'FALSE' as const,
+          changeKind: 'WORLD_CHANGE' as const,
+          effectiveAtEventId: { kind: 'CONTENT' as const, id: eventId },
+          recordedAtEventId: { kind: 'CONTENT' as const, id: eventId },
+          supersedesVersionId: currentVersionId,
+          correctsVersionId: null,
+          evidence: [
+            {
+              origin: 'CONTENT' as const,
+              sourceVersionId: contentId,
+              span: {
+                textVersionId: contentId,
+                start: 0,
+                end: 11,
+                quote: [...x.text].slice(0, 11).join(''),
+              },
+              assertion: 'EXPLICIT_NARRATION' as const,
+              note: '故障注入：改写命题真值',
+            },
+          ],
+        };
+        assertions.push(propositionVersion);
+        changes.push({
+          collection: 'propositions' as const,
+          key: propositionId,
+          operation: 'SET_FIELDS' as const,
+          expected: { currentVersionId },
+          values: { currentVersionId: propositionVersion.id },
+          eventId,
+          order: 1,
+        });
+      }
       const e = {
         id: eventId,
         contentVersionId: contentId,
@@ -276,8 +323,8 @@ export class FakeModel implements ModelGateway {
             note: '检查动作',
           },
         ],
-        assertions: [],
-        proposedChanges: [change],
+        assertions,
+        proposedChanges: changes,
       };
       result = {
         events: [e],
@@ -285,8 +332,8 @@ export class FakeModel implements ModelGateway {
           baseSnapshotId: x.baseSnapshotId,
           contentVersionId: contentId,
           eventIds: [eventId],
-          changes: [change],
-          propositionVersions: [],
+          changes,
+          propositionVersions: assertions,
           stateRuleVersion: '1',
         },
       };
@@ -312,14 +359,12 @@ export class FakeModel implements ModelGateway {
       o.adaptationMap = x.knowledge.items
         .filter((i: any) => i.kind === 'FRAMEWORK')
         .flatMap((i: any) =>
-          i.payload.nodes
-            .slice(0, 1)
-            .map((n: any) => ({
-              sourceNodeId: n.id,
-              newPlanNodeId: o.book.id,
-              retainedFunction: n.function,
-              changedPremise: '将旧地图的线索结构改编为渡口来信',
-            })),
+          i.payload.nodes.slice(0, 1).map((n: any) => ({
+            sourceNodeId: n.id,
+            newPlanNodeId: o.book.id,
+            retainedFunction: n.function,
+            changedPremise: '将旧地图的线索结构改编为渡口来信',
+          })),
         );
     }
     return r.schema ? r.schema.parse(result) : (result as T);

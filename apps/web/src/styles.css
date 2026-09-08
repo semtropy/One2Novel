@@ -1078,6 +1078,51 @@ pre {
   height: 6px;
   accent-color: #334d70;
 }
+.writing-knowledge-form,
+.project-fields {
+  border: 0;
+  padding: 0;
+  margin: 16px 0;
+  min-width: 0;
+}
+.writing-knowledge-form legend {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.writing-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.writing-knowledge-form textarea,
+.library-detail .writing-knowledge-form textarea {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.writing-knowledge-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+.knowledge-cards article {
+  border-bottom: 1px solid #e3e8ee;
+  padding: 16px 0;
+}
+.knowledge-cards blockquote {
+  margin: 12px 0;
+  padding-left: 14px;
+  border-left: 2px solid #334d70;
+  color: #617084;
+}
+@media (max-width: 640px) {
+  .writing-form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
 .source-chapters {
   max-height: 240px;
   overflow: auto;

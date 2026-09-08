@@ -4,7 +4,10 @@ import type { DB, Tx } from '../platform/db.js';
 import { asJson, hash, requireThat, uuid } from '../platform/core.js';
 
 export const batchInputSchema = z.strictObject({
+  planRevision: z.number().int().nonnegative().optional(),
+  openingId: z.string().uuid().nullable().optional(),
   knowledge: z.json().optional(),
+  authorizedQuotes: z.json().optional(),
   mode: z.literal('GENERATE'),
   count: z.number().int().min(2).max(10),
   fromChapter: z.number().int().positive(),
@@ -50,7 +53,10 @@ export async function batchPosition(tx: Tx, parent: Job) {
     next++;
   }
   requireThat(
-    p.chainEpoch === parent.chainEpoch &&
+    (input.planRevision === undefined
+      ? p.planRevision === 0
+      : input.planRevision === p.planRevision) &&
+      p.chainEpoch === parent.chainEpoch &&
       p.headSnapshotId === base &&
       p.headChapter === next - 1 &&
       p.targetCount >= input.endChapter,
@@ -96,8 +102,16 @@ export async function scheduleBatch(db: DB, parentId: string) {
         chainEpoch: parent.chainEpoch,
         baseSnapshotId: base,
         input: asJson({
+          ...(input.planRevision !== undefined ? { planRevision: input.planRevision } : {}),
           mode: 'GENERATE',
+          ...('openingId' in (parent.input as object)
+            ? { openingId: (parent.input as { openingId: string | null }).openingId }
+            : {}),
           knowledge: (parent.input as { knowledge?: unknown }).knowledge || {
+            items: [],
+            hash: hash([]),
+          },
+          authorizedQuotes: (parent.input as { authorizedQuotes?: unknown }).authorizedQuotes || {
             items: [],
             hash: hash([]),
           },
@@ -130,7 +144,7 @@ export async function retryBatch(tx: Tx, parent: Job) {
   const { pending } = await batchPosition(tx, parent);
   if (pending) {
     requireThat(
-      ['FAILED', 'INTERRUPTED', 'PAUSED'].includes(pending.status),
+      ['FAILED', 'INTERRUPTED', 'PAUSED', 'WAITING_USER'].includes(pending.status),
       'INVALID_JOB_STATE',
       '当前子任务不可恢复',
       409,
@@ -174,7 +188,7 @@ export async function pauseBatch(db: DB, jobId: string, revision: number) {
   return db.$transaction(async (tx) => {
     const j = await tx.job.findUniqueOrThrow({ where: { id: jobId } });
     requireThat(
-      j.kind === 'BATCH' && j.revision === revision,
+      j.kind === 'BATCH' && revision <= j.revision,
       'REVISION_CONFLICT',
       '批次已变化，请刷新',
       409,

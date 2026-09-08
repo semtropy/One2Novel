@@ -1,5 +1,6 @@
 import {
   collections,
+  id,
   stateSchema,
   extractionSchema,
   type StoryState,
@@ -234,7 +235,7 @@ export function simulate(
   body: string,
   contentId: string,
   existing: VersionMap = {},
-  revivalAllowed = false,
+  revivalAllowed: boolean | ReadonlySet<number> = false,
 ): StoryState {
   const x = extractionSchema.parse(raw),
     d = x.delta;
@@ -395,7 +396,14 @@ export function simulate(
           requireThat(next.status !== 'UNKNOWN', 'INVALID_TRANSITION', '已成立组织不能退回未知');
         if (c.collection === 'characters' && old.life === 'DEAD' && next.life === 'ALIVE')
           requireThat(
-            revivalAllowed && Object.values(s.worldRules).some((r) => r.active),
+            (revivalAllowed === true ||
+              (typeof revivalAllowed !== 'boolean' &&
+                revivalAllowed.has(
+                  d.changes.findIndex(
+                    (change) => change.eventId === c.eventId && change.order === c.order,
+                  ),
+                ))) &&
+              Object.values(s.worldRules).some((r) => r.active),
             'ILLEGAL_REVIVAL',
             '复活须有世界许可和独立验证',
           );
@@ -438,8 +446,27 @@ export function assumptionChecks(
   s: StoryState,
   versions: VersionMap,
 ) {
+  const ids = new Set<string>();
   return plan.assumptions.map((a) => {
     const { collection, key, field } = a.selector;
+    requireThat(!ids.has(a.id), 'INVALID_ASSUMPTION', '计划前提 ID 不可重复');
+    ids.add(a.id);
+    requireThat(
+      Object.hasOwn(collections, collection) &&
+        (Object.hasOwn(collections[collection as keyof typeof collections].shape, field) ||
+          (collection === 'propositions' && field === 'currentTruth')) &&
+        (collection === 'knowledge'
+          ? key.split(':').length === 2 &&
+            key.split(':').every((part) => id.safeParse(part).success)
+          : id.safeParse(key).success),
+      'INVALID_ASSUMPTION',
+      `计划前提选择器无效：${a.reason}`,
+    );
+    requireThat(
+      a.operator !== 'EXISTS' || typeof a.expected === 'boolean',
+      'INVALID_ASSUMPTION',
+      'EXISTS 前提的期望值必须是布尔值',
+    );
     let row: unknown =
       collection === 'knowledge'
         ? s.knowledge.find((k) => `${k.characterId}:${k.propositionId}` === key)
@@ -447,18 +474,24 @@ export function assumptionChecks(
     let actual = (row as Record<string, unknown> | undefined)?.[field];
     if (collection === 'propositions' && field === 'currentTruth')
       actual = versions[s.propositions[key]?.currentVersionId || '']?.truth;
-    const known = actual !== undefined && actual !== null;
+    const known = actual !== undefined;
     let matches = false;
-    if (a.operator === 'EXISTS') matches = known === a.expected;
+    if (a.operator === 'EXISTS') matches = (known && actual !== null) === a.expected;
     else if (known) {
       if (a.operator === 'EQUALS') matches = canonical(actual) === canonical(a.expected);
       if (a.operator === 'NOT_EQUALS') matches = canonical(actual) !== canonical(a.expected);
-      if (a.operator === 'CONTAINS')
+      if (a.operator === 'CONTAINS') {
+        requireThat(
+          Array.isArray(actual) || (typeof actual === 'string' && typeof a.expected === 'string'),
+          'INVALID_ASSUMPTION',
+          'CONTAINS 前提需要数组或字符串及匹配的期望类型',
+        );
         matches = Array.isArray(actual)
           ? actual.some((x) => canonical(x) === canonical(a.expected))
           : typeof actual === 'string' &&
             typeof a.expected === 'string' &&
             actual.includes(a.expected);
+      }
     }
     return {
       assumptionId: a.id,

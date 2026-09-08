@@ -6,8 +6,30 @@ import { defaultPolicy, validatePolicy, evaluators } from '../evaluation/service
 import { defaultSkills, skillDefinitions } from '../knowledge/service.js';
 export const defaultSettings: Settings = {
   baseUrl: 'https://api.chatanywhere.tech/v1',
-  profiles: [],
-  roleMappings: { planner: '', writer: '', reviewer: '', extractor: '', repairer: '' },
+  profiles: process.env.ONE2NOVEL_DEFAULT_MODEL
+    ? [
+        {
+          id: 'default',
+          name: '默认模型',
+          model: process.env.ONE2NOVEL_DEFAULT_MODEL,
+          contextWindow: 1000000,
+          maxOutput: 8192,
+          outputTokenParam: 'max_tokens',
+          supportsTemperature: false,
+          structuredMode: 'TEXT_JSON',
+          streaming: false,
+        },
+      ]
+    : [],
+  roleMappings: process.env.ONE2NOVEL_DEFAULT_MODEL
+    ? {
+        planner: 'default',
+        writer: 'default',
+        reviewer: 'default',
+        extractor: 'default',
+        repairer: 'default',
+      }
+    : { planner: '', writer: '', reviewer: '', extractor: '', repairer: '' },
 };
 export async function seedConfig(db: DB) {
   for (const [kind, payload] of Object.entries({

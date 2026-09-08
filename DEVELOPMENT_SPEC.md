@@ -1,19 +1,35 @@
 # One2Novel V2 开发细则（默认设计版）
 
-> 版本：0.2，2026-09-05。本文是供用户直接手动修改的完整默认设计，不再逐轮问答。
-> 字段、算法、阈值、接口均是待实现规范，不代表当前已有功能或模型效果已实测。
-> 实施对照（2026-09-06）：MVP、P5、P6实际交付以README和对应验收记录为准。参考导入、完整分析、知识改编/发布与小说生产已打通；当前存储、确定性框架派生、人工身份确认方式及暂缓项见 [P6_ACCEPTANCE.md](docs/P6_ACCEPTANCE.md)。下文完整V2目标保留，不把尚未交付项改写为已实现。
-> 原 D-001～D-003 问题由本版默认设计替代，不再等待回答。本文完成不自动启动业务开发。
+> 完整设计基线：0.2；文档收敛：2026-09-08。本文是唯一完整 V2 规范，供用户直接手动修改，不再逐轮问答。
+> 字段、算法、阈值、接口描述目标行为，不代表全部已有实现或模型效果已实测。当前交付、差距与最新验收只记录在 [REMAINING_WORK.md](REMAINING_WORK.md)，运行和操作见 [README.md](README.md)。
+> 原 PRD 的业务范围与技术方案的有效约束已归入本文；两份原文及阶段验收已归档，仅供历史追溯，不再作为并列规范。保留原章节号、默认决策和 T01～T49 验收编号。
 
 ## 0. 如何阅读和修改
 
 **用户明确要求**：个人使用、仅 Web、简洁纯白、从零重写、不照搬旧代码、不迁移旧数据、所有模型服务通过 ChatAnyWhere。
 
-**PRD 不变量**：八个领域；知识/计划/事实分离；单本串行；只有 PASS 且状态原子提交成功才完成章节；核心对象版本化。
+**当前交付优先级（用户最新要求）**：先完成参考书解析与小说写作的可用闭环，版本管理扩展后置。文字风格、章节模板默认使用中文字段、选项和普通文本输入，不要求用户读写JSON；开书方案的故事方向、分卷目标和开篇介绍同样提供中文表单；参考产物默认可读展示，结构化原始内容只作高级入口。此顺序不取消审核、知识隔离、原子提交或完整V2剩余范围。
+
+**产品不变量**：八个领域；知识/计划/事实分离；单本串行；只有 PASS 且状态原子提交成功才完成章节；核心对象版本化。
 
 除以上约束外，本文具体选择均为**可修改的默认设计**。建议优先修改第1节参数、第5节规划、第6节事实、第8节审核、第11节重写，修改时同步相关伪代码和验收案例。
 
-优先级：用户最新要求 → 用户对本文的最新修改 → PRD 不变量 → 本文默认细则 → TECHNICAL_PLAN 概要。手工修改若与 PRD 不变量冲突，实际开发前列出冲突，不静默选择。旧代码和旧 CLAUDE.md 没有规范效力。
+优先级：用户最新要求 → 用户对本文的最新修改 → 本节产品不变量 → 本文默认细则。现状清单和 README 不反向覆盖需求；若发现实现差异，记录差距或同步明确修订本文，不能把“已经这样实现”视为需求自动变更。归档文档、旧代码和旧 CLAUDE.md 没有当前规范效力。
+
+完整产品目标是从一句灵感开始，借助可选参考作品与知识、四级滚动规划、正文编辑、强制审核和事实提交，持续创作可追溯的中文长篇小说。首个两章闭环只是阶段交付，不缩小完整 V2 的范围。
+
+| 领域 | 责任与边界 | 本文位置 |
+| --- | --- | --- |
+| Reference | 完整导入、切分、理解和聚合外部作品；不直接生成新小说 | §3 |
+| Knowledge | 版本化 Framework、Raw/Clean/Adapted Asset Pack、Style、Template 和内部 Skill；不属于本书事实 | §4 |
+| Planning | Book → Volume → Arc → Chapter 描述未来；应用参考结构和改编素材，维护前提、依赖与义务 | §5 |
+| Production | 从计划、当前事实和固定知识组装上下文，生成、编辑和修正文；RAG 是其检索机制 | §7 |
+| Story State | Canon、实体状态、命题/角色认知、事件、时间线、Promise、冲突、目标及受控 Custom；不接受计划直接写入 | §6 |
+| Evaluation | 可注册审核器与冻结策略，required 及 Core 门禁；结果仅 PASS/FAIL | §8 |
+| Orchestrator | 阶段转移、串行执行资格、预算、取消、恢复与原子提交协调，不替代领域规则 | §9 |
+| Platform | ChatAnyWhere、数据库、存储、任务、检索、缓存、配置和可观察性；不反向依赖业务 | §10、§13 |
+
+主链为：参考解析 → 可选知识发布/绑定 → 确认 Book 与初始事实 → 逐章规划/写作/审核 → 不可变候选 → 事件与 Delta 验证 → 唯一原子提交 → 下一章。任何失败停留在已提交事实；修复正文后必须重新审核和抽取。八个领域是服务端边界，不是八个独立服务或导航项。
 
 目录：1 默认决策；2 通用类型；3 Reference；4 Knowledge；5 Planning；6 Story State；7 Context/Production；8 Evaluation；9 Orchestrator；10 Platform；11 重写与数据管理；12 API/Web；13 工程与数据库；14 开发验收；15 风险与核对。
 
@@ -890,7 +906,7 @@ writeNext(job):
     atomicCommit(job,candidate,evaluation,events,delta,simulation,semantic)
 ```
 
-PRD的“Commit Content”解释为持久化不可变候选，不提前设置active。所有长调用在事务外；外部副作用只有模型费用，不能回滚，必须记录。
+“Commit Content”在最终事务前仅表示持久化不可变候选，不提前设置active。所有长调用在事务外；外部副作用只有模型费用，不能回滚，必须记录。
 
 ### 9.4 唯一最终提交
 
@@ -1199,7 +1215,9 @@ GET Job的generationSnapshot为`{attemptId,text,complete,codePointLength}`或nul
 
 ### 13.1 技术基线
 
-采用TECHNICAL_PLAN的Node24、TS5.9、pnpm10、React19、Vite7、Router7、Tailwind3、TipTap2、TanStackQuery5、Express5、Zod4、Prisma7/SQLite、openai SDK、Vitest/Playwright。P1选择这些主版本内兼容补丁并生成全新lockfile；不复制旧依赖。原生模块安装/迁移/构建须在Windows验证，不能声称旧项目能运行就等于新基线能运行。
+技术基线为Node24、TS5.9、pnpm10、React19、Vite7、Router7、Tailwind3、TipTap2、TanStackQuery5、Express5、Zod4、Prisma7/SQLite、openai SDK、Vitest/Playwright。选择这些主版本内兼容补丁，实际依赖以当前全新生成的lockfile为准；Prisma CLI/client/adapter保持同版本，不复制旧依赖。原生模块安装/迁移/构建须在Windows验证，不能声称旧项目能运行就等于新基线能运行。
+
+采用单进程Express、SQLite持久化Job和同进程Worker，不引入Redis/BullMQ、独立向量数据库、LangChain或多厂商SDK。前端局部编辑状态与TanStack Query分工，不增加无业务需求的全局状态框架。白底、灰阶、细边框和一个强调色，正文编辑优先；不开发Electron、账户/多租户/协作/支付、任意插件或代码上传后台。
 
 只绑定127.0.0.1，生产7456，开发前端7457、后端7456，Vite代理/api；生产Express托管静态文件。默认无登录，拒绝不匹配Host及跨站Origin写入；无Origin写请求仅接受带应用启动时生成会话令牌的本机客户端，令牌由同源初始化接口下发、不写日志。开放公网不属于本设计。
 
@@ -1256,7 +1274,7 @@ HTTP只验证和派发用例；Orchestrator调领域，领域不反向调编排�
 
 ## 14. 可按顺序执行的开发任务与验收
 
-本次只写文档，下表为后续开发任务。每阶段只在前置阶段通过后推进；开发中发现本文矛盾应修正文档，不擅自用旧实现补空白。
+下表定义完整 V2 的阶段与验收依赖；不是当前进度表。已有交付继续增量补齐，当前执行顺序和欠项只查 [REMAINING_WORK.md](REMAINING_WORK.md)。每项先满足前置能力，发现规范矛盾时同步修正文档，不擅自用旧实现补空白。
 
 | 顺序 | 任务与前置定义 | 产出 | 必须通过 |
 | --- | --- | --- | --- |
@@ -1271,7 +1289,7 @@ HTTP只验证和派发用例；Orchestrator调领域，领域不反向调编排�
 | P7 | 长篇检索；第7/10节 | 中文BM25、摘要、可选Embedding、状态检索优化 | T32～T34；不改变已实现事实语义 |
 | P8 | 收尾；第11/12/15节 | 备份恢复、回收站、可用性、说明与基准 | T35～T38；可从新环境复现 |
 
-调整原技术方案：P2即定义全部Story State schema和转换约束，P7仅做长篇检索和性能优化，不把事实正确性推迟到后期。P3使用系统默认Knowledge，P6才实现用户可导入的参考/知识工作台。
+P2即定义全部Story State schema和转换约束，P7仅做长篇检索和性能优化，不把事实正确性推迟到后期。P3使用系统默认Knowledge，P6实现用户可导入的参考/知识工作台。
 
 ### 14.1 验收用例（Given / When / Then）
 
@@ -1343,9 +1361,9 @@ HTTP只验证和派发用例；Orchestrator调领域，领域不反向调编排�
 
 ### 15.2 旧实现参考
 
-归档根：`C:/Users/gaijinchao/Desktop/code/tmp/One2Novel-legacy-20260905-124250/workspace`。
+旧实现归档根：`C:/Users/gaijinchao/Desktop/code/tmp/One2Novel-legacy-20260905-124250/workspace`；清单位于父目录的`archive-manifest.json`。这与仓库内的`docs/archive/`历史文档目录不同。
 
-仅带着具体问题参考：`server/src/platform/llm/contextSelection.ts`（预算教训）、`server/src/modules/novel/planning/referenceDeepAnalysis/`（切分经验）、`server/src/modules/novel/production/quality/qualityGate.ts`（审核领域）、`client/src/components/workspace/ChapterEditor.tsx`（编辑体验）。其他位置见TECHNICAL_PLAN第11节。
+仅带着具体问题参考：`server/src/platform/llm/contextSelection.ts`（预算教训）、`server/src/modules/novel/planning/referenceDeepAnalysis/`（切分经验）、`server/src/modules/novel/production/quality/qualityGate.ts`（审核领域）、`client/src/components/workspace/ChapterEditor.tsx`（编辑体验）。其他精确位置与归档校验历史保留在 [原技术方案第11节](docs/archive/TECHNICAL_PLAN.md#11-可供定点参考的旧代码位置)，不自动扫描整个旧项目来补需求。
 
 禁止复制函数/文件/Prompt/schema/测试后改名；禁止从归档导入模块、复制数据库/密钥、运行旧服务作为新系统的验收。旧chapterPipeline、commit投影、Director仅作反例，不作模板。
 
@@ -1353,7 +1371,7 @@ HTTP只验证和派发用例；Orchestrator调领域，领域不反向调编排�
 
 ```text
 readyForImplementation(spec):
-    require all eight PRD domains mapped to sections and tasks
+    require all eight product domains mapped to sections and tasks
     require every state has allowed transitions and error outcome
     require every model task has input/output/validation/failure contract
     require candidate/active/working draft never ambiguous
@@ -1363,6 +1381,6 @@ readyForImplementation(spec):
     require no unresolved placeholder business function hides an undefined policy
 ```
 
-本文默认设计用于人工修改后的执行起点；不保留“待逐轮问答”的流程要求。用户修改后开发者先核对相关章节一致性，再开始所请求阶段，不因为本文完成而自行开发应用。
+本文默认设计用于人工修改后的执行起点，不保留“待逐轮问答”的流程要求。用户修改后先核对相关章节一致性，再执行所请求的开发范围；单纯文档完成不自动扩大任务。完整 V2 的实现和验收结果维护在剩余清单，不在本文重复写逐轮进展。
 
 技术事实参考：[ChatAnyWhere官方说明](https://github.com/chatanywhere/GPT_API_free)、[官方Chat Completions示例](https://github.com/chatanywhere/GPT_API_free/blob/main/demo/openai_chat_completion_demo.py)、[SQLite适用场景](https://www.sqlite.org/whentouse.html)、[Prisma 7 migration](https://docs.prisma.io/docs/cli/v7/migrate)。协议地址已有前轮公共资料核对；本轮未调用真实模型。

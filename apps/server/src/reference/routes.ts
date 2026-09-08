@@ -8,6 +8,7 @@ import { asJson, hash, requireThat, uuid } from '../platform/core.js';
 import { parseImport, UPLOAD_LIMIT, validateSplit } from './import.js';
 import { startLibrary } from '../orchestrator/library-commands.js';
 import { resolveIdentities } from './resolve.js';
+import { decodeUploadFilename, referenceDisplayTitle } from './filename.js';
 
 export function referenceRoutes(app: Express, db: DB, engine: Orchestrator) {
   const send = (res: Response, data: unknown, status = 200) =>
@@ -28,7 +29,12 @@ export function referenceRoutes(app: Express, db: DB, engine: Orchestrator) {
     send(res, await resolveIdentities(db, id.parse(req.params.id), req.body), 201),
   );
   app.get('/api/v1/references', async (_req, res) =>
-    send(res, await db.referenceSource.findMany({ select: meta, orderBy: { createdAt: 'desc' } })),
+    send(
+      res,
+      (await db.referenceSource.findMany({ select: meta, orderBy: { createdAt: 'desc' } })).map(
+        (source) => ({ ...source, title: referenceDisplayTitle(source.title) }),
+      ),
+    ),
   );
   app.post(
     '/api/v1/references',
@@ -39,7 +45,8 @@ export function referenceRoutes(app: Express, db: DB, engine: Orchestrator) {
     async (req, res) => {
       requireThat(req.file, 'INVALID_FORMAT', '请选择TXT或EPUB文件');
       const encoding = z.enum(['UTF8', 'GB18030']).parse(req.body.encoding || 'UTF8');
-      const parsed = await parseImport(req.file.buffer, req.file.originalname, encoding);
+      const filename = decodeUploadFilename(req.file.originalname);
+      const parsed = await parseImport(req.file.buffer, filename, encoding);
       const result = await db.$transaction(async (tx) => {
         const duplicate = await tx.referenceSource.findUnique({
           where: { originalHash: parsed.originalHash },
@@ -52,7 +59,7 @@ export function referenceRoutes(app: Express, db: DB, engine: Orchestrator) {
             title: text
               .min(1)
               .max(200)
-              .parse(req.body.title || req.file!.originalname),
+              .parse(req.body.title || filename),
             originalHash: parsed.originalHash,
             original: new Uint8Array(req.file!.buffer),
             format: parsed.format,
@@ -72,7 +79,7 @@ export function referenceRoutes(app: Express, db: DB, engine: Orchestrator) {
         });
         return tx.referenceSource.findUniqueOrThrow({ where: { id: source.id }, select: meta });
       });
-      send(res, result, 201);
+      send(res, { ...result, title: referenceDisplayTitle(result.title) }, 201);
     },
   );
   app.get('/api/v1/references/:id', async (req, res) => {
@@ -90,7 +97,7 @@ export function referenceRoutes(app: Express, db: DB, engine: Orchestrator) {
     const jobs = await db.job.findMany({
       where: { id: { in: source.analyses.map((a) => a.jobId) } },
     });
-    send(res, { ...source, jobs });
+    send(res, { ...source, title: referenceDisplayTitle(source.title), jobs });
   });
   app.get('/api/v1/references/:id/text', async (req, res) => {
     const source = await db.referenceSource.findUniqueOrThrow({

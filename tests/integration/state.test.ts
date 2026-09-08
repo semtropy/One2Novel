@@ -9,6 +9,36 @@ import { uuid } from '../../apps/server/src/platform/core.js';
 import { gate, defaultPolicy, validatePolicy } from '../../apps/server/src/evaluation/service.js';
 import type { PropositionVersion, Extraction } from '@one2novel/contracts';
 describe('事实与角色观察', () => {
+  it('前提区分已知null与缺失，并拒绝非法选择器及运算类型', () => {
+    const s = emptyState(uuid(), uuid()),
+      key = uuid();
+    s.characters[key] = {
+      life: 'ALIVE',
+      locationId: null,
+      conditions: [],
+      abilityIds: [],
+      organizationIds: [],
+    };
+    const a = {
+      id: uuid(),
+      selector: { collection: 'characters', key, field: 'locationId' },
+      operator: 'EQUALS' as const,
+      expected: null,
+      importance: 'HARD' as const,
+      reason: '位置前提',
+      basedOnSnapshotId: null,
+    };
+    const check = (change: Record<string, unknown> = {}) =>
+      assumptionChecks({ assumptions: [{ ...a, ...change } as any] }, s, {})[0];
+    expect(check().result).toBe('MATCH');
+    expect(check({ selector: { ...a.selector, key: uuid() } }).result).toBe('UNKNOWN');
+    expect(check({ operator: 'EXISTS', expected: false }).result).toBe('MATCH');
+    expect(() => check({ operator: 'EXISTS', expected: 'false' })).toThrow();
+    expect(() => check({ selector: { ...a.selector, field: '__proto__' } })).toThrow();
+    expect(() => check({ selector: { ...a.selector, collection: 'constructor' } })).toThrow();
+    expect(() => check({ operator: 'CONTAINS', expected: 'x' })).toThrow();
+    expect(() => assumptionChecks({ assumptions: [a, a] }, s, {})).toThrow();
+  });
   it('世界从门开变门关后，角色仍保留旧TRUE观察版本', () => {
     const project = uuid(),
       canon = uuid(),

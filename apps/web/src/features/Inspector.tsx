@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Check, AlertCircle, LoaderCircle, Square, RotateCcw } from 'lucide-react';
-import { stageLabels, type EvaluatorResult, type StoryState } from '@one2novel/contracts';
+import {
+  stageLabels,
+  type EvaluatorResult,
+  type StoryState,
+  type JobRecovery,
+} from '@one2novel/contracts';
 import { api, active, type Artifact, type Project, type Job } from '../api';
 import { ErrorBox } from '../components/ui';
 export function PlanView({ artifact }: { artifact: Artifact }) {
@@ -128,16 +133,32 @@ export function StateView({ project: p }: { project: Project }) {
 export function JobPanel({
   job,
   onAction,
+  onViewCandidate,
+  onRestart,
 }: {
   job?: Job;
   onAction: (f: () => Promise<unknown>) => Promise<void>;
+  onViewCandidate?: (number: number, contentId: string) => void;
+  onRestart?: () => Promise<unknown>;
 }) {
+  const recovery = useQuery({
+    queryKey: [
+      'job-recovery',
+      job?.id,
+      job?.revision,
+      job?.children?.map((c) => c.revision).join(':'),
+    ],
+    queryFn: () => api<JobRecovery>(`/jobs/${job!.id}/recovery`),
+    enabled:
+      !!job?.projectId && ['PAUSED', 'FAILED', 'INTERRUPTED', 'WAITING_USER'].includes(job.status),
+    refetchInterval: 2000,
+  });
   if (!job) return null;
   const isBatch = job.kind === 'BATCH',
     children = job.children || [],
     child = children.find((j) => j.status !== 'SUCCEEDED'),
     budgetJob = isBatch ? child : job,
-    resumable = ['PAUSED', 'FAILED', 'INTERRUPTED'].includes(job.status);
+    resumable = ['PAUSED', 'FAILED', 'INTERRUPTED', 'WAITING_USER'].includes(job.status);
   return (
     <div className="job-panel">
       <div className="job-title">
@@ -177,6 +198,41 @@ export function JobPanel({
       )}
       {job.cancelRequested && active(job) && <p className="hint">正在取消…</p>}
       {job.errorMessage && <p className="job-error">{job.errorMessage}</p>}
+      {resumable && job.projectId && (
+        <>
+          <ErrorBox error={recovery.error} />
+          {recovery.data?.record && (
+            <div className="issue">
+              <strong>
+                需要处理：
+                {stageLabels[recovery.data.record.failedStage] || recovery.data.record.failedStage}
+              </strong>
+              <p>{recovery.data.record.message}</p>
+            </div>
+          )}
+          <p className="hint">
+            增加额度后可恢复原任务。修改草稿、创作知识或引用授权后，请新建任务并重新审核。
+          </p>
+          {recovery.data?.reason && <p className="hint">{recovery.data.reason}</p>}
+          {recovery.data?.record?.candidateId && recovery.data.number && onViewCandidate && (
+            <button
+              onClick={() =>
+                onViewCandidate(recovery.data!.number!, recovery.data!.record!.candidateId!)
+              }
+            >
+              查看失败候选
+            </button>
+          )}
+          {onRestart && recovery.data?.canRestart && (
+            <>
+              <p className="hint">
+                重新生成从当前未完成章开始，结束旧任务；旧候选和用量记录保留。原批次不会自动续写。
+              </p>
+              <button onClick={() => void onAction(onRestart)}>按当前输入重新生成</button>
+            </>
+          )}
+        </>
+      )}
       <div className="actions wrap">
         {active(job) ? (
           <>
@@ -203,6 +259,7 @@ export function JobPanel({
         ) : resumable ? (
           <>
             <button
+              disabled={!!job.projectId && !recovery.data?.canResume}
               onClick={() =>
                 void onAction(() =>
                   api(`/jobs/${job.id}/retry`, 'POST', { expectedRevision: job.revision }),

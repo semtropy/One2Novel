@@ -1,3 +1,5 @@
+> 历史归档：仅供定点追溯，不作为当前规范或进度。当前入口见[开发约定](../../AGENTS.md)与[剩余清单](../../REMAINING_WORK.md)。
+
 # P6 参考作品与知识库闭环
 
 日期：2026-09-06。基线：`e790e07`。本次优先交付资料到新小说的可执行闭环，沿用P5章节审核、唯一原子提交和串行执行。没有读取、复制或引入工作区外的旧实现。
@@ -96,16 +98,19 @@ bind(project, versionIds, expectedRevision):
 
 startOpeningOrProduction():
     冻结knowledge={items:[versionId,kind,hash,payload],hash}
-    BATCH子任务继承父任务同一knowledge
+    冻结authorizedQuotes={items:[text,sourceRef],hash}
+    BATCH子任务继承父任务同一knowledge与authorizedQuotes
     knowledge进入开书、滚动规划、正文生成和规划审核
     框架使用须有来源节点到新计划节点的改编映射
     已绑定STYLE用于正文；知识身份不能直接成为新事实实体ID
-    正文匹配参考原文连续80字符且不在计划allowedQuotes中 -> Core FAIL
+    模型返回allowedQuotes无效；仅用户授权且服务端校验来源后的引用进入计划
+    正文匹配参考原文连续80字符且不在授权引用中 -> Core FAIL
     出现STYLE禁用词 -> Core FAIL
     仅既有Evaluation PASS + 唯一事实原子提交才完成章节
 
 retry():
     require 当前绑定hash == 任务冻结knowledge.hash
+    require 当前授权引用hash == 任务冻结authorizedQuotes.hash
     require 原有head/epoch/配置等恢复条件仍成立
 ```
 
@@ -117,6 +122,7 @@ retry():
 - `/references/:id/analyze`：幂等分析任务；`/publish`发布完整分析；`/entity-resolutions`人工解释并派生版本。
 - `/api/v1/knowledge`：列表、创建知识/转换任务；`/:id/versions`候选，`/publish`发布，`/clean`及`/adapt`转换。
 - `/api/v1/projects/:id/knowledge-bindings`：读取、替换固定绑定；资料任务复用Job/SSE/取消/恢复/增额接口。
+- `/api/v1/projects/:id/authorized-quotes`：读取、新增和删除用户授权引用；写入校验revision、绑定知识链、已发布参考分析和精确原文片段。
 - `apps/server/src/reference`：解析、证据、Registry、身份确认。
 - `apps/server/src/knowledge/library.ts`：知识校验、派生及绑定。
 - `apps/server/src/orchestrator/library*.ts`：幂等、执行锁、冻结与分段恢复。
@@ -125,17 +131,17 @@ retry():
 ## 验证和升级
 
 - `pnpm typecheck`：contracts、server、web通过。
-- `pnpm test`：42项通过。原29项生产/状态/模型，新增8项资料闭环、4项导入及1项迁移。
+- `pnpm test`：51项通过。原生产/状态/模型、资料闭环、导入、迁移和可靠性补强测试均通过。
 - `pnpm build`：通过；Vite的两条Zod依赖注释标记警告不影响构建。
 - `pnpm test:e2e`：4项Chrome流程通过，包括TXT上传到知识改编、绑定、两章提交和导出；原MVP重写、多标签草稿冲突及批次暂停/恢复回归通过。390px宽度无横向溢出。
-- 同名两种决定、部分完成恢复、精确证据、超额候选、取消/重启不自动调用、来源伪造、固定绑定和统计防篡改均有集成断言。
+- 同名两种决定、部分完成恢复、精确证据、超额候选、取消/重启不自动调用、来源伪造、固定绑定、统计防篡改、模型伪造引用豁免无效和用户授权引用放行均有集成断言。
 - EPUB校验spine顺序、脚本剥离、实体解码；拒绝目录越界、符号链接、加密资源、外部XML实体、超限上传和膨胀条目。
-- `20260907000000_library`正式迁移增加资料表，重建Job使projectId可空。已存在父子任务、执行锁、调用用量和事件逐项对照保留，外键与完整性检查通过。health schema=3；Story State规则/快照格式仍为1。
+- `20260907000000_library`正式迁移增加资料表，重建Job使projectId可空；`20260908000000_authorized_quotes`正式迁移增加授权引用表。已存在父子任务、执行锁、调用用量和事件逐项对照保留，外键与完整性检查通过。health schema=3；Story State规则/快照格式仍为1。
 - Prompt版本提升至2。旧版本1未完成任务不会自动切换提示词续跑，需要新命令；已提交内容继续可读和回放。
 - 本机现有数据库升级前备份至被Git忽略的`data/backups/pre-p6.db`；升级前后均为1个小说、无活动任务，SQLite完整性正常且无外键错误。生产服务已升级，书架、资料库、模型设置及资料API只读冒烟通过。
 - 手工编辑开书候选、模型生成和正式确认共用知识绑定/身份隔离/改编映射校验；集成测试验证不能删除改编映射后直接确认。
 
-测试使用临时SQLite和测试目录FakeModel，未调用真实ChatAnyWhere。截图在被Git忽略的`test-results/library-adapted.png`。离线通过不能证明实际模型长文理解、身份识别、结构化输出稳定性或文学质量。
+自动化测试使用临时SQLite和测试目录FakeModel；本轮另完成一次真实ChatAnyWhere连通测试。截图在被Git忽略的`test-results/library-adapted.png`。离线通过和连通测试不能证明实际模型长文理解、身份识别、结构化输出稳定性或文学质量。
 
 ## 实施取舍及后续
 

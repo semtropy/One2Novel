@@ -1,6 +1,30 @@
 import { z } from 'zod';
 export const text = z.string().refine((s) => !s.includes('\0'), '文本不能包含 NUL');
 export const id = z.string().uuid();
+export const restartJobRequestSchema = z.strictObject({
+  expectedRevision: z.number().int().nonnegative(),
+  projectRevision: z.number().int().nonnegative(),
+  mode: z.enum(['GENERATE', 'AUDIT_DRAFT']),
+  draftRevision: z.number().int().nonnegative().nullable(),
+});
+export const recoveryRecordSchema = z.strictObject({
+  failedStage: z.string(),
+  code: z.string(),
+  message: z.string(),
+  candidateId: id.nullable(),
+  adjustableInputs: z.array(z.enum(['BUDGET', 'DRAFT', 'KNOWLEDGE', 'AUTHORIZED_QUOTES'])),
+});
+export const jobRecoverySchema = z.strictObject({
+  jobId: id,
+  leafId: id,
+  number: z.number().int().positive().nullable(),
+  record: recoveryRecordSchema.nullable(),
+  canResume: z.boolean(),
+  canRestart: z.boolean(),
+  needsBudget: z.boolean(),
+  reason: z.string().nullable(),
+});
+export type JobRecovery = z.infer<typeof jobRecoverySchema>;
 export const json = z.json();
 export const obj = z.record(z.string(), json);
 export const refSchema = z.strictObject({ kind: z.enum(['INITIAL', 'CONTENT']), id });
@@ -260,6 +284,8 @@ export const arcSchema = z.strictObject({
   turn: text,
   resolutionTarget: text,
 });
+export const quoteSourceRefSchema = z.strictObject({ kind: text, id, versionId: id });
+export const allowedQuoteSchema = z.strictObject({ text, sourceRef: quoteSourceRefSchema });
 export const chapterPlanSchema = z.strictObject({
   ...commonPlan,
   level: z.literal('CHAPTER'),
@@ -285,10 +311,21 @@ export const chapterPlanSchema = z.strictObject({
     }),
   ),
   targetLength: z.number().int().min(500).max(10000),
-  allowedQuotes: z.array(
-    z.strictObject({ text, sourceRef: z.strictObject({ kind: text, id, versionId: id }) }),
-  ),
+  allowedQuotes: z.array(allowedQuoteSchema),
 });
+export const quoteAuthorizationInputSchema = z.strictObject({
+  expectedRevision: z.number().int().nonnegative(),
+  text: text.min(80).max(2000),
+  sourceRef: quoteSourceRefSchema,
+});
+export const authorizedQuoteSchema = z.strictObject({
+  id,
+  projectId: id,
+  text: text.min(80).max(2000),
+  sourceRef: quoteSourceRefSchema,
+  createdAt: text,
+});
+export type AuthorizedQuote = z.infer<typeof authorizedQuoteSchema>;
 export const openingSchema = z.strictObject({
   adaptationMap: z
     .array(
@@ -311,6 +348,13 @@ export const rollingSchema = z.strictObject({
   arc: arcSchema,
   chapters: z.array(chapterPlanSchema).min(1).max(5),
 });
+export const planPayloadSchema = z.discriminatedUnion('level', [
+  bookSchema,
+  volumeSchema,
+  arcSchema,
+  chapterPlanSchema,
+]);
+export type PlanPayload = z.infer<typeof planPayloadSchema>;
 export const planningValidationSchema = z.strictObject({
   violations: z.array(z.strictObject({ constraintId: text, reason: text, evidence: text })),
   uncertain: z.array(text),
@@ -434,6 +478,7 @@ export const stageLabels: Record<string, string> = {
   SUCCEEDED: '已完成',
   FAILED: '执行失败',
   INTERRUPTED: '运行中断',
+  WAITING_USER: '等待处理',
   CANCELLED: '已取消',
 };
 export const writeRequestSchema = z

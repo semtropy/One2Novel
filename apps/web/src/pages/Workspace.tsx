@@ -5,6 +5,7 @@ import { ArrowLeft, Download, BookOpen, Check } from 'lucide-react';
 import { api, active, type Project } from '../api';
 import { Shell, Modal, ErrorBox, Loading } from '../components/ui';
 import { OpeningPanel } from '../features/OpeningPanel';
+import { PlanManager } from '../features/PlanManager';
 import { KnowledgeBindings } from '../features/KnowledgeBindings';
 import { ChapterEditor } from '../features/ChapterEditor';
 import { PlanView, EvaluationView, StateView, JobPanel } from '../features/Inspector';
@@ -21,8 +22,12 @@ export function Workspace() {
     [busy, setBusy] = useState(false),
     [batchOpen, setBatchOpen] = useState(false),
     [bindingsOpen, setBindingsOpen] = useState(false),
+    [plansOpen, setPlansOpen] = useState(false),
     [batchCount, setBatchCount] = useState(2),
     [rewrite, setRewrite] = useState<unknown>(null);
+  const [recoveryCandidate, setRecoveryCandidate] = useState<{ number: number; id: string } | null>(
+    null,
+  );
   const qc = useQueryClient();
   const p = q.data,
     command = p?.jobs.find(active) || p?.jobs[0],
@@ -82,6 +87,22 @@ export function Workspace() {
           .flatMap((j) => [j, ...(j.children || [])])
           .some((j) => j.number === number && j.id === a.jobId),
     );
+  const writeCurrent = async (mode: { mode: string; draftRevision: number | null }) => {
+    setSelected(next);
+    const restarting =
+      command &&
+      ['CHAPTER', 'BATCH'].includes(command.kind) &&
+      ['PAUSED', 'FAILED', 'INTERRUPTED', 'WAITING_USER'].includes(command.status);
+    await api(
+      restarting ? `/jobs/${command.id}/restart` : `/projects/${p.id}/write`,
+      'POST',
+      restarting
+        ? { expectedRevision: command.revision, projectRevision: p.revision, ...mode }
+        : { expectedRevision: p.revision, ...mode },
+      true,
+    );
+    setRecoveryCandidate(null);
+  };
   return (
     <Shell>
       <div className="workspace-top">
@@ -96,6 +117,11 @@ export function Workspace() {
           </span>
         </div>
         <div className="actions">
+          {p.headSnapshotId && (
+            <button disabled={busy || isActive} onClick={() => setPlansOpen(true)}>
+              计划管理
+            </button>
+          )}
           <button disabled={busy || isActive} onClick={() => setBindingsOpen(true)}>
             创作知识
           </button>
@@ -117,6 +143,14 @@ export function Workspace() {
         </div>
       </div>
       <div className="workspace">
+        {plansOpen && (
+          <PlanManager
+            project={p}
+            busy={busy || isActive}
+            onAction={run}
+            onClose={() => setPlansOpen(false)}
+          />
+        )}
         <aside className="chapters">
           <div className="rail-title">
             章节目录<span>{p.targetCount} 章目标</span>
@@ -157,21 +191,12 @@ export function Workspace() {
               project={p}
               number={number}
               job={job}
+              initialVersionId={
+                recoveryCandidate?.number === number ? recoveryCandidate.id : undefined
+              }
               onAction={run}
               busy={busy || isActive}
-              onWrite={async (mode) => {
-                setSelected(next);
-                await api(
-                  `/projects/${p.id}/write`,
-                  'POST',
-                  {
-                    expectedRevision: p.revision,
-                    mode: mode.mode,
-                    draftRevision: mode.draftRevision,
-                  },
-                  true,
-                );
-              }}
+              onWrite={writeCurrent}
               onRewrite={async () => {
                 const preview = await api(
                   `/projects/${p.id}/rewrite-preview?fromChapter=${number}`,
@@ -213,7 +238,15 @@ export function Workspace() {
           ) : (
             <StateView project={p} />
           )}
-          <JobPanel job={command} onAction={run} />
+          <JobPanel
+            job={command}
+            onAction={run}
+            onViewCandidate={(number, contentId) => {
+              setSelected(number);
+              setRecoveryCandidate({ number, id: contentId });
+            }}
+            onRestart={() => writeCurrent({ mode: 'GENERATE', draftRevision: null })}
+          />
         </aside>
       </div>
       {batchOpen && (

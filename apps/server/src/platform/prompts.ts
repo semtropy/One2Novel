@@ -22,7 +22,7 @@ export const prompts = {
   'planning.rolling': {
     role: 'planner',
     instructions:
-      '根据固定全书方向、当前State和已有父计划规划当前卷/Arc及未来章节。应用knowledge中的框架叙事功能、已改编素材和对应层级Template.defaults/guidance；用户明确要求优先于模板默认值，知识不能覆盖故事事实。卷最多30章，Arc最多10章；chapters必须恰好覆盖输入requestedRange，不能跳章。所有章节目标长度使用输入targetLength。计划前提使用可验证State字段，basedOnSnapshotId固定当前base；未来新人物不可伪造为既有角色，可以在expectedEvents描述新人物出场，让正文抽取创建。castIds/locationIds只能引用State既有实体。父计划ID必须正确；本次生成的卷/Arc/章的内部父ID使用各自payload.id。硬事实或前提冲突需调整未来计划，不能改写已确认Book。',
+      '根据固定全书方向、当前State和已有父计划规划当前卷/Arc及未来章节。若提供existingVolume或existingArc，必须逐字段沿用这些已启用父计划，只补缺失下级；卷内全部arcDirections连续覆盖卷范围。应用knowledge中的框架叙事功能、已改编素材和对应层级Template.defaults/guidance；用户明确要求优先于模板默认值，知识不能覆盖故事事实。卷最多30章，Arc最多10章；chapters必须恰好覆盖输入requestedRange，不能跳章。所有章节目标长度使用输入targetLength。计划前提使用可验证State字段，basedOnSnapshotId固定当前base；未来新人物不可伪造为既有角色，可以在expectedEvents描述新人物出场，让正文抽取创建。castIds/locationIds只能引用State既有实体。父计划ID必须正确；本次生成的卷/Arc/章的内部父ID使用各自payload.id。硬事实或前提冲突需调整未来计划，不能改写已确认Book。',
   },
   'planning.validate': {
     role: 'reviewer',
@@ -62,4 +62,4 @@ export const prompts = {
   'connection.test': { role: 'planner', instructions: '仅回答 OK。此请求用于用户显式连通测试。' },
 } as const;
 export type PromptId = keyof typeof prompts;
-export const promptVersion = '2';
+export const promptVersion = '3';

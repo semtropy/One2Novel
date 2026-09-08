@@ -13,6 +13,7 @@ export function ChapterEditor({
   onAction,
   onWrite,
   onRewrite,
+  initialVersionId,
 }: {
   project: Project;
   number: number;
@@ -21,6 +22,7 @@ export function ChapterEditor({
   onAction: (fn: () => Promise<unknown>) => Promise<void>;
   onWrite: (x: { mode: string; draftRevision: number | null }) => Promise<void>;
   onRewrite: () => Promise<void>;
+  initialVersionId?: string;
 }) {
   const q = useQuery({
     queryKey: ['chapter', p.id, number],
@@ -35,6 +37,9 @@ export function ChapterEditor({
     [status, setStatus] = useState(''),
     [history, setHistory] = useState(false),
     [selectedVersion, setSelectedVersion] = useState<string | null>(null);
+  useEffect(() => {
+    if (initialVersionId) setSelectedVersion(initialVersionId);
+  }, [initialVersionId]);
   const revision = useRef(0),
     saveLock = useRef(false),
     latest = useRef('');
@@ -235,12 +240,12 @@ export function ChapterEditor({
           </button>
         </div>
       )}
-      {!committed && !busy && job?.number === number && job.generationText && (
+      {!committed && !busy && (version || (job?.number === number && job.generationText)) && (
         <button
           className="text-link"
           onClick={() => {
             setSelectedVersion(null);
-            const t = job.generationText;
+            const t = version?.text || job!.generationText;
             latest.current = t;
             setDraft(t);
             sessionStorage.setItem(
@@ -259,7 +264,7 @@ export function ChapterEditor({
             );
           }}
         >
-          载入上次生成的正文到草稿
+          {version ? '载入此候选到草稿' : '载入上次生成的正文到草稿'}
         </button>
       )}
       <EditorContent editor={editor} />

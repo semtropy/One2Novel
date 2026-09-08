@@ -336,7 +336,7 @@ export async function validateKnowledgeSources(
       );
     }
 }
-export async function referenceTexts(db: DB, knowledge: KnowledgeContext) {
+export async function referenceTextSources(db: DB, knowledge: KnowledgeContext) {
   const ids = new Set<string>();
   for (const item of knowledge.items) {
     if (item.kind === 'FRAMEWORK') ids.add(item.payload.sourceModelVersionId);
@@ -354,7 +354,10 @@ export async function referenceTexts(db: DB, knowledge: KnowledgeContext) {
     }
   }
   const sources = await Promise.all([...ids].map((id) => publishedModel(db, id)));
-  return sources.map((s) => s.source.text);
+  return sources.map((s) => ({ text: s.source.text, textVersionId: s.source.textId }));
+}
+export async function referenceTexts(db: DB, knowledge: KnowledgeContext) {
+  return (await referenceTextSources(db, knowledge)).map((s) => s.text);
 }
 export type KnowledgeContext = {
   items: { versionId: string; kind: KnowledgeKind; hash: string; payload: any }[];
@@ -449,6 +452,7 @@ export async function bindKnowledge(
       'INVALID_BINDINGS',
       '绑定重复或超过数量限制',
     );
+    const previousKnowledge = await resolveKnowledge(tx, projectId);
     await tx.knowledgeBinding.deleteMany({ where: { projectId } });
     for (const versionId of versionIds)
       await tx.knowledgeBinding.create({ data: { id: uuid(), projectId, versionId } });
@@ -462,6 +466,26 @@ export async function bindKnowledge(
       'KNOWLEDGE_CONFLICT',
       '必需要求与知识禁用词冲突',
     );
+    if (previousKnowledge.hash !== context.hash) {
+      await tx.planVersion.updateMany({
+        where: {
+          projectId,
+          level: 'BOOK',
+          rangeEnd: { gt: p.headChapter },
+          status: { in: ['ACTIVE', 'NEEDS_REVIEW'] },
+        },
+        data: { status: 'NEEDS_REVIEW' },
+      });
+      await tx.planVersion.updateMany({
+        where: {
+          projectId,
+          level: { not: 'BOOK' },
+          rangeEnd: { gt: p.headChapter },
+          status: { in: ['ACTIVE', 'NEEDS_REVIEW'] },
+        },
+        data: { status: 'STALE' },
+      });
+    }
     await tx.project.update({ where: { id: projectId }, data: { revision: { increment: 1 } } });
     return context;
   });

@@ -12,6 +12,7 @@ import {
   openingSchema,
   projectInputSchema,
   writeRequestSchema,
+  restartJobRequestSchema,
   id,
   text,
 } from '@one2novel/contracts';
@@ -19,10 +20,19 @@ import { artifact, getArtifact, workspaceRoot, type DB } from './platform/db.js'
 import { asJson, AppError, hash, normalize, requireThat, uuid } from './platform/core.js';
 import { getConfig, saveConfig } from './orchestrator/config.js';
 import { Orchestrator } from './orchestrator/service.js';
+import { jobRecovery } from './orchestrator/recovery.js';
 import { evaluators } from './evaluation/service.js';
 import { skillDefinitions } from './knowledge/service.js';
 import { validateOpening } from './story-state/service.js';
 import type { ModelGateway } from './platform/llm.js';
+import { authorizeQuote, resolveAuthorizedQuotes } from './planning/quotes.js';
+import {
+  listPlans,
+  savePlanCandidates,
+  getActivationCandidates,
+  ensureBookPlan,
+} from './planning/versions.js';
+import { planPayloadSchema, type Opening } from '@one2novel/contracts';
 export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
   const app = express(),
     sessions = new Map<string, number>(),
@@ -96,14 +106,29 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
         where: {
           projectId: p.id,
           kind: {
-            in: ['OPENING', 'PLAN', 'ROLLING', 'EVALUATION', 'STATE_VALIDATION', 'PLAN_REVIEW'],
+            in: [
+              'OPENING',
+              'OPENING_CONFIRMATION',
+              'PLAN',
+              'ROLLING',
+              'EVALUATION',
+              'STATE_VALIDATION',
+              'PLAN_REVIEW',
+            ],
           },
         },
         orderBy: { createdAt: 'desc' },
         take: 40,
       }),
     ]);
-    send(res, { ...p, chapters, jobs, artifacts });
+    if (p.openingId && !artifacts.some((a) => a.id === p.openingId)) {
+      const activeOpening = await db.artifact.findUnique({ where: { id: p.openingId } });
+      if (activeOpening?.projectId === p.id) artifacts.push(activeOpening);
+    }
+    const book = await db.planVersion.findFirst({
+      where: { projectId: p.id, level: 'BOOK', status: 'ACTIVE' },
+    });
+    send(res, { ...p, chapters, jobs, artifacts, activeBook: book?.payload || null });
   });
   app.post('/api/v1/projects/:id/opening-plans', async (req, res) => {
     const body = z.strictObject({ expectedRevision: revision }).parse(req.body);
@@ -113,31 +138,60 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
       202,
     );
   });
+  app.get('/api/v1/projects/:id/plans', async (req, res) => {
+    const projectId = id.parse(req.params.id);
+    const p = await db.project.findUniqueOrThrow({ where: { id: projectId } });
+    if (p.openingId && !(await db.planVersion.count({ where: { projectId } }))) {
+      const opening = await getArtifact<Opening>(db, p.openingId, projectId);
+      await db.$transaction(async (tx) =>
+        ensureBookPlan(tx, p, opening, (await resolveKnowledge(tx, projectId)).hash),
+      );
+    }
+    send(res, { versions: await listPlans(db, projectId), expectedRevision: p.revision });
+  });
+  app.post('/api/v1/projects/:id/plan-versions', async (req, res) => {
+    const b = z
+      .strictObject({ expectedRevision: revision, payload: planPayloadSchema })
+      .parse(req.body);
+    send(
+      res,
+      await savePlanCandidates(db, id.parse(req.params.id), b.expectedRevision, [b.payload]),
+      201,
+    );
+  });
+  app.put('/api/v1/projects/:id/plan-siblings', async (req, res) => {
+    const b = z
+      .strictObject({
+        expectedRevision: revision,
+        payloads: z.array(planPayloadSchema).min(1).max(3000),
+      })
+      .parse(req.body);
+    send(
+      res,
+      await savePlanCandidates(db, id.parse(req.params.id), b.expectedRevision, b.payloads, {
+        siblings: true,
+      }),
+      201,
+    );
+  });
+  app.post('/api/v1/projects/:id/plans/:versionId/activate', async (req, res) => {
+    const b = z.strictObject({ expectedRevision: revision }).parse(req.body),
+      projectId = id.parse(req.params.id);
+    const versions = await getActivationCandidates(db, projectId, id.parse(req.params.versionId));
+    send(
+      res,
+      await engine.startJob(projectId, 'PLAN_ACTIVATE', b.expectedRevision, key(req), {
+        versionIds: versions.map((v) => v.id),
+      }),
+      202,
+    );
+  });
   app.post('/api/v1/projects/:id/opening-candidates', async (req, res) => {
     const b = z
         .strictObject({ expectedRevision: revision, payload: openingSchema })
         .parse(req.body),
       projectId = id.parse(req.params.id);
-    validateOpening(b.payload, projectId);
-    const result = await db.$transaction(async (tx) => {
-      const p = await tx.project.findUniqueOrThrow({ where: { id: projectId } });
-      requireThat(
-        !p.headSnapshotId && p.revision === b.expectedRevision,
-        'REVISION_CONFLICT',
-        '开书状态已改变',
-        409,
-      );
-      requireThat(
-        !(await tx.activeCommand.findUnique({ where: { projectId } })),
-        'PROJECT_BUSY',
-        '请等待当前任务结束',
-        409,
-      );
-      validateOpeningKnowledge(b.payload, await resolveKnowledge(tx, projectId));
-      const a = await artifact(tx, projectId, 'OPENING', b.payload);
-      await tx.project.update({ where: { id: projectId }, data: { revision: { increment: 1 } } });
-      return a;
-    });
+    const result = await engine.saveOpeningCandidate(projectId, b.expectedRevision, b.payload);
     send(res, result, 201);
   });
   app.post('/api/v1/projects/:id/opening-confirmations', async (req, res) => {
@@ -234,6 +288,38 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
     );
     send(res, s);
   });
+  app.get('/api/v1/projects/:id/authorized-quotes', async (req, res) =>
+    send(res, await resolveAuthorizedQuotes(db, id.parse(req.params.id))),
+  );
+  app.post('/api/v1/projects/:id/authorized-quotes', async (req, res) =>
+    send(res, await authorizeQuote(db, id.parse(req.params.id), req.body), 201),
+  );
+  app.delete('/api/v1/projects/:id/authorized-quotes/:quoteId', async (req, res) => {
+    const projectId = id.parse(req.params.id),
+      quoteId = id.parse(req.params.quoteId),
+      b = z.strictObject({ expectedRevision: revision }).parse(req.body);
+    const result = await db.$transaction(async (tx) => {
+      const p = await tx.project.findUniqueOrThrow({ where: { id: projectId } });
+      requireThat(
+        p.revision === b.expectedRevision,
+        'REVISION_CONFLICT',
+        '小说已更新，请刷新',
+        409,
+      );
+      requireThat(
+        !(await tx.activeCommand.findUnique({ where: { projectId } })),
+        'PROJECT_BUSY',
+        '请等待当前任务结束',
+        409,
+      );
+      const row = await tx.authorizedQuote.findUnique({ where: { id: quoteId } });
+      requireThat(row && row.projectId === projectId, 'NOT_FOUND', '引用授权不存在', 404);
+      await tx.authorizedQuote.delete({ where: { id: quoteId } });
+      await tx.project.update({ where: { id: projectId }, data: { revision: { increment: 1 } } });
+      return { ok: true };
+    });
+    send(res, result);
+  });
   app.get('/api/v1/projects/:id/rewrite-preview', async (req, res) => {
     const p = await db.project.findUniqueOrThrow({ where: { id: id.parse(req.params.id) } }),
       n = z.coerce.number().int().positive().parse(req.query.fromChapter);
@@ -308,6 +394,39 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
         where: { projectId, number: { gte: b.fromChapter } },
         data: { activeContentId: null, status: 'STALE', revision: { increment: 1 } },
       });
+      const retainedSnapshots = [base.id];
+      let ancestor = base;
+      while (ancestor.parentId) {
+        ancestor = await tx.snapshot.findUniqueOrThrow({ where: { id: ancestor.parentId } });
+        retainedSnapshots.push(ancestor.id);
+      }
+      await tx.planVersion.updateMany({
+        where: {
+          projectId,
+          level: { not: 'BOOK' },
+          rangeEnd: { gte: b.fromChapter },
+          status: { in: ['ACTIVE', 'NEEDS_REVIEW'] },
+        },
+        data: { status: 'STALE' },
+      });
+      await tx.planVersion.updateMany({
+        where: {
+          projectId,
+          level: 'BOOK',
+          baseSnapshotId: { notIn: retainedSnapshots },
+          status: { in: ['ACTIVE', 'NEEDS_REVIEW'] },
+        },
+        data: { status: 'NEEDS_REVIEW' },
+      });
+      await tx.planVersion.updateMany({
+        where: {
+          projectId,
+          baseSnapshotId: { in: retainedSnapshots },
+          status: { in: ['ACTIVE', 'NEEDS_REVIEW'] },
+          OR: [{ level: 'BOOK' }, { rangeEnd: { lt: b.fromChapter } }],
+        },
+        data: { chainEpoch: p.chainEpoch + 1 },
+      });
       const result = await tx.project.update({
         where: { id: projectId },
         data: {
@@ -365,6 +484,27 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
       202,
     );
   });
+  app.get('/api/v1/jobs/:id/recovery', async (req, res) =>
+    send(res, await jobRecovery(db, id.parse(req.params.id))),
+  );
+  app.post('/api/v1/jobs/:id/restart', async (req, res) => {
+    const jobId = id.parse(req.params.id),
+      b = restartJobRequestSchema.parse(req.body);
+    const old = await db.job.findUnique({ where: { id: jobId } });
+    requireThat(old?.projectId, 'NOT_FOUND', '小说任务不存在', 404);
+    send(
+      res,
+      await engine.startJob(
+        old.projectId,
+        'CHAPTER',
+        b.projectRevision,
+        key(req),
+        { mode: b.mode, draftRevision: b.draftRevision },
+        { id: jobId, revision: b.expectedRevision },
+      ),
+      202,
+    );
+  });
   app.post('/api/v1/jobs/:id/cancel', async (req, res) =>
     send(res, await engine.cancel(id.parse(req.params.id))),
   );
@@ -392,14 +532,15 @@ export function createApp(db: DB, engine: Orchestrator, gateway: ModelGateway) {
       if (j.parentId) {
         const parent = await tx.job.findUniqueOrThrow({ where: { id: j.parentId } });
         requireThat(
-          ['PAUSED', 'INTERRUPTED', 'FAILED'].includes(parent.status),
+          ['PAUSED', 'INTERRUPTED', 'FAILED', 'WAITING_USER'].includes(parent.status),
           'INVALID_JOB_STATE',
           '请先停止所属批次',
           409,
         );
       }
       requireThat(
-        j.revision === b.expectedRevision && ['FAILED', 'PAUSED', 'INTERRUPTED'].includes(j.status),
+        j.revision === b.expectedRevision &&
+          ['FAILED', 'PAUSED', 'INTERRUPTED', 'WAITING_USER'].includes(j.status),
         'REVISION_CONFLICT',
         '请在任务停止时调整额度',
         409,

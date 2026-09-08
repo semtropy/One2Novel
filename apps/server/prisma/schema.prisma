@@ -15,6 +15,7 @@ model Project {
   status String @default("DRAFT")
   revision Int @default(0)
   chainEpoch Int @default(0)
+  planRevision Int @default(0)
   headChapter Int @default(0)
   headSnapshotId String?
   openingId String?
@@ -26,6 +27,8 @@ model Project {
   jobs Job[]
   command ActiveCommand?
   knowledgeBindings KnowledgeBinding[]
+  authorizedQuotes AuthorizedQuote[]
+  plans PlanVersion[]
 }
 model Chapter {
   id String @id
@@ -305,4 +308,38 @@ model KnowledgeBinding {
   versionId String
   version KnowledgeVersion @relation(fields:[versionId],references:[id])
   @@unique([projectId,versionId])
+}
+model AuthorizedQuote {
+  id String @id
+  projectId String
+  project Project @relation(fields:[projectId],references:[id])
+  text String
+  sourceKind String
+  sourceId String
+  sourceVersionId String
+  createdAt DateTime @default(now())
+  @@unique([projectId,text,sourceVersionId])
+  @@index([projectId,createdAt])
+}
+
+model PlanVersion {
+  id String @id
+  projectId String
+  project Project @relation(fields:[projectId],references:[id])
+  level String
+  parentVersionId String?
+  supersedesVersionId String?
+  rangeStart Int
+  rangeEnd Int
+  payload Json
+  hash String
+  baseSnapshotId String
+  knowledgeHash String
+  chainEpoch Int
+  status String
+  validationId String?
+  groupId String?
+  createdAt DateTime @default(now())
+  @@index([projectId,level,status])
+  @@index([parentVersionId])
 }

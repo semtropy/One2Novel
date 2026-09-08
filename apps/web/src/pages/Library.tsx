@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { WritingKnowledgeForm, prepareWritingKnowledge } from '../features/WritingKnowledgeForm';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Job } from '../api';
 import { Shell, Modal, ErrorBox } from '../components/ui';
@@ -38,6 +40,7 @@ export function Library() {
       id: string;
     } | null>(null),
     [importing, setImporting] = useState(false),
+    [creating, setCreating] = useState<'STYLE' | 'TEMPLATE' | null>(null),
     [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false);
   const qc = useQueryClient(),
@@ -67,32 +70,10 @@ export function Library() {
             <p className="muted">从作品中理解结构，把素材改编成自己的故事。</p>
           </div>
           <div className="actions">
-            <button
-              onClick={() =>
-                void run(async () => {
-                  const v = await api<Item>('/knowledge', 'POST', {
-                    kind: 'STYLE',
-                    title: '我的文字风格',
-                    payload: defaultStyle,
-                  });
-                  setSelection({ kind: 'knowledge', id: v.id });
-                })
-              }
-            >
+            <button disabled={busy} onClick={() => setCreating('STYLE')}>
               新建风格
             </button>
-            <button
-              onClick={() =>
-                void run(async () => {
-                  const v = await api<Item>('/knowledge', 'POST', {
-                    kind: 'TEMPLATE',
-                    title: '我的章节模板',
-                    payload: { target: 'CHAPTER', schemaId: 'CHAPTER', defaults: {}, guidance: [] },
-                  });
-                  setSelection({ kind: 'knowledge', id: v.id });
-                })
-              }
-            >
+            <button disabled={busy} onClick={() => setCreating('TEMPLATE')}>
               新建模板
             </button>
             <button className="primary" onClick={() => setImporting(true)}>
@@ -157,6 +138,25 @@ export function Library() {
           </section>
         </div>
       </main>
+      {creating && (
+        <CreateWritingKnowledge
+          kind={creating}
+          busy={busy}
+          error={error}
+          onClose={() => setCreating(null)}
+          onCreate={(title, payload) =>
+            run(async () => {
+              const item = await api<Item>('/knowledge', 'POST', {
+                kind: creating,
+                title,
+                payload,
+              });
+              setSelection({ kind: 'knowledge', id: item.id });
+              setCreating(null);
+            })
+          }
+        />
+      )}
       {importing && (
         <ImportDialog
           busy={busy}
@@ -178,6 +178,103 @@ export function Library() {
         />
       )}
     </Shell>
+  );
+}
+function CreateWritingKnowledge({
+  kind,
+  busy,
+  error,
+  onClose,
+  onCreate,
+}: {
+  kind: 'STYLE' | 'TEMPLATE';
+  busy: boolean;
+  error: unknown;
+  onClose: () => void;
+  onCreate: (title: string, payload: unknown) => Promise<void>;
+}) {
+  const [title, setTitle] = useState('');
+  const [value, setValue] = useState<any>(
+    kind === 'STYLE'
+      ? structuredClone(defaultStyle)
+      : { target: 'CHAPTER', schemaId: 'CHAPTER', defaults: {}, guidance: [] },
+  );
+  const [localError, setLocalError] = useState<unknown>();
+  return (
+    <Modal title={kind === 'STYLE' ? '新建文字风格' : '新建写作模板'} onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setLocalError(undefined);
+          try {
+            void onCreate(title.trim(), prepareWritingKnowledge(kind, value));
+          } catch (e) {
+            setLocalError(e);
+          }
+        }}
+      >
+        <label>
+          {kind === 'STYLE' ? '风格名称' : '模板名称'}
+          <input
+            required
+            maxLength={100}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={kind === 'STYLE' ? '例如：克制的悬疑叙述' : '例如：线索推进章'}
+          />
+        </label>
+        <WritingKnowledgeForm kind={kind} value={value} onChange={setValue} disabled={busy} />
+        <ErrorBox error={localError || error} />
+        <button className="primary" disabled={busy || !title.trim()} type="submit">
+          {kind === 'STYLE' ? '保存文字风格' : '保存写作模板'}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+function KnowledgeSummary({ kind, payload }: { kind: string; payload: any }) {
+  if (kind === 'ASSET_PACK')
+    return (
+      <div className="knowledge-cards">
+        {payload.assets.map((asset: any) => (
+          <article key={asset.id}>
+            <h3>{asset.name}</h3>
+            <p>{asset.description}</p>
+            {asset.evidence?.map((e: any, i: number) => (
+              <blockquote key={i}>{e.quote}</blockquote>
+            ))}
+          </article>
+        ))}
+      </div>
+    );
+  return (
+    <div className="knowledge-cards">
+      {payload.nodes?.map((node: any) => (
+        <article key={node.id}>
+          <h3>
+            {(
+              {
+                SETUP: '铺垫',
+                INCITING: '事件引入',
+                ESCALATION: '冲突升级',
+                REVERSAL: '转折',
+                CLIMAX: '高潮',
+                RESOLUTION: '阶段收束',
+                REVEAL: '揭示',
+                TRANSITION: '过渡',
+              } as Record<string, string>
+            )[node.function] || '剧情节拍'}
+          </h3>
+          <p>{node.sourceSummary}</p>
+          {node.expectedEffects?.map((effect: string, i: number) => (
+            <p className="hint" key={i}>
+              {effect}
+            </p>
+          ))}
+          {node.guidance && <p>{String(node.guidance)}</p>}
+        </article>
+      ))}
+    </div>
   );
 }
 function ImportDialog({
@@ -521,7 +618,9 @@ function KnowledgeDetail({
   });
   const [selected, setSelected] = useState<string | null>(null),
     [draft, setDraft] = useState<string | null>(null),
-    [brief, setBrief] = useState('');
+    [brief, setBrief] = useState(''),
+    [formDraft, setFormDraft] = useState<any>(null),
+    [editRevision, setEditRevision] = useState<number | null>(null);
   const item = q.data;
   if (!item) return <ErrorBox error={q.error} />;
   const v = item.versions.find((v) => v.id === selected) || item.versions[0],
@@ -541,6 +640,8 @@ function KnowledgeDetail({
               onChange={(e) => {
                 setSelected(e.target.value);
                 setDraft(null);
+                setFormDraft(null);
+                setEditRevision(null);
               }}
             >
               {item.versions.map((v) => (
@@ -556,33 +657,58 @@ function KnowledgeDetail({
               {names[v.payload.stage]} · {v.payload.assets.length} 份素材
             </p>
           )}
-          <textarea
-            className="knowledge-editor"
-            aria-label="知识内容"
-            rows={18}
-            value={draft ?? JSON.stringify(v.payload, null, 2)}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <p className="hint">编辑保存为新候选版本；不会覆盖已经绑定到小说的版本。</p>
+          {item.kind === 'STYLE' || item.kind === 'TEMPLATE' ? (
+            <WritingKnowledgeForm
+              kind={item.kind}
+              value={formDraft ?? v.payload}
+              disabled={busy || running}
+              onChange={(value) => {
+                setFormDraft(value);
+                setEditRevision((old) => old ?? item.revision);
+              }}
+            />
+          ) : (
+            <>
+              <KnowledgeSummary kind={item.kind} payload={v.payload} />
+              <details>
+                <summary>高级：编辑结构化内容</summary>
+                <textarea
+                  className="knowledge-editor"
+                  aria-label="知识内容"
+                  rows={18}
+                  value={draft ?? JSON.stringify(v.payload, null, 2)}
+                  onChange={(e) => setDraft(e.target.value)}
+                />
+              </details>
+            </>
+          )}
+          <p className="hint">
+            发布后即可用于小说。已经在写作的小说保持原设置，需要重新选择才会使用这次修改。
+          </p>
           <div className="actions wrap">
             <button
-              disabled={busy || running || draft === null}
+              disabled={busy || running || (draft === null && formDraft === null)}
               onClick={() =>
                 void run(async () => {
                   const created = await api<Version>(`/knowledge/${id}/versions`, 'POST', {
-                    payload: JSON.parse(draft!),
-                    expectedRevision: item.revision,
+                    payload:
+                      formDraft !== null
+                        ? prepareWritingKnowledge(item.kind, formDraft)
+                        : JSON.parse(draft!),
+                    expectedRevision: editRevision ?? item.revision,
                   });
                   setSelected(created.id);
                   setDraft(null);
+                  setFormDraft(null);
+                  setEditRevision(null);
                 })
               }
             >
-              保存新版本
+              保存修改
             </button>
             <button
               className="primary"
-              disabled={busy || running || !!v.publishedAt || draft !== null}
+              disabled={busy || running || !!v.publishedAt || draft !== null || formDraft !== null}
               onClick={() =>
                 void run(() =>
                   api(`/knowledge/${id}/publish`, 'POST', {
@@ -594,6 +720,11 @@ function KnowledgeDetail({
             >
               发布知识版本
             </button>
+            {v.publishedAt && (item.kind !== 'ASSET_PACK' || v.payload.stage === 'ADAPTED') && (
+              <Link className="button" to={`/?knowledge=${v.id}`}>
+                用它开始新小说
+              </Link>
+            )}
             {v.payload.stage === 'RAW' && (
               <button
                 disabled={busy || running || !v.publishedAt}

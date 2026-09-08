@@ -20,6 +20,14 @@ it('P5已存在的父子任务、用量、锁与事件在P6迁移后完整保留
     db.exec(
       readFileSync('apps/server/prisma/migrations/20260907000000_library/migration.sql', 'utf8'),
     );
+    db.exec(
+      readFileSync(
+        'apps/server/prisma/migrations/20260908000000_authorized_quotes/migration.sql',
+        'utf8',
+      ),
+    );
+    db.exec(readFileSync('apps/server/prisma/migrations/20260909000000_plan_versions/migration.sql', 'utf8'));
+    expect(db.prepare('SELECT planRevision FROM Project WHERE id=?').get('project')).toEqual({ planRevision: 0 });
     expect(db.prepare('SELECT * FROM Job ORDER BY id').all()).toEqual(before);
     expect(db.pragma('foreign_key_check')).toEqual([]);
     expect(db.pragma('integrity_check')).toEqual([{ integrity_check: 'ok' }]);
@@ -30,6 +38,9 @@ it('P5已存在的父子任务、用量、锁与事件在P6迁移后完整保留
       INSERT INTO LibraryCommand (scope,jobId) VALUES ('reference:example','library');`);
     expect(db.prepare('SELECT projectId FROM Job WHERE id=?').get('library')).toEqual({
       projectId: null,
+    });
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get('AuthorizedQuote')).toEqual({
+      name: 'AuthorizedQuote',
     });
   } finally {
     db.close();

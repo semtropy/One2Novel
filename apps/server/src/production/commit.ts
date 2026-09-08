@@ -1,5 +1,6 @@
+import { checkStateValidation } from '../story-state/validation.js';
 import type { Job } from '@prisma/client';
-import { stateValidationSchema, type EvaluatorResult, type Extraction } from '@one2novel/contracts';
+import type { EvaluatorResult, Extraction } from '@one2novel/contracts';
 import type { DB } from '../platform/db.js';
 import { pack } from '../story-state/snapshot.js';
 import { validatePolicy, gate } from '../evaluation/service.js';
@@ -37,6 +38,53 @@ export async function commitChapter(
     const parent = latest.parentId
       ? await tx.job.findUniqueOrThrow({ where: { id: latest.parentId } })
       : null;
+    const frozenPlanRevision = (j.input as { planRevision?: number }).planRevision;
+    requireThat(
+      frozenPlanRevision === undefined
+        ? p.planRevision === 0
+        : frozenPlanRevision === p.planRevision,
+      'COMMIT_CONFLICT',
+      '计划版本已改变，不能提交旧计划的正文',
+      409,
+    );
+    const planBinding = await tx.artifact.findFirst({
+      where: { jobId: j.id, kind: 'PLAN_BINDING' },
+      orderBy: { createdAt: 'desc' },
+    });
+    requireThat(
+      planBinding &&
+        planBinding.projectId === p.id &&
+        planBinding.baseSnapshotId === p.headSnapshotId &&
+        planBinding.hash === hash(planBinding.payload),
+      'COMMIT_CONFLICT',
+      '缺少有效的章节计划版本绑定',
+      409,
+    );
+    const bound = planBinding.payload as {
+      planRevision: number;
+      versions: { id: string; hash: string }[];
+    };
+    requireThat(
+      bound.planRevision === p.planRevision &&
+        bound.versions.length === 4 &&
+        new Set(bound.versions.map((v) => v.id)).size === 4,
+      'COMMIT_CONFLICT',
+      '计划绑定不完整',
+      409,
+    );
+    for (const v of bound.versions) {
+      const row = await tx.planVersion.findUnique({ where: { id: v.id } });
+      requireThat(
+        row &&
+          row.projectId === p.id &&
+          row.status === 'ACTIVE' &&
+          row.hash === v.hash &&
+          row.hash === hash(row.payload),
+        'COMMIT_CONFLICT',
+        '计划版本已失效或损坏',
+        409,
+      );
+    }
     requireThat(
       owner?.jobId === (latest.parentId || j.id) &&
         (!parent ||
@@ -68,19 +116,16 @@ export async function commitChapter(
       'STATE_VALIDATION_REQUIRED',
       '缺少状态验证',
     );
-    const checked = stateValidationSchema.parse(validation.payload);
     requireThat(
       hash(validation.payload) === validation.hash &&
-        !checked.missingChanges.length &&
-        checked.checks.length === x.delta.changes.length &&
-        new Set(checked.checks.map((c) => c.changeIndex)).size === x.delta.changes.length &&
-        checked.checks.every(
-          (c) => c.verdict === 'PASS' && c.changeIndex < x.delta.changes.length,
-        ) &&
-        (x.delta.changes.length > 0 || checked.noStateChange),
+        validation.projectId === projectId &&
+        validation.baseSnapshotId === j.baseSnapshotId,
       'STATE_VALIDATION_REQUIRED',
-      '持久化的状态验证未完整通过',
+      '状态验证来源或哈希不一致',
     );
+    const validationContent = await tx.content.findUniqueOrThrow({ where: { id: contentId } });
+    const checked = checkStateValidation(validation.payload, x, validationContent.text);
+    requireThat(checked.input, 'STATE_VALIDATION_REQUIRED', '新提交必须绑定状态审核输入');
     const storedEvaluation = await tx.artifact.findUniqueOrThrow({ where: { id: evaluationId } }),
       storedContent = await tx.content.findUniqueOrThrow({ where: { id: contentId } }),
       storedChapter = await tx.chapter.findUniqueOrThrow({ where: { id: chapterId } });
